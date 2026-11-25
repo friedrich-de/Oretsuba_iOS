@@ -90,8 +90,7 @@ memory. No shipped record uses it.
 Body scanners: FUN_00456540 (step one unit), FUN_004567f0 (step to next
 stop), FUN_00456a90 (skip n tags / to end), FUN_00433000 (plain-text
 extraction), FUN_00432ce0 (manager's own renderer), FUN_0045a990 (text
-object put-char). Lead bytes are SJIS 0x81–0x9F/0xE0–0xFC everywhere
-(Chinese patch widens to 0x81–0xFE).
+object put-char). Lead bytes are SJIS 0x81–0x9F/0xE0–0xFC everywhere.
 
 | syntax | step code (FUN_00456540) | meaning (as executed by msg window FUN_00409090) | used? |
 |---|---|---|---|
@@ -557,7 +556,7 @@ Func_lib wrapper after each line (`call L+2c3c(0)`): see §10.
 |+0x14/+0x18| escapement/orientation (rotation, 1/10°; 2700 = vertical) | 0 |
 |+0x1c| lfWeight 400 / 700 bold | 400 |
 |+0x20..+0x22| italic/underline/strikeout | 0 |
-|+0x23| lfCharSet = 0x80 SHIFTJIS (Chinese patch hook → 0x86 GB2312) | |
+|+0x23| lfCharSet = 0x80 SHIFTJIS | |
 |+0x26| lfQuality 3 | |
 |+0x28| lfFaceName[32] | |
 |+0x48| AA: 0 GGO_BITMAP, 1 GGO_GRAY4, 2 GGO_GRAY8 | 1 |
@@ -580,8 +579,7 @@ FUN_0044b410 gradient, FUN_0044bb80 edge(density, radius).
 
 ### 9.2 Glyph raster (FUN_0044bc80)  [VERIFIED]
 * code = `(lead<<8)|trail` passed raw to GetGlyphOutlineA (charset picks
-  the code page) → a port must decode cp932 (or GBK for the CHS scripts)
-  to Unicode itself.
+  the code page) → a port must decode cp932 to Unicode itself.
 * GRAY4 levels 0..16 → alpha `min(v*16,255)`; GRAY8 0..64 → `min(v*4,255)`;
   fallback if GGO_GRAY fails: GGO_BITMAP at 4×/8× + box filter.
 * glyph = {ox = gmptGlyphOrigin.x, oy = tmAscent − gmptGlyphOrigin.y,
@@ -626,15 +624,6 @@ dest alpha kept. drawOver (used by text objects): ARGB "over":
   "cf_bold"/"cf_edge" strings exist in the EXE; these are the equivalents.)
 * Default look: 22 px MS Gothic, GRAY4 AA, white, soft black edge r=2,
   no gradient, window bg mode 1 colour 0 alpha 140.
-
-### 9.5 Chinese patch impact
-CreateFont*/EnumFontFamiliesExA forced to GB2312; GetGlyphOutlineA hook
-remaps 9 SJIS title glyphs; ~100 lead-byte upper bounds 0x9f/0xfc → 0xfe
-(its EXE is a different build: addresses +0x10 in 0x44a..0x45x, +0x20 in
-0x41d..0x43e; e.g. our put-char/kinsoku code, the message renderer
-0x432d7e/0x432dab, font measure/draw). With GBK text all bytes 0x81..0xFE
-are lead bytes; the kinsoku tables stay SJIS (so CJK punctuation kinsoku
-silently stops working for GBK text — GUESS from the unchanged tables).
 
 ---------------------------------------------------------------------------
 
@@ -816,11 +805,8 @@ table (FUN at ore_tuba.c ~11530) and config1 "reset".
    frame rate of the task loop (one glyph per tick upper bound).
 5. Ruby (`vtbl+0x114`, ruby font +0x2c) and `<"str">`, `@nnn` gaiji, `[`
    blocks, `%` interpolation, record type≠0 are implemented but unused by
-   the Japanese scripts; check the Chinese scripts (SCRIPT_CHS) for any
-   use before dropping them.
-6. Chinese build: kinsoku tables are SJIS byte pairs; with GBK text they
-   match wrong characters (or none). Decide on Unicode kinsoku in the port.
-7. tmAscent of MS Gothic 22 px and whether GDI used embedded bitmaps
+   the Japanese scripts.
+6. tmAscent of MS Gothic 22 px and whether GDI used embedded bitmaps
    (affects pixel-exact baseline/edge look).
 8. Who sets G[905]/G[906]/G[908] on load / back-to-choice (probably native
    save restore), and the N_1f8/N_1fc "LAG" object format (logo only).

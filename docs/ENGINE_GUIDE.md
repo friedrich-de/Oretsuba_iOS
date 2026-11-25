@@ -30,7 +30,7 @@ The engine is a C++17 reimplementation of the Lucifen engine used by
 * `gfx/transition.h` transition interface used by `Surface`.
 * `audio/` mixer + sound manager; `input/` DIK-based input; `media/` movies.
 * `text/` fonts + message system; `ui/` controls. `platform/` host services
-  (`Platform`: CoreText glyphs, SJIS/GBK → Unicode, time, dialogs).
+  (`Platform`: CoreText glyphs, SJIS → Unicode, time, dialogs).
 
 ## Natives
 Register in your area's `register_*_natives(Engine &e)` with the pattern used
@@ -42,8 +42,7 @@ auto def = [&e](int idx, const char *name, std::function<int32_t(Args &)> fn) {
 def(0x1b1, "set_opacity", [](Args &a) { ... });
 ```
 Argument k = k-th pushed word (args[0] first push). Strings are in the game
-encoding (`e.encoding`: Shift-JIS, or GBK for the Chinese patch, lead bytes
-0x81–0xFE). Handles of other subsystems: `e.image_of(h)` (image or page
+encoding (`e.encoding`: Shift-JIS). Handles of other subsystems: `e.image_of(h)` (image or page
 pixels), `e.surface_of(h)`, `layer_of(h)` (gfx/natives_gfx.cpp), `Object::as<T>`.
 
 ## Build and test
@@ -52,15 +51,14 @@ make -C engine BUILD=../build/host-<yourname> -j8
 ../build/host-<yourname>/orehost --data data/SET_UP --frames 900 --shot 300,600 --out /tmp/<dir>
 ```
 `orehost --input FILE` feeds scripted clicks/keys (see engine/host/main.mm).
-The Chinese patch: `--patch 中文三号补丁 --chs`. Game data must never be
-committed. Keep to the existing code style (tabs, 120 columns, brief
+Game data must never be committed. Keep to the existing code style (tabs, 120 columns, brief
 comments, names like the surrounding code).
 
 
 ## Movie regression and device diagnostics
 
 `make -C engine tests` also builds `build/host/movie_flow`. Run it with the
-player-owned SET_UP and Chinese patch folders. It runs both original MoviePlay
+player-owned SET_UP folder. It runs both original MoviePlay
 scripts to natural completion, checks that frames were rendered and the script
 returns, and uses disposable saves. Its 60 Hz host mixes 735 audio samples per
 frame at 44100 Hz.

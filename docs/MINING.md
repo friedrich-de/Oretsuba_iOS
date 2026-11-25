@@ -10,7 +10,7 @@ Nothing is sent unless a file named `mining.txt` lies in the game folder.
 
 1. Open your mining server's page, go to its settings, and under "The game" press **Download mining.txt**.
 2. Put the file into the game folder, next to `SCRIPT.LPK`. One of the two folders above it works as well.
-   * **iPhone / iPad**: in the Files app, move `mining.txt` to "On My iPhone" › 我们没有翅膀 (or into the
+   * **iPhone / iPad**: in the Files app, move `mining.txt` to "On My iPhone" › Oretsuba (or into the
      `SET_UP` folder inside it). With a cable, Finder's "Files" tab of the device does the same.
    * **Mac**: put it into the game directory you chose in the launcher.
 3. Open the app. The launcher says where the lines go and whether the server takes the key:
@@ -29,7 +29,7 @@ key = the-api-key
 | --- | --- |
 | `server` | The address of the mining server. Needed. |
 | `key` | The server's API key. Needed. |
-| `game` | The title the server shows and puts on cards. Without it: 俺たちに翼はない, or 我们没有翅膀 when the Chinese patch is played. |
+| `game` | The title the server shows and puts on cards. Without it: 俺たちに翼はない. |
 | `voice` | `no` sends lines without their voice. |
 | `screenshot` | `no` sends lines without a screenshot. |
 
@@ -70,7 +70,7 @@ The launcher's line under the game files says what is wrong:
 | ... could not be reached | The address is wrong, the server is down, or the device has no connection to it. |
 | ... does not take the key in mining.txt | The key was changed on the server: download the file again. |
 
-Press 重新检查 in the launcher to ask again.
+Press Check again in the launcher to ask again.
 
 ## For developers
 
