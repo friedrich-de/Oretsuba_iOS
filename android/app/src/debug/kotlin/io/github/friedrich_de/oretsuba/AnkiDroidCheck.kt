@@ -16,6 +16,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import java.io.File
 import org.json.JSONArray
@@ -75,10 +76,14 @@ class AnkiDroidCheck : Instrumentation() {
         if (!status.optBoolean("allowed")) {
             // The system's question needs a screen; a check grants itself what the player would.
             note("not allowed yet: granting " + AnkiDroid.PERMISSION)
-            try {
-                uiAutomation.grantRuntimePermission(context.packageName, AnkiDroid.PERMISSION)
-            } catch (e: Throwable) {
-                note("granting failed: $e")
+            if (Build.VERSION.SDK_INT >= 28) {
+                try {
+                    uiAutomation.grantRuntimePermission(context.packageName, AnkiDroid.PERMISSION)
+                } catch (e: Throwable) {
+                    note("granting failed: $e")
+                }
+            } else {
+                note("grant it by hand: adb shell pm grant ${context.packageName} ${AnkiDroid.PERMISSION}")
             }
             status = ask(context, "status")
         }
@@ -141,7 +146,7 @@ class AnkiDroidCheck : Instrumentation() {
         check(fields.startsWith("$word\u001fto eat"), "the fields of text arrive as they are")
         check(Regex("<img src=\"oretsuba_${stamp}[^\"]*\\.jpe?g\">").containsMatchIn(fields), "the picture is in its field as an image")
         for (ending in listOf("ogg", "m4a", "mp3")) {
-            val stored = Regex("\\[sound:(oretsuba_${stamp}[^]]*)]").findAll(fields).map { it.groupValues[1] }.toList()
+            val stored = Regex("\\[sound:(oretsuba_${stamp}[^\\]]*)\\]").findAll(fields).map { it.groupValues[1] }.toList()
             check(stored.any { it.endsWith(".$ending") }, "the .$ending sound is in its field and keeps its ending (stored: $stored)")
         }
         check(tags.split(' ').filter { it.isNotEmpty() }.toSet() == setOf("oretsuba-check", "two_words"),

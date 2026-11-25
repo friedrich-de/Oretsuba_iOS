@@ -79,6 +79,12 @@ void ore_app_opened_with(const char *link);
 #if DEBUG
 /* Device smoke test; the host must supply an isolated temporary save directory. */
 int ore_debug_start_movie(OreEngine *engine, int index);
+/* Device smoke test of the cards for AnkiMobile, against the stand-in of
+   tools/apple/ankimobile-standin (run.sh there says how it is run): asks for the
+   lists and hands three cards over, and writes what happened, a line at a
+   time, to the file `report`; the last line begins with "done". `folder` is a
+   scratch folder. Returns at once. */
+void ore_debug_ankimobile_check(const char *folder, const char *report);
 #endif
 
 #ifdef __cplusplus
