@@ -60,9 +60,13 @@ are hidden: swipe in from the edge of the screen to see them.
 | History (text log) | Swipe down | Wheel up |
 | Scroll the other way | Swipe up | Wheel down |
 | Skip | Hold a finger down, for as long as it should skip | Hold Ctrl (or Shift, a setting of the game) |
+| End a film early | Back, or tap with two fingers | Escape |
 
-A mouse and a keyboard work as on the PC. Game controllers work too: A confirms, B opens the menu, the right trigger
-skips, up and down on the D-pad scroll.
+A mouse and a keyboard work as on the PC. Game controllers work too: A confirms, B opens the menu (and ends a film),
+the right trigger skips, up and down on the D-pad scroll.
+
+On the PC only Escape ends one of the game's films early. A phone has no such key, so while a film plays Back, the
+tap with two fingers and a controller's B send Escape in place of the right button.
 
 Back does not close the game, because the original uses the right button for its menu. Leave the game through its
 own menu, which leads back to the launcher, or with the Home gesture.

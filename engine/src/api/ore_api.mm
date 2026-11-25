@@ -99,6 +99,10 @@ void ore_game_command(OreEngine *e, int command) {
 	e->engine->game_command(command);
 }
 
+int ore_movie_playing(OreEngine *e) {
+	return e->engine->movie ? 1 : 0;
+}
+
 int ore_audio_rate(void) {
 	return ore::AudioMixer::kOutputRate;
 }
