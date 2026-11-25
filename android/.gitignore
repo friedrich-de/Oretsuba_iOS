@@ -1,0 +1,9 @@
+# Build products and this machine's settings
+.gradle/
+.kotlin/
+build/
+app/.cxx/
+local.properties
+# Signing keys never belong in the repository
+*.jks
+*.keystore

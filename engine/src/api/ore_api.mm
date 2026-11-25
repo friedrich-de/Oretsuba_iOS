@@ -1,4 +1,6 @@
-// C interface of the engine for the Swift app.
+// C interface of the engine for the apps: Swift on Apple devices, Kotlin
+// (through JNI) on Android. The file is Objective-C++ by its name only; the
+// Android build compiles it as C++.
 #include "api/ore_api.h"
 
 #include <cstring>
@@ -8,12 +10,26 @@
 #include "core/engine.h"
 #include "mining/anki_app.h"
 #include "mining/mining.h"
-#include "platform/apple/apple_http.h"
-#include "platform/apple/apple_platform.h"
 #include "util/log.h"
 
+// The platform of the app this is built into, and its HTTP for mining.
+#if defined(__ANDROID__)
+#include "android_platform.h"  // android/app/src/main/cpp
+namespace {
+using HostPlatform = ore::AndroidPlatform;
+ore::HttpSend host_http_sender() { return ore::android_http_sender(); }
+}  // namespace
+#else
+#include "platform/apple/apple_http.h"
+#include "platform/apple/apple_platform.h"
+namespace {
+using HostPlatform = ore::ApplePlatform;
+ore::HttpSend host_http_sender() { return ore::apple_http_sender(); }
+}  // namespace
+#endif
+
 struct OreEngine {
-	std::unique_ptr<ore::ApplePlatform> platform;
+	std::unique_ptr<HostPlatform> platform;
 	std::unique_ptr<ore::Engine> engine;
 	std::string error;
 };
@@ -22,7 +38,7 @@ extern "C" {
 
 OreEngine *ore_create(const OreConfig *config, char *err, int err_len) {
 	auto e = std::make_unique<OreEngine>();
-	e->platform = std::make_unique<ore::ApplePlatform>(config->save_dir ? config->save_dir : "");
+	e->platform = std::make_unique<HostPlatform>(config->save_dir ? config->save_dir : "");
 	ore::EngineConfig cfg;
 	cfg.data_dir = config->data_dir ? config->data_dir : "";
 	cfg.autosave_lines = config->autosave_lines;
@@ -117,7 +133,7 @@ int ore_mining_check(const char *data_dir, char *text, int text_len) {
 	ore::MiningSettings settings;
 	std::string message;
 	int result = ore::load_mining_settings(data_dir ? data_dir : "", settings, message);
-	if (result > 0) result = ore::mining_check(settings, ore::apple_http_sender(), message) ? 1 : -1;
+	if (result > 0) result = ore::mining_check(settings, host_http_sender(), message) ? 1 : -1;
 	if (text && text_len > 0) {
 		strncpy(text, message.c_str(), size_t(text_len) - 1);
 		text[text_len - 1] = 0;

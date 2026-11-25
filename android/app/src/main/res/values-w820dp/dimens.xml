@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- On a wide screen the launcher's column stays a width that is good to read. -->
+    <dimen name="column_width">760dp</dimen>
+</resources>
