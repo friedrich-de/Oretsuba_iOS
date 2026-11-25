@@ -12,6 +12,7 @@
 //   <frame> wheel D           +120 up / -120 down
 //   <frame> key VK [down|up]  (no state = press and release)
 //   <frame> command N        native toolbar command (0 quick save, 1 quick load, ...)
+//   <frame> pause N           the app goes to the background for N frames
 //   <frame> shot NAME
 //   <frame> quit
 // Times are logical frames (60 per second); the clock advances 16.67 ms per
@@ -29,6 +30,7 @@
 #include <vector>
 
 #include "core/engine.h"
+#include "mining/mining_tap.h"
 #include "platform/apple/apple_platform.h"
 #include "stb_image_write.h"
 #include "util/log.h"
@@ -172,6 +174,13 @@ int main(int argc, char **argv) {
 				}
 			} else if (c.op == "keyup") {
 				engine.input.on_key(c.a, false);
+			} else if (c.op == "pause") {
+				engine.set_paused(true);
+				Cmd r;
+				r.op = "resume";
+				releases.emplace(f + (c.a > 0 ? c.a : 60), r);
+			} else if (c.op == "resume") {
+				engine.set_paused(false);
 			} else if (c.op == "shot") {
 				write_png(engine.framebuffer(), out + "/" + c.s + ".png");
 			} else if (c.op == "quit") {
@@ -186,6 +195,8 @@ int main(int argc, char **argv) {
 		if (!go) break;
 		int r = engine.frame(platform.clock);
 		engine.mixer.mix(audio.data(), 735);
+		// The host's clock runs ahead of the real one: let a mining server keep up.
+		if (engine.mining && engine.mining->queue().stats().pending >= 8) engine.mining->queue().flush(30000);
 		if (shots.count(f) || (shot_every && f % shot_every == 0)) {
 			char name[64];
 			snprintf(name, sizeof name, "/f%05d.png", f);
@@ -197,6 +208,12 @@ int main(int argc, char **argv) {
 		}
 	}
 	write_png(engine.framebuffer(), out + "/last.png");
+	if (engine.mining) {
+		engine.mining->queue().flush(30000);
+		ore::MiningQueue::Stats mined = engine.mining->queue().stats();
+		fprintf(stderr, "mining: %d lines sent, %d dropped, %d left, last answer %d%s\n", mined.sent, mined.dropped,
+		        mined.pending, mined.last_status, mined.refused ? ", key refused" : "");
+	}
 	const ore::ScriptBlob *s = engine.vm.current_script();
 	fprintf(stderr, "ran %d frames, script %s at %s, steps %llu\n", f, s ? s->name.c_str() : "-",
 	        engine.vm.where(engine.vm.pc()).c_str(), (unsigned long long)engine.vm.steps());

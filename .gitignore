@@ -9,6 +9,7 @@ extract/
 *.elg
 *.mpg
 # Credentials and private notes
+mining.txt
 Claude.md
 CLAUDE.md
 .env

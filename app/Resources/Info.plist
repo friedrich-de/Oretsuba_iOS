@@ -76,5 +76,12 @@
 	</array>
 	<key>UIPreferredDefaultInterfaceOrientation</key>
 	<string>UIInterfaceOrientationLandscapeRight</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Sends the lines you read to the mining server named in mining.txt, when that server is in your own network.</string>
 </dict>
 </plist>

@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "mining/mining.h"
 #include "util/text.h"
 
 namespace ore {
@@ -49,6 +50,10 @@ public:
 	virtual int poll_text_input(std::string &utf8_result) { (void)utf8_result; return 0; }
 	// Encodes UTF-8 to the game's encoding (for typed text).
 	virtual std::string from_utf8(const std::string &utf8, TextEncoding enc) { (void)enc; return utf8; }
+
+	// HTTP for the mining tap (mining/mining.h); an empty function when the host has none.
+	// The function is called from a thread of the tap's and must work without this object.
+	virtual HttpSend http_sender() { return nullptr; }
 };
 
 }  // namespace ore

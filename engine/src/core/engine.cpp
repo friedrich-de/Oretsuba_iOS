@@ -5,6 +5,7 @@
 
 #include "gfx/blend.h"
 #include "gfx/transition.h"
+#include "mining/mining_tap.h"
 #include "text/font.h"
 #include "text/text_system.h"
 #include "ui/ui_system.h"
@@ -131,6 +132,7 @@ bool Engine::boot(std::string *err) {
 	sound.set_category_default_volume(1, int(opt32(0xe9c)));
 	rng_state = uint32_t(platform.now_ms()) | 1;
 	if (!vm.start("MAIN", err)) return false;
+	mining = MiningTap::open(*this);
 	booted_ = true;
 	return true;
 }
@@ -138,6 +140,7 @@ bool Engine::boot(std::string *err) {
 void Engine::set_paused(bool p) {
 	paused_ = p;
 	sound.set_paused(p);
+	if (p && mining) mining->leaving();
 	if (p) {
 		write_gamedata();
 		write_textlog();
@@ -175,6 +178,7 @@ int Engine::frame(int64_t t) {
 		if (i == 0) input.clear_edges();
 	}
 	render_frame();
+	if (mining) mining->frame_drawn();
 	return quit_requested ? 1 : 0;
 }
 

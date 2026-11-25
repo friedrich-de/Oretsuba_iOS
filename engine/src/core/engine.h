@@ -26,6 +26,7 @@ namespace ore {
 class TextSystem;
 class UiSystem;
 class Font;
+class MiningTap;
 
 struct EngineConfig {
 	std::string data_dir;
@@ -156,6 +157,8 @@ public:
 	// Native toolbar action; history also closes its own screen.
 	void game_command(int command);
 	std::unique_ptr<ChsExtras> chs;
+	// Sends the lines the player reads to a mining server; null without a mining.txt (docs/MINING.md).
+	std::unique_ptr<MiningTap> mining;
 
 private:
 	void register_natives();

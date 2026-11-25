@@ -6,6 +6,8 @@
 #include <string>
 
 #include "core/engine.h"
+#include "mining/mining.h"
+#include "platform/apple/apple_http.h"
 #include "platform/apple/apple_platform.h"
 #include "util/log.h"
 
@@ -109,6 +111,18 @@ void ore_answer_text_input(OreEngine *e, int ok, const char *utf8) {
 
 void ore_set_paused(OreEngine *e, int paused) {
 	e->engine->set_paused(paused != 0);
+}
+
+int ore_mining_check(const char *data_dir, char *text, int text_len) {
+	ore::MiningSettings settings;
+	std::string message;
+	int result = ore::load_mining_settings(data_dir ? data_dir : "", settings, message);
+	if (result > 0) result = ore::mining_check(settings, ore::apple_http_sender(), message) ? 1 : -1;
+	if (text && text_len > 0) {
+		strncpy(text, message.c_str(), size_t(text_len) - 1);
+		text[text_len - 1] = 0;
+	}
+	return result;
 }
 
 #if DEBUG
