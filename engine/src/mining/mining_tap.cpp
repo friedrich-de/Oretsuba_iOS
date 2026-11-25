@@ -47,6 +47,7 @@ LineGate::Record MiningTap::record() const {
 void MiningTap::line_shown(MessageWindow &window) {
 	window_ = &window;
 	gate_.shown(record(), engine_.now);
+	log_debug("mining: line %d shown at %lld ms%s", window.mm.line, (long long)engine_.now, gate_.armed() ? "" : ", sent before");
 }
 
 void MiningTap::window_gone(MessageWindow &window) {
@@ -94,6 +95,8 @@ void MiningTap::send() {
 		for (int y = 0; y < line.height; ++y)
 			memcpy(&line.pixels[size_t(y) * size_t(line.width)], frame.row32(y), size_t(line.width) * 4);
 	}
+	log_debug("mining: line %d sent at %lld ms, voice %s (%zu bytes), screen %dx%d", mm.line, (long long)engine_.now,
+	          line.voice.empty() ? "-" : line.voice.c_str(), line.audio.size(), line.width, line.height);
 	queue_.push(std::move(line));
 }
 

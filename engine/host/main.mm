@@ -12,6 +12,7 @@
 //   <frame> wheel D           +120 up / -120 down
 //   <frame> key VK [down|up]  (no state = press and release)
 //   <frame> command N        native toolbar command (0 quick save, 1 quick load, ...)
+//   <frame> pause N           the app goes to the background for N frames
 //   <frame> shot NAME
 //   <frame> quit
 // Times are logical frames (60 per second); the clock advances 16.67 ms per
@@ -173,6 +174,13 @@ int main(int argc, char **argv) {
 				}
 			} else if (c.op == "keyup") {
 				engine.input.on_key(c.a, false);
+			} else if (c.op == "pause") {
+				engine.set_paused(true);
+				Cmd r;
+				r.op = "resume";
+				releases.emplace(f + (c.a > 0 ? c.a : 60), r);
+			} else if (c.op == "resume") {
+				engine.set_paused(false);
 			} else if (c.op == "shot") {
 				write_png(engine.framebuffer(), out + "/" + c.s + ".png");
 			} else if (c.op == "quit") {

@@ -48,6 +48,8 @@ asks once for access to the local network.
   are not sent.
 * Switching to another app in the middle of a line sends that line at once, since the next thing you do is most
   likely to look up a word of it. The app asks iOS for the time to finish sending before it is put to sleep.
+  The text is the whole line; the screenshot shows the screen as it was, so a line you leave while it is
+  still appearing has only its first words in the picture.
 * The text goes without the engine's tags and line breaks. The voice is the game's own Ogg file, as it is. The
   screenshot is the 800x600 screen at that moment, with the text box, as a JPEG of about 100 KB.
 * The history screen sends nothing. A line shown again after a menu or a load is not sent twice.
@@ -96,4 +98,16 @@ cd engine && c++ -std=c++17 -Isrc -Ithird_party tests/mining_test.cpp src/mining
 ```
 
 The test host mines too: with a `mining.txt` in the folder given to `orehost --data`, every line its scripted
-input reads goes to the server, and the run ends by saying how many arrived.
+input reads goes to the server, and the run ends by saying how many arrived. `--debug` prints each line the
+ADV loop begins and each line that is sent, with the game's clock, and the input command `pause N` puts the
+app into the background for N frames. `engine/tests/inputs/mining_read.input` reads the opening of the
+Japanese original that way:
+
+```sh
+build/host/orehost --data SET_UP --save /tmp/ore-save --frames 31970 --debug \
+    --input engine/tests/inputs/mining_read.input 2>&1 | grep mining:
+```
+
+Of the 634 lines it runs through, the 61 that are read at a normal pace are sent, 28 of them with a voice. The
+lines clicked away after 0.2 seconds and the lines the skip key runs over are not. Line 11 of the first script
+goes out 0.5 seconds after it began, when the app is paused.
