@@ -1,13 +1,16 @@
 // One dictionary in one SQLite file of its own, so that removing it is
 // removing the file and an import that fails leaves nothing behind. Words are
-// found by how they are written and how they are read; their definitions are
-// kept compressed.
+// found by how they are written and how they are read. Their definitions are
+// kept in blocks, many definitions compressed together: that is several times
+// smaller and far quicker to write than each on its own, and a lookup unpacks
+// only the few blocks it reads from.
 #pragma once
 
 #include "dict/kit_config.h"
 #if ORE_MINING_KIT
 
 #include <cstdint>
+#include <list>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -73,12 +76,38 @@ struct TagRow {
 };
 
 // The schema; a file with another one is read as no dictionary.
-inline constexpr int kSchemaVersion = 1;
+inline constexpr int kSchemaVersion = 2;
 
-// Keeps a definition: as it is when short, else deflated after its length.
-std::string pack_glossary(std::string_view utf8);
-// Reads back what pack_glossary kept. False when it is damaged.
-bool unpack_glossary(const void *data, size_t size, std::string &out);
+// Definitions are gathered until a block is about this long.
+inline constexpr size_t kBlockBytes = 32 * 1024;
+
+// Keeps a block of definitions: as it is when short, else deflated after its length.
+std::string pack_block(std::string_view utf8);
+// Reads back what pack_block kept. False when it is damaged.
+bool unpack_block(const void *data, size_t size, std::string &out);
+
+// The words of one bank, ready to be written: their definitions are in blocks
+// already packed, so that several banks can be made ready at once.
+struct TermBatch {
+	struct Row {
+		std::string expression, reading, definition_tags, rules, term_tags;
+		int64_t score = 0, sequence = 0;
+		uint32_t block = 0, start = 0, length = 0;  // where its definitions are, among the blocks of this batch
+	};
+	std::vector<Row> rows;
+	std::vector<std::string> blocks;
+
+	// Adds a word. A definition that is the one of the word before it is kept once.
+	void add(Row row, std::string_view glossary);
+	// Packs what is left. Nothing is added after it.
+	void finish();
+
+private:
+	void pack();
+	std::string open_;  // the block being gathered
+	bool has_last_ = false;
+	uint32_t last_start_ = 0, last_length_ = 0;
+};
 
 // Writes a new dictionary file. Nothing is in it for anyone else until finish() has run.
 // Every function throws DictError when the file cannot be written.
@@ -90,9 +119,8 @@ public:
 	DictionaryWriter(const DictionaryWriter &) = delete;
 	DictionaryWriter &operator=(const DictionaryWriter &) = delete;
 
-	void add_term(const std::string &expression, const std::string &reading, const std::string &definition_tags,
-	              const std::string &rules, int64_t score, std::string_view glossary, int64_t sequence,
-	              const std::string &term_tags);
+	// Writes the words of a finished batch.
+	void add_terms(const TermBatch &batch);
 	void add_meta(const std::string &expression, const std::string &mode, std::string_view data);
 	void add_tag(const TagRow &tag);  // a later one of the same name wins
 	void add_media(const std::string &path, const std::string &data);
@@ -103,7 +131,8 @@ private:
 	void run(const char *sql);
 	void step(sqlite3_stmt *statement);
 	sqlite3 *db_ = nullptr;
-	sqlite3_stmt *term_ = nullptr, *meta_ = nullptr, *tag_ = nullptr, *media_ = nullptr;
+	sqlite3_stmt *term_ = nullptr, *block_ = nullptr, *meta_ = nullptr, *tag_ = nullptr, *media_ = nullptr;
+	int64_t blocks_ = 0;
 };
 
 // Reads one dictionary file. Its calls may come from several threads.
@@ -140,6 +169,9 @@ private:
 	std::string styles_;
 	sqlite3 *db_ = nullptr;
 	std::mutex gate_;
+	// The blocks read last, unpacked, the newest first.
+	std::list<std::pair<int64_t, std::string>> blocks_;
+	const std::string *block(int64_t id);
 	bool tags_read_ = false;
 	std::unordered_map<std::string, TagRow> tags_;
 	bool retired_ = false;

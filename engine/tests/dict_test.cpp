@@ -34,6 +34,8 @@
 #include "util/json.h"
 #include "util/utf8.h"
 
+#include "zip_writer.h"
+
 using namespace ore;
 using namespace ore::dict;
 
@@ -247,60 +249,7 @@ void test_deinflector(const std::string &root) {
 std::string scratch;  // a folder of the test's own
 int made = 0;
 
-void put16(std::string &out, uint32_t v) {
-	out += char(v);
-	out += char(v >> 8);
-}
-void put32(std::string &out, uint32_t v) {
-	put16(out, v);
-	put16(out, v >> 16);
-}
-
-// Writes a zip: every other file deflated, the rest stored.
-void write_zip(const std::string &path, const std::vector<std::pair<std::string, std::string>> &files) {
-	std::string out, directory;
-	int n = 0;
-	for (const auto &file : files) {
-		const std::string &name = file.first, &data = file.second;
-		uint32_t crc = uint32_t(crc32(0, reinterpret_cast<const Bytef *>(data.data()), uInt(data.size())));
-		std::string packed = data;
-		int method = 0;
-		if (n++ % 2 == 0 && !data.empty()) {
-			z_stream z{};
-			deflateInit2(&z, 6, Z_DEFLATED, -MAX_WBITS, 8, Z_DEFAULT_STRATEGY);
-			packed.assign(deflateBound(&z, uLong(data.size())), '\0');
-			z.next_in = reinterpret_cast<Bytef *>(const_cast<char *>(data.data()));
-			z.avail_in = uInt(data.size());
-			z.next_out = reinterpret_cast<Bytef *>(packed.data());
-			z.avail_out = uInt(packed.size());
-			deflate(&z, Z_FINISH);
-			packed.resize(z.total_out);
-			deflateEnd(&z);
-			method = 8;
-		}
-		uint32_t offset = uint32_t(out.size());
-		put32(out, 0x04034b50);
-		put16(out, 20), put16(out, 0x800), put16(out, uint32_t(method)), put16(out, 0), put16(out, 0);
-		put32(out, crc), put32(out, uint32_t(packed.size())), put32(out, uint32_t(data.size()));
-		put16(out, uint32_t(name.size())), put16(out, 0);
-		out += name;
-		out += packed;
-		put32(directory, 0x02014b50);
-		put16(directory, 20), put16(directory, 20), put16(directory, 0x800), put16(directory, uint32_t(method)), put16(directory, 0),
-		    put16(directory, 0);
-		put32(directory, crc), put32(directory, uint32_t(packed.size())), put32(directory, uint32_t(data.size()));
-		put16(directory, uint32_t(name.size())), put16(directory, 0), put16(directory, 0), put16(directory, 0), put16(directory, 0);
-		put32(directory, 0), put32(directory, offset);
-		directory += name;
-	}
-	uint32_t at = uint32_t(out.size());
-	out += directory;
-	put32(out, 0x06054b50);
-	put16(out, 0), put16(out, 0), put16(out, uint32_t(files.size())), put16(out, uint32_t(files.size()));
-	put32(out, uint32_t(directory.size())), put32(out, at), put16(out, 0);
-	std::ofstream f(path, std::ios::binary | std::ios::trunc);
-	f.write(out.data(), std::streamsize(out.size()));
-}
+using testing_zip::write_zip;
 
 // A format 3 term row.
 std::string term(const std::string &expression, const std::string &reading, const std::string &definition_tags, const std::string &rules,
@@ -416,19 +365,77 @@ void test_import() {
 	// A word without a reading is read as it is written.
 	auto rice = reader->find_terms({"ごはん"});
 	check(rice.size() == 1 && rice[0].reading == "ごはん", "a word without a reading is read as written");
-	if (rice.size() == 1) check_eq(reader->glossaries({rice[0].id})[rice[0].id], R"(["rice","meal"])", "a definition is kept without its blanks");
+	if (rice.size() == 1) check_eq(reader->glossaries({rice[0].id})[rice[0].id], R"(["rice", "meal"])", "a definition is kept as the bank writes it");
 	check(reader->find_metas({"食べる"}).size() == 3, "a word's frequencies and pitches are found");
 	std::string picture;
 	check(reader->media("pictures/bowl.png", picture) && picture == std::string("\x89PNG", 4), "a picture is kept");
 	check(!reader->media("notes.txt", picture), "a file that is no picture is left out");
 
 	std::string long_text = kStructured, short_text = R"(["food"])";
-	std::string packed_long = pack_glossary(long_text), packed_short = pack_glossary(short_text), back;
+	std::string packed_long = pack_block(long_text), packed_short = pack_block(short_text), back;
 	check(packed_long.size() < long_text.size() / 2, "long definitions are kept compressed");
 	check(packed_short.size() == short_text.size() + 1, "short ones as they are");
-	check(unpack_glossary(packed_long.data(), packed_long.size(), back) && back == long_text, "a compressed definition unpacks");
-	check(unpack_glossary(packed_short.data(), packed_short.size(), back) && back == short_text, "a plain definition unpacks");
-	check(!unpack_glossary("\x02\xff\xff\xff\x7f" "x", 6, back) && !unpack_glossary("\x09", 1, back), "a damaged definition is refused");
+	check(unpack_block(packed_long.data(), packed_long.size(), back) && back == long_text, "a compressed definition unpacks");
+	check(unpack_block(packed_short.data(), packed_short.size(), back) && back == short_text, "a plain definition unpacks");
+	check(!unpack_block("\x02\xff\xff\xff\x7f" "x", 6, back) && !unpack_block("\x09", 1, back), "a damaged definition is refused");
+
+	// Definitions are gathered into blocks; one that repeats the one before it is kept once.
+	TermBatch batch;
+	auto word = [](const std::string &expression) {
+		TermBatch::Row row;
+		row.expression = row.reading = expression;
+		return row;
+	};
+	std::string filler(kBlockBytes / 2 + 100, 'x');
+	batch.add(word("一"), R"(["one"])");
+	batch.add(word("壱"), R"(["one"])");
+	batch.add(word("二"), "[\"" + filler + "\"]");
+	batch.add(word("三"), "[\"" + filler + "\"]");
+	batch.add(word("四"), "[\"" + filler + "y\"]");
+	batch.add(word("五"), R"(["five"])");
+	batch.finish();
+	check(batch.rows.size() == 6 && batch.blocks.size() == 2, "definitions are gathered into blocks of a size");
+	check(batch.rows[0].block == 0 && batch.rows[1].start == batch.rows[0].start && batch.rows[1].length == batch.rows[0].length,
+	      "a definition that repeats is kept once");
+	check(batch.rows[3].start == batch.rows[2].start && batch.rows[4].start > batch.rows[3].start && batch.rows[4].block == 0 &&
+	          batch.rows[5].block == 1 && batch.rows[5].start == 0,
+	      "and a full block is closed before the next definition");
+
+	// Many banks are read at once and written in their order: every word has its own definitions.
+	TestZip many;
+	many.title = "Many banks";
+	std::string padding(3000, 'p');
+	for (int i = 0; i < 120; ++i)
+		many.terms.push_back(term("語" + std::to_string(i), "ご" + std::to_string(i), "", "", i,
+		                          "[\"meaning " + std::to_string(i) + " " + padding + "\"]"));
+	std::string many_path = scratch + "/many.db";
+	DictionaryInfo many_info = import_yomitan(many.write(), many_path, "many", nullptr, kGo);
+	auto many_reader = DictionaryReader::open(many_path);
+	bool in_order = many_reader != nullptr && many_info.terms == 120, all_there = in_order;
+	for (int i = 0; many_reader && i < 120; ++i) {
+		auto found = many_reader->find_terms({"語" + std::to_string(i)});
+		if (found.size() != 1) {
+			all_there = false;
+			continue;
+		}
+		if (found[0].id != i + 1) in_order = false;
+		if (many_reader->glossaries({found[0].id})[found[0].id] != "[\"meaning " + std::to_string(i) + " " + padding + "\"]") all_there = false;
+	}
+	check(in_order, "the words of many banks are written in the order of the banks");
+	check(all_there, "and each has its own definitions");
+	if (many_reader) {
+		std::vector<int64_t> every;
+		for (int i = 1; i <= 120; ++i) every.push_back(i);
+		auto each = many_reader->glossaries(every);
+		bool right = each.size() == 120;
+		for (int i = 0; right && i < 120; ++i) right = each[i + 1].rfind("[\"meaning " + std::to_string(i) + " ", 0) == 0;
+		check(right, "definitions from more blocks than a reader keeps are read");
+	}
+	TestZip cut = many;
+	cut.terms[61] = "[\"語\", \"ご\"";
+	check_eq(refusal(cut, scratch + "/broken.db"), "term_bank_31.json in that dictionary is not a list of rows.",
+	         "a bank that is no list ends the import, however many are read at once");
+	check(!exists(scratch + "/broken.db"), "and leaves no file");
 
 	TestZip old;
 	old.format = 1;
