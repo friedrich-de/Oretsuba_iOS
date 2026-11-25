@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="app_name" translatable="false">Oretsuba</string>
+    <string name="game_title" translatable="false">俺たちに翼はない</string>
+    <string name="subtitle">Oretsuba · a port for Android</string>
+
+    <string name="files_title">Game files</string>
+    <string name="files_found">✓ Game files found</string>
+    <string name="files_missing">No game files found yet</string>
+    <string name="files_missing_note">Bring in the SET_UP folder from the disc of your own copy of the game (the folder with SCRIPT.LPK, PIC.LPK and the other files).</string>
+    <string name="mining_off">Mining is off (optional: bring in the mining.txt of your mining server below)</string>
+
+    <string name="start_game">Start game</string>
+    <string name="continue_game">Continue</string>
+
+    <string name="options_title">Options</string>
+    <string name="keep_place">Auto save and continue</string>
+    <string name="keep_place_note" tools:ignore="PluralsCandidate">Saves without a sound every %1$d lines and when you leave the app, into a slot of its own that the game\'s menus do not show. The game then starts at that line, past the title menu. Your saves and quick saves stay as they are.</string>
+
+    <string name="import_files">Import the game files</string>
+    <string name="manage_files">Manage files</string>
+    <string name="import_by_cable">Option 1: connect this device to a computer with a cable, allow file transfer, and copy the SET_UP folder into %1$s on the device.</string>
+    <string name="import_by_picker">Option 2: have the folder on this device first (in Downloads, on a memory card, on a USB stick), then import it with the button below. The app makes its own copy, so the original can be deleted afterwards.</string>
+    <string name="import_folder">Import a folder…</string>
+    <string name="import_mining">Import mining.txt…</string>
+    <string name="remove_mining">Remove mining.txt</string>
+    <string name="check_again">Check again</string>
+    <string name="import_copying">Copying %1$s…</string>
+    <string name="import_progress">Copying %1$s: %2$s of %3$s. Keep the app open.</string>
+    <string name="import_replace">A folder named %1$s is already in the app. Replace it with the one you chose?</string>
+    <string name="import_failed">Copying failed: %1$s</string>
+    <string name="import_no_game">The folder was copied, but there is no SCRIPT.LPK in it. Choose the game\'s SET_UP folder.</string>
+    <string name="mining_unreadable">The chosen file could not be read.</string>
+    <string name="mining_not_one">The chosen file is not a mining.txt. Download it from your mining server\'s settings.</string>
+    <string name="mining_remove_question">Remove mining.txt? The game then sends no lines until you bring one in again.</string>
+
+    <string name="controls_touch">Controls: tap = left button · tap with two fingers or back = right button (menu) · swipe up or down = wheel (history) · long press = skip.</string>
+    <string name="controls_other">A mouse, a keyboard or a game controller works too, as on the PC.</string>
+
+    <string name="ok">OK</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="cancel">Cancel</string>
+    <string name="replace">Replace</string>
+    <string name="remove">Remove</string>
+    <string name="comment">Comment</string>
+</resources>

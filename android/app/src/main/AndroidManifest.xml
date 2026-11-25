@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Mining only (docs/MINING.md): lines go to the server named in mining.txt. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.gamepad" android:required="false" />
+
+    <!--
+        usesCleartextTraffic: a mining server in the player's own network is reached by plain
+        http (http://192.168.1.20:8733); Android cannot allow that for local addresses alone.
+        allowBackup off, and the rules that say the same to Android 12 and later: the game
+        files are far beyond what Android's backup takes.
+        hasFragileUserData: on uninstalling, Android offers to keep the game files and saves.
+    -->
+    <application
+        android:allowBackup="false"
+        android:appCategory="game"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:enableOnBackInvokedCallback="true"
+        android:fullBackupContent="false"
+        android:hasFragileUserData="true"
+        android:icon="@mipmap/ic_launcher"
+        android:isGame="true"
+        android:label="@string/app_name"
+        android:theme="@style/Launcher"
+        android:usesCleartextTraffic="true"
+        tools:targetApi="33">
+
+        <activity
+            android:name=".LauncherActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- The picture is 4:3: a phone holds it sideways. Where Android 16 lets a large
+             screen turn anyway, the picture is fitted with black bars. -->
+        <activity
+            android:name=".GameActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:exported="false"
+            android:screenOrientation="sensorLandscape"
+            android:theme="@style/Game"
+            tools:ignore="DiscouragedApi" />
+    </application>
+</manifest>
