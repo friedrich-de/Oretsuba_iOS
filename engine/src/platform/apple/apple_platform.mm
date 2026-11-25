@@ -14,15 +14,14 @@
 namespace ore {
 namespace {
 
-CFStringEncoding cf_encoding(TextEncoding enc) {
-	return enc == TextEncoding::Gbk ? kCFStringEncodingGB_18030_2000 : kCFStringEncodingDOSJapanese;
+CFStringEncoding cf_encoding(TextEncoding) {
+	return kCFStringEncodingDOSJapanese;
 }
 
 bool face_is_serif(const std::string &face) {
-	// "ＭＳ 明朝", "MS Mincho", "宋体" ...
+	// "ＭＳ 明朝", "MS Mincho"
 	return face.find("\x96\xbe\x92\xa9") != std::string::npos ||  // 明朝 (cp932)
-	       face.find("Mincho") != std::string::npos || face.find("MINCHO") != std::string::npos ||
-	       face.find("\xcb\xce\xcc\xe5") != std::string::npos;    // 宋体 (gbk)
+	       face.find("Mincho") != std::string::npos || face.find("MINCHO") != std::string::npos;
 }
 
 }  // namespace
@@ -37,7 +36,7 @@ ApplePlatform::~ApplePlatform() {
 
 uint32_t ApplePlatform::decode_char(uint16_t code, TextEncoding enc) {
 	std::lock_guard<std::mutex> lock(mu_);
-	auto &cache = char_cache_[enc == TextEncoding::Gbk];
+	auto &cache = char_cache_;
 	auto it = cache.find(code);
 	if (it != cache.end()) return it->second;
 	uint8_t bytes[2];
@@ -92,14 +91,11 @@ std::string ApplePlatform::from_utf8(const std::string &utf8, TextEncoding enc) 
 const void *ApplePlatform::font_for(const std::string &face, int size, int weight) {
 	bool serif = face_is_serif(face);
 	bool bold = weight >= 600;
-	std::string key = std::to_string(serif) + ":" + std::to_string(bold) + ":" + std::to_string(size) + ":" +
-	                  std::to_string(chinese_fonts_);
+	std::string key = std::to_string(serif) + ":" + std::to_string(bold) + ":" + std::to_string(size);
 	auto it = fonts_.find(key);
 	if (it != fonts_.end()) return it->second;
 	const char *name;
-	if (chinese_fonts_)
-		name = bold ? "PingFangSC-Semibold" : "PingFangSC-Regular";
-	else if (serif)
+	if (serif)
 		name = bold ? "HiraMinProN-W6" : "HiraMinProN-W3";
 	else
 		name = bold ? "HiraginoSans-W6" : "HiraginoSans-W3";

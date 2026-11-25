@@ -452,17 +452,15 @@ void register_save_natives(Engine &e) {
 		stat(path.c_str(), &st);
 		struct tm lt;
 		localtime_r(&st.st_mtime, &lt);
-		bool gbk = e.encoding == TextEncoding::Gbk;
 		static const char *wd_sjis[] = {"\x93\xfa", "\x8c\x8e", "\x89\xce", "\x90\x85", "\x96\xd8", "\x8b\xe0", "\x93\x79"};
-		static const char *wd_gbk[] = {"\xc8\xd5", "\xd2\xbb", "\xb6\xfe", "\xc8\xfd", "\xcb\xc4", "\xce\xe5", "\xc1\xf9"};
 		char date[64];
 		snprintf(date, sizeof date, "%04d/%02d/%02d(%s) %02d:%02d", lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday,
-		         (gbk ? wd_gbk : wd_sjis)[lt.tm_wday], lt.tm_hour, lt.tm_min);
+		         wd_sjis[lt.tm_wday], lt.tm_hour, lt.tm_min);
 		const char *sep = a.i(3) == 0 ? " " : a.i(3) == 1 ? "\n" : "\r\n";
-		// "『%s』" + sep + "【記録日時 %s】" (Chinese patch: 【存档时间 %s】)
-		std::string open = gbk ? "\xa1\xba" : "\x81\x77", close = gbk ? "\xa1\xbb" : "\x81\x78";
-		std::string label = gbk ? "\xa1\xbe\xb4\xe6\xb5\xb5\xca\xb1\xbc\xe4 " : "\x81\x79\x8b\x4c\x98\x5e\x93\xfa\x8e\x9e ";
-		std::string end = gbk ? "\xa1\xbf" : "\x81\x7a";
+		// "『%s』" + sep + "【記録日時 %s】"
+		std::string open = "\x81\x77", close = "\x81\x78";
+		std::string label = "\x81\x79\x8b\x4c\x98\x5e\x93\xfa\x8e\x9e ";
+		std::string end = "\x81\x7a";
 		a.out_str(0, open + title + close + sep + label + date + end);
 		return 0;
 	});
@@ -496,12 +494,10 @@ void register_save_natives(Engine &e) {
 			stat(path.c_str(), &st);
 			struct tm lt;
 			localtime_r(&st.st_mtime, &lt);
-			bool gbk = e.encoding == TextEncoding::Gbk;
 			static const char *wd_sjis[] = {"\x93\xfa", "\x8c\x8e", "\x89\xce", "\x90\x85", "\x96\xd8", "\x8b\xe0", "\x93\x79"};
-			static const char *wd_gbk[] = {"\xc8\xd5", "\xd2\xbb", "\xb6\xfe", "\xc8\xfd", "\xcb\xc4", "\xce\xe5", "\xc1\xf9"};
 			char date[64];
 			snprintf(date, sizeof date, "%04d/%02d/%02d(%s) %02d:%02d", lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday,
-			         (gbk ? wd_gbk : wd_sjis)[lt.tm_wday], lt.tm_hour, lt.tm_min);
+			         wd_sjis[lt.tm_wday], lt.tm_hour, lt.tm_min);
 			a.out_str(5, date);
 		}
 		return 0;

@@ -43,7 +43,7 @@ void default_options(uint8_t *o) {
 Engine::Engine(Platform &p, EngineConfig cfg)
     : platform(p),
       config(std::move(cfg)),
-      encoding(config.chinese ? TextEncoding::Gbk : TextEncoding::ShiftJis),
+      encoding(TextEncoding::ShiftJis),
       vm([this](const std::string &path, std::vector<uint8_t> &out) { return vfs.read(path, out); }),
       sound(mixer, [this](const std::string &path, std::vector<uint8_t> &out) { return vfs.read(path, out); }) {}
 
@@ -75,45 +75,7 @@ ImageRef Engine::load_image(const std::string &path, bool keep8) {
 
 bool Engine::boot(std::string *err) {
 	if (!vfs.mount_archives(config.data_dir, err)) return false;
-	if (config.chinese && !config.patch_dir.empty()) {
-		vfs.add_overlay(config.patch_dir + "/SCRIPT_CHS", "SCRIPT");
-		vfs.add_overlay(config.patch_dir + "/SYS", "SYS");
-		vfs.add_overlay(config.patch_dir + "/DATA", "DATA");
-	}
 	register_natives();
-	if (config.chinese && !config.patch_dir.empty()) {
-		chs = std::make_unique<ChsExtras>();
-		if (!chs->load(config.patch_dir + "/ORE_TUBA_CHS.dll", platform)) chs.reset();
-	}
-	if (chs) {
-		// let the overlay see every message record (the patch hooked the same spot)
-		NativeFn set_message = vm.native(0x1ce);
-		vm.set_native(0x1ce, [this, set_message](Vm &v, uint32_t a) {
-			uint32_t rec = v.mem().rd32(a);
-			if (rec) {
-				std::string text;
-				uint32_t p = rec + 3;
-				for (;;) {
-					uint8_t c = v.mem().host(p)[0];
-					if (!c) {
-						// the name terminator '$' may already have been replaced by NUL
-						uint8_t n = v.mem().host(p + 1)[0];
-						if (n == '$' || n == '&') {
-							text.push_back('$');
-							++p;
-							continue;
-						}
-						break;
-					}
-					text.push_back(char(c));
-					++p;
-					if (text.size() > 4096) break;
-				}
-				chs->on_message(text);
-			}
-			return set_message ? set_message(v, a) : 0;
-		}, "set_message");
-	}
 	if (!vm.init(err)) return false;
 	opt_block_ = vm.mem().alloc(kOptSize + 16, "options");
 	default_options(vm.mem().host(opt_block_, kOptSize));
@@ -200,8 +162,7 @@ void Engine::render_frame() {
 	for (auto &o : images)
 		if (auto *s = dynamic_cast<Surface *>(o.get()))
 			if (s->transition && s->transition->done) s->end_transition(s->trans_apply);
-	uint64_t overlay = chs ? chs->generation() : 0;
-	if (rendered_gen_ == g_gfx_generation && overlay == overlay_gen_) {
+	if (rendered_gen_ == g_gfx_generation) {
 		bool animating = false;
 		for (View *v : view_list)
 			if (v->visible && v->surface && v->surface->transition) animating = true;
@@ -221,8 +182,6 @@ void Engine::render_frame() {
 		main_object->update(now);
 		blit(frame_, main_object->current_image(), 0, 0, main_object->image().rect(), 0, 255, false);
 	}
-	if (chs) chs->draw(frame_);
-	overlay_gen_ = overlay;
 	rendered_gen_ = g_gfx_generation;
 	++frame_serial_;
 }
@@ -239,16 +198,6 @@ void Engine::game_command(int command) {
 }
 
 void Engine::mouse_button(int button, bool down) {
-	if (button == 0 && chs) {
-		if (down && chs->on_press(input.cursor_x(), input.cursor_y())) {
-			swallow_release_ = true;
-			return;
-		}
-		if (!down && swallow_release_) {
-			swallow_release_ = false;
-			return;
-		}
-	}
 	input.on_mouse_button(button, down);
 }
 

@@ -13,17 +13,14 @@ struct Clock : ore::ApplePlatform {
 };
 
 int main(int argc, char **argv) {
-	if (argc != 3) { fprintf(stderr, "usage: movie_flow DATA PATCH\n"); return 2; }
+	if (argc != 2) { fprintf(stderr, "usage: movie_flow DATA\n"); return 2; }
 	char saves[] = "/tmp/ore-movie-flow-XXXXXX";
 	if (!mkdtemp(saves)) return 2;
 	bool ok = true;
 	for (int index = 0; index < 2; ++index) {
 		Clock platform(saves);
-		platform.set_chinese_fonts(true);
 		ore::EngineConfig config;
 		config.data_dir = argv[1];
-		config.patch_dir = argv[2];
-		config.chinese = true;
 		ore::Engine engine(platform, config);
 		std::string error;
 		if (!engine.boot(&error)) { fprintf(stderr, "boot: %s\n", error.c_str()); ok = false; break; }

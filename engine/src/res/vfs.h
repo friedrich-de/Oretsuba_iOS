@@ -16,7 +16,7 @@ public:
 	bool mount_archives(const std::string &data_dir, std::string *error);
 
 	// Adds a loose-file overlay: files under `dir` are visible as
-	// `virtual_prefix\NAME` (e.g. dir=".../SCRIPT_CHS", prefix="SCRIPT").
+	// `virtual_prefix\NAME` (e.g. dir=".../scripts", prefix="SCRIPT").
 	// Later overlays take precedence over earlier ones and over archives.
 	void add_overlay(const std::string &dir, const std::string &virtual_prefix);
 

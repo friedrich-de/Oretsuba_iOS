@@ -22,9 +22,7 @@ struct RootView: View {
 
     var body: some View {
         if model.playing, let game = model.gameFolder {
-            GameView(gameFolder: game,
-                     patchFolder: model.effectiveLanguage == .chinese ? model.patchFolder : nil,
-                     language: model.effectiveLanguage, controls: controls) { error in
+            GameView(gameFolder: game, controls: controls) { error in
                 model.stop(error: error)
             }
             .ignoresSafeArea()
@@ -43,13 +41,11 @@ struct RootView: View {
 /// Hosts the game's view controller.
 struct GameView: UIViewControllerRepresentable {
     let gameFolder: URL
-    let patchFolder: URL?
-    let language: GameLanguage
     let controls: GameControls
     let onExit: (String?) -> Void
 
     func makeUIViewController(context: Context) -> GameViewController {
-        let controller = GameViewController(gameFolder: gameFolder, patchFolder: patchFolder, language: language, onExit: onExit)
+        let controller = GameViewController(gameFolder: gameFolder, onExit: onExit)
         controls.controller = controller
         return controller
     }
@@ -70,12 +66,12 @@ private struct VisionGameControls: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            action("保存", .save)
-            action("读取", .load)
-            action("快存", .quickSave)
-            action("快读", .quickLoad)
-            action("回想", .history)
-            action("菜单", .menu)
+            action("Save", .save)
+            action("Load", .load)
+            action("Quick save", .quickSave)
+            action("Quick load", .quickLoad)
+            action("History", .history)
+            action("Menu", .menu)
         }
         .padding(16)
         .glassBackgroundEffect()

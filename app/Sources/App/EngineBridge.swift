@@ -8,8 +8,8 @@ final class EngineBridge {
     private var source: AVAudioSourceNode?
     private var diagnosticSaves: URL?
 
-    init(gameFolder: URL, patchFolder: URL?, language: GameLanguage) throws {
-        var saves = GamePaths.saves(for: language)
+    init(gameFolder: URL) throws {
+        var saves = GamePaths.saves
         #if DEBUG
         let movieTest = ProcessInfo.processInfo.environment["ORE_TEST_MOVIE"].flatMap(Int.init)
         if let index = movieTest, (0...1).contains(index) {
@@ -21,13 +21,8 @@ final class EngineBridge {
         var err = [CChar](repeating: 0, count: 512)
         let created: OpaquePointer? = gameFolder.path.withCString { data in
             saves.path.withCString { save in
-                let make: (UnsafePointer<CChar>?) -> OpaquePointer? = { patch in
-                    var cfg = OreConfig(data_dir: data, patch_dir: patch, save_dir: save,
-                                        chinese: language == .chinese ? 1 : 0)
-                    return ore_create(&cfg, &err, Int32(err.count))
-                }
-                if let patch = patchFolder { return patch.path.withCString { make($0) } }
-                return make(nil)
+                var cfg = OreConfig(data_dir: data, save_dir: save)
+                return ore_create(&cfg, &err, Int32(err.count))
             }
         }
         guard let created else {
@@ -37,7 +32,7 @@ final class EngineBridge {
         if let index = movieTest, diagnosticSaves != nil, ore_debug_start_movie(created, Int32(index)) == 0 {
             ore_destroy(created)
             throw NSError(domain: "Oretsuba", code: 2,
-                          userInfo: [NSLocalizedDescriptionKey: "无法启动片头播放测试"])
+                          userInfo: [NSLocalizedDescriptionKey: "The opening film test could not be started."])
         }
         #endif
         engine = created

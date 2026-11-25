@@ -25,8 +25,7 @@ std::unique_ptr<MiningTap> MiningTap::open(Engine &engine) {
 		return nullptr;
 	}
 	if (settings.game.empty())
-		settings.game = engine.config.chinese ? "\xE6\x88\x91\xE4\xBB\xAC\xE6\xB2\xA1\xE6\x9C\x89\xE7\xBF\x85\xE8\x86\x80"  // 我们没有翅膀
-		                                      : "\xE4\xBF\xBA\xE3\x81\x9F\xE3\x81\xA1\xE3\x81\xAB\xE7\xBF\xBC\xE3\x81\xAF\xE3\x81\xAA\xE3\x81\x84";  // 俺たちに翼はない
+		settings.game = "\xE4\xBF\xBA\xE3\x81\x9F\xE3\x81\xA1\xE3\x81\xAB\xE7\xBF\xBC\xE3\x81\xAF\xE3\x81\xAA\xE3\x81\x84";  // 俺たちに翼はない
 	log_info("mining: lines go to %s", settings.server.c_str());
 	return std::unique_ptr<MiningTap>(new MiningTap(engine, std::move(settings), std::move(send)));
 }

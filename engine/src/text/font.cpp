@@ -21,22 +21,6 @@ struct Glyph {
 	std::vector<uint8_t> a;
 };
 
-// The Chinese patch remaps nine SJIS title glyphs to GBK (GetGlyphOutlineA hook).
-uint16_t chs_title_remap(uint16_t c) {
-	switch (c) {
-	case 0x8148: return 0xa3bf;
-	case 0x89b4: return 0xb0b3;
-	case 0x82bd: return 0xa4bf;
-	case 0x82bf: return 0xa4c1;
-	case 0x82c9: return 0xa4cb;
-	case 0x9783: return 0xd2ed;
-	case 0x82cd: return 0xa4cf;
-	case 0x82c8: return 0xa4ca;
-	case 0x82a2: return 0xa4a4;
-	default: return c;
-	}
-}
-
 uint8_t quantize(int a, int aa) {
 	switch (aa) {
 	case 0: return a >= 128 ? 255 : 0;
@@ -178,8 +162,7 @@ const Glyph &get_glyph(Font &f, uint16_t code, bool edge, bool bold) {
 		return cache.emplace(k, std::move(g)).first->second;
 	}
 	Engine &e = f.engine;
-	uint16_t c = e.encoding == TextEncoding::Gbk ? chs_title_remap(code) : code;
-	uint32_t cp = e.platform.decode_char(c, e.encoding);
+	uint32_t cp = e.platform.decode_char(code, e.encoding);
 	GlyphBitmap gb;
 	if (cp > 0x20 && cp != 0x3000 && e.platform.render_glyph(cp, f.face, f.size, bold ? 700 : 400, gb)) {
 		g.w = gb.width;

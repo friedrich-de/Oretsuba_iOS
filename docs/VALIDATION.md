@@ -1,45 +1,97 @@
-# 版本验证记录
+# Validation record
 
-本轮验证日期：2026-10-18。引擎参考版本为 `ORE_TUBA.EXE` 1.01，中文模式使用玩家自行提供的「中文三号补丁」。仓库与发布包不包含这些资源。
+What was checked, on what, and how far it reaches. The engine follows `ORE_TUBA.EXE` 1.01. Every check with the game
+uses files the player supplies; the repository and the packages contain none of them.
 
-## v0.1.1 中文启动流程
+## This fork: the Japanese original, 2026-11-25
 
-移除中文补丁附带三张启动图的加载与点击等待；正文 TIPS 的图片和 425 条注释保留。现有宿主使用独立空存档、无输入运行 1200 帧：修改前停在 `MAIN+0`、VM steps 为 0，修改后到达 `TITLE`，并目视核对中文标题和 START / LOAD / CONFIG 菜单。新增逻辑帧边界回归：在尚未运行脚本的一帧内到达的短按和原生命令会保留到下一逻辑帧；修复前两项失败，修复后通过。普通存读档（30300 帧）、快存快读（27000 帧）、回想切换（26000 帧）和两段片头自然结束均通过；三个 Release 目标重新构建成功。
+Run on a Mac with macOS 26.6 and Xcode 27.2, with the `SET_UP` folder of the game's disc.
 
-## v0.1.0 实机与原生应用
+**The engine's checks** all pass (the commands are in the [README](../README.md#checks-and-packages), what each one
+covers is under [Automatic checks](#automatic-checks)):
 
-| 平台 | 测试环境 | 已确认的行为 |
+- `save_roundtrip`, `quick_save`, `command_input`, `image_blend`.
+- `native_coverage`: 412 executable scripts refer to 341 different natives, and each has a registered handler.
+- `movie_flow`: both opening films play to their own end and return to the script, with 3744 and 5308 rendered frames.
+- `tools/test_save.py` (30300 frames), `tools/test_quick_save.py` (27000 frames) and `tools/test_history_toggle.py`
+  (26000 frames): from the title into the story, then saving and loading, quick save and quick load, and opening and
+  closing the history, each ending back in the text.
+- `elg_all`: all 2851 ELG pictures decode.
+- `mining_test`: 106 checks. `FolderImportTests`: 4 scenarios.
+
+**Reading with mining on.** `engine/tests/inputs/mining_read.input` plays 31970 frames from the title into the second
+script, next to a VN Mining Server 0.1.0. 634 lines run through the message window and the 61 that were read at
+reading speed arrive at the server in order, each with its screenshot, and the 28 voiced ones with a voice file that
+is byte for byte the game's own. [MINING.md](MINING.md) describes the run.
+
+**The build before and after the Chinese patch support was removed.** The test host played the same two inputs with
+both builds and wrote a picture every 100 frames. All 321 pictures of the reading run are the same files. Of the 311
+pictures of the save flow 290 are the same files, and the other 21 differ only in the minute of the clock that the
+save menu shows for the save.
+
+**The app in the iPhone Simulator** (iPhone 17 Pro, iOS 27.2). The launcher finds the imported game folder and says
+where the mined lines go, the game starts, the opening plays, and the first lines arrive at a VN Mining Server on the
+same Mac with voice and screenshot. The Release build for iOS, the unsigned IPA, compiles.
+
+**Not checked by this fork:** a real iPhone, iPad or Vision Pro, the visionOS and Mac builds of the current code, and
+the story beyond its second script.
+
+## The original project's checks on devices, 2026-10-18
+
+The original project checked its versions 0.1.0 and 0.1.1 on real devices. It played with a Chinese translation
+patch, which this fork no longer supports; the engine those checks ran is otherwise the one in this repository.
+
+| Platform | Tested on | Confirmed |
 |---|---|---|
-| iPhone | iPhone 16 Pro Max，iOS 26.6.2 | 中文正文、声音、轻点推进；第一段片头画面连续、音乐正常、自然结束返回启动器 |
-| iPad | iPad Pro M5，iPadOS 26.4.2 | 中文正文、声音、轻点推进、横竖屏比例与命中；普通存读档、快速保存和快速读取；第二段片头画面连续、音乐正常、自然结束返回启动器 |
-| visionOS | 第一代 Apple Vision Pro，visionOS 27.2 | 中文正文、声音、注视捏合推进；原生大按钮、普通存读档、回想再次点击关闭、章节提示文字；第一段片头画面连续、音乐正常、自然结束返回启动器 |
-| Mac | macOS 26.6.2，Mac Catalyst | Release 文件选择器识别游戏/补丁、中文启动与标题、鼠标 START、章节跳转提示和 NO 后中文开篇 |
+| iPhone | iPhone 16 Pro Max, iOS 26.6.2 | Text, sound, advancing by tap. The first opening film plays without gaps, with its music, to its own end and returns. |
+| iPad | iPad Pro M5, iPadOS 26.4.2 | Text, sound, advancing by tap, proportions and touch positions in landscape and portrait. Saving and loading, quick save and quick load. The second opening film plays without gaps, with its music, to its own end and returns. |
+| visionOS | First Apple Vision Pro, visionOS 27.2 | Text, sound, advancing by look and pinch. The large native buttons, saving and loading, History closing on a second press, the chapter captions. The first opening film plays without gaps, with its music, to its own end and returns. |
+| Mac | macOS 26.6.2, Mac Catalyst | The Release build's folder chooser finds the game, the game starts to its title, START by mouse, the question about jumping to a chapter and, after NO, the opening. |
 
-设备数据导入后，iPad 与 Vision Pro 的 16 个游戏文件、571 个汉化文件已与本机的相对路径和文件大小核对一致。视频诊断使用独立临时存档；本轮设备视频验收结束后，iPhone、iPad 与 Vision Pro 均已无诊断环境变量正常重启。
+The files on the iPad and the Vision Pro were compared with the local ones by path and size after the import. The
+film check uses a temporary save folder of its own; afterwards iPhone, iPad and Vision Pro started normally again
+without the diagnostic environment variable.
 
-构建使用 Xcode 27.1。构建最低系统版本见 README，实机结果不代表所有最低版本系统均已测试。Mac 发布包同时包含 arm64 与 x86_64，本轮只在 Apple 芯片 Mac 运行，Intel 硬件未实测。
+Those builds were made with Xcode 27.1. The README names the lowest systems the build supports; the results on
+devices do not mean that every one of those systems was tested. The Mac package holds arm64 and x86_64 code and ran
+on an Apple silicon Mac only.
 
-## 自动回归
+0.1.1 added a check at the boundary of a logic frame: a short press and a native command that arrive in a frame in
+which no script has run yet are kept for the next logic frame.
 
-- `save_roundtrip`：普通场景存档、全局进度、已读历史写入后重新读取。
-- `quick_save`：负编号解析为最新快速存档、环形覆盖、状态还原、只读不推进索引、空环。
-- `command_input`：原生菜单命令按游戏映射消费一次、回想切换、确认/取消/四方向按住与释放。
-- `image_blend`：透明菜单面板、半透明叠加、透明源、额外 opacity，以及已有 sprite 混合行为。
-- `native_coverage`：原版与中文覆盖后的 VFS 各检查 412 个可执行 SOB0/SOB2、341 个不同 native 引用，全部有注册处理。此项只检查入口注册。
-- 中文普通存读档流程：30300 帧后回到正文与原存档句子。
-- 原生命令快速保存/确认/读取流程：27000 帧后回到正文。
-- 回想打开/关闭流程：26000 帧，正文 → HISTORY → 正文。
-- `movie_flow`：原游戏 MoviePlay 的两段片头均无输入跳过，自然结束并返回脚本；分别记录 3732、5308 个渲染帧。
-- `fx_test` 效果数学回归，以及全部 2851 张 ELG 解码，0 失败。
-- `FolderImportTests`：同目录导入、重名冲突、复制失败与成功导入的四个场景。
-- iOS、visionOS、Mac Catalyst Release 均编译成功；无团队配置、无游戏数据的干净源码 Mac Release 编译成功。
+## Automatic checks
 
-运行命令见 [README](../README.md#本地验证与测试包)。测试需要使用玩家自己的游戏文件。
+- `save_roundtrip`: a save of a normal scene, the global progress and the read history are written and read again.
+- `quick_save`: a negative number stands for the newest quick save, the ring overwrites its oldest entry, the state is
+  restored, reading does not move the index, and an empty ring is handled.
+- `command_input`: native menu commands are taken once, following the game's own mapping; History toggles; confirm,
+  cancel and the four directions are held and released.
+- `image_blend`: a transparent menu panel, a half-transparent overlay, a transparent source, extra opacity, and the
+  blending of sprites as before.
+- `native_coverage`: every native a script refers to has a registered handler. This checks registration only, not
+  what a handler does.
+- `tools/test_save.py`: saves and loads through the game's menus and is back in the text at the saved sentence.
+- `tools/test_quick_save.py`: quick save, its confirmation and quick load through the native commands.
+- `tools/test_history_toggle.py`: text, then HISTORY, then text again.
+- `movie_flow`: both opening films of the game's MoviePlay script, with no input to skip them, end by themselves and
+  return to the script.
+- `fx_test` checks the arithmetic of the effects, and `elg_all` decodes every ELG picture.
+- `mining_test`: the mining settings file, the text of a record, which lines are sent, the request and the queue.
+- `FolderImportTests`: importing the folder that is already there, a name that is taken, a copy that fails, and an
+  import that succeeds.
 
-## 发布检查与覆盖边界
+The tests with the game need the player's own game files.
 
-源码通过干净 Git 历史发布；游戏/汉化资源、本地指令与计划、开发团队配置和签名材料均被排除。发布包包含第三方许可，不含游戏内容、描述文件或 Debug 视频入口，每个包提供 SHA256 校验文件。
+## Limits
 
-iOS 与 visionOS IPA 未签名，需要用户自己的 Apple 账号签名。已验证的原生 visionOS 安装路径为 Xcode；Sideloadly 对原生 visionOS 包的支持未验证。Mac 包为本地 ad-hoc 签名，未公证。
+The iOS and visionOS IPAs are unsigned and need the user's own Apple account. For a native visionOS app, installing
+with Xcode is the checked way; whether Sideloadly handles such a package was not checked. The Mac package carries a
+local ad-hoc signature and is not notarised. The packages include the third-party licences and no game content, no
+provisioning profile and no Debug film entry.
 
-本轮没有逐一通关全部角色路线，也没有验证每个选择分支和全部视觉效果的逐像素一致性。部分效果数学、`bg_anime` 格式仍有[逆向开放问题](re/30_effects.md#open-questions)；静态检查未找到原版与中文场景对 `bg_anime` 所在 FUNC_LIB `L+dec8` 的引用。不能把 native 注册完整或开篇通过等同于全游戏行为均已实测。因此 v0.1.0 以预发布形式提供，后续问题可附平台、版本、脚本位置及复现步骤反馈。
+Nobody has played every route to its end, taken every choice, or compared every visual effect with the original
+pixel by pixel. Some of the effects' arithmetic and the `bg_anime` format still have
+[open questions](re/30_effects.md#open-questions); a static check found no scene that refers to `L+dec8` in FUNC_LIB,
+where `bg_anime` lives. That every native is registered and that the opening runs does not mean the whole game was
+tested, which is why this is a pre-release. A problem report is most useful with the platform, the version, the place
+in the script and the steps that lead to it.

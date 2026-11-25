@@ -16,8 +16,6 @@ import UIKit
 ///                         d-pad up / down = wheel
 final class GameViewController: UIViewController {
     private let gameFolder: URL
-    private let patchFolder: URL?
-    private let language: GameLanguage
     private let onExit: (String?) -> Void
 
     private var renderer: Renderer!
@@ -27,10 +25,8 @@ final class GameViewController: UIViewController {
     private var holdingCtrl = false
     private var observers: [NSObjectProtocol] = []
 
-    init(gameFolder: URL, patchFolder: URL?, language: GameLanguage, onExit: @escaping (String?) -> Void) {
+    init(gameFolder: URL, onExit: @escaping (String?) -> Void) {
         self.gameFolder = gameFolder
-        self.patchFolder = patchFolder
-        self.language = language
         self.onExit = onExit
         super.init(nibName: nil, bundle: nil)
     }
@@ -44,14 +40,14 @@ final class GameViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         guard let renderer = Renderer(view: mtkView) else {
-            onExit("Metal 不可用")
+            onExit("Metal is not available.")
             return
         }
         self.renderer = renderer
         mtkView.delegate = renderer
         mtkView.isMultipleTouchEnabled = true
         do {
-            let bridge = try EngineBridge(gameFolder: gameFolder, patchFolder: patchFolder, language: language)
+            let bridge = try EngineBridge(gameFolder: gameFolder)
             self.bridge = bridge
             renderer.bridge = bridge
         } catch {
@@ -109,22 +105,22 @@ final class GameViewController: UIViewController {
             ore_answer_dialog(engine, r)
         }
         if yesNo {
-            alert.addAction(UIAlertAction(title: "否", style: .cancel) { _ in answer(0) })
-            alert.addAction(UIAlertAction(title: "是", style: .default) { _ in answer(1) })
+            alert.addAction(UIAlertAction(title: "No", style: .cancel) { _ in answer(0) })
+            alert.addAction(UIAlertAction(title: "Yes", style: .default) { _ in answer(1) })
         } else {
-            alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in answer(1) })
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in answer(1) })
         }
         present(alert, animated: true)
     }
 
     private func presentTextInput(_ initial: String) {
-        let alert = UIAlertController(title: "输入注释", message: nil, preferredStyle: .alert)
+        let alert = UIAlertController(title: "Comment", message: nil, preferredStyle: .alert)
         alert.addTextField { $0.text = initial }
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel) { [weak self] _ in
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { [weak self] _ in
             guard let engine = self?.engine else { return }
             ore_answer_text_input(engine, 0, nil)
         })
-        alert.addAction(UIAlertAction(title: "确定", style: .default) { [weak self, weak alert] _ in
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self, weak alert] _ in
             guard let engine = self?.engine else { return }
             let text = alert?.textFields?.first?.text ?? ""
             text.withCString { ore_answer_text_input(engine, 1, $0) }

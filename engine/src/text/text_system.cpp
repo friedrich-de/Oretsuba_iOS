@@ -44,9 +44,8 @@ std::string TextSystem::preview_text(size_t max) {
 	}
 	size_t bs = nm.find('\\');
 	if (bs != std::string::npos) nm.resize(bs);
-	bool gbk = engine.encoding == TextEncoding::Gbk;
 	std::string out;
-	if (!nm.empty()) out = (gbk ? "\xa1\xbe" : "\x81\x79") + nm + (gbk ? "\xa1\xbf" : "\x81\x7a") + "\n";
+	if (!nm.empty()) out = "\x81\x79" + nm + "\x81\x7a" + "\n";
 	out += message_plain_text(body, engine.encoding, false);
 	// cut on a character boundary
 	size_t i = 0, keep = 0;
