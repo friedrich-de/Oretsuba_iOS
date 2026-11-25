@@ -58,7 +58,7 @@ public:
 	Font *ruby_font() const;
 
 	// --- vtable methods of the text object
-	void set_bg_style(int mode, uint32_t rgb, int alpha);           // vt+0x84
+	virtual void set_bg_style(int mode, uint32_t rgb, int alpha);   // vt+0x84
 	void set_margins(int l, int t, int r, int b, bool redraw);      // vt+0x88
 	void set_pads(int l, int t, int r, int b, bool redraw);         // vt+0x8c
 	void relayout();          // vt+0xf0: line metrics
@@ -101,6 +101,7 @@ public:
 	int ui_type() const override { return 0x6f; }
 	void set_pos(int nx, int ny) override;  // moves the name box too
 	void clear_page() override;             // also hides the name box
+	void set_bg_style(int mode, uint32_t rgb, int alpha) override;  // the name box follows
 
 	int show(bool allow_skip);  // N_2fa
 	int show_instant();         // N_2fb

@@ -323,6 +323,14 @@ void MessageWindow::set_pos(int nx, int ny) {
 	TextWindow::set_pos(nx, ny);
 }
 
+// The window opacity and colour of the settings reach the name box through its
+// message window: the scripts hand N_c the message window and the choice
+// window only, and the original shows the name box in the same shade.
+void MessageWindow::set_bg_style(int mode, uint32_t rgb, int alpha) {
+	if (TextWindow *nb = Object::as<TextWindow>(name_box)) nb->set_bg_style(mode, rgb, alpha);
+	TextWindow::set_bg_style(mode, rgb, alpha);
+}
+
 void MessageWindow::clear_page() {
 	TextWindow::clear_page();
 	if (TextWindow *nb = Object::as<TextWindow>(name_box)) {
