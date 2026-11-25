@@ -15,7 +15,8 @@
 # adds notes to it.
 # ORE_ANKIDROID_APK names an AnkiDroid package to install; without it the
 # newest release is downloaded from AnkiDroid's page on GitHub. What it found
-# is in build/ankidroid-check.
+# is in build/ankidroid-check; the emulator and the downloaded package are
+# kept in its folder "work" and nowhere else on the machine.
 set -eu
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="$ROOT/build/ankidroid-check"
@@ -24,12 +25,13 @@ PACKAGE=io.github.friedrich_de.oretsuba
 SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 [ -n "$SDK" ] || { echo "ANDROID_HOME is not set." >&2; exit 2; }
 [ -f "$APP" ] || { echo "Build the debug app first: (cd android && ./gradlew :app:assembleDebug)" >&2; exit 2; }
-mkdir -p "$OUT"
+WORK="$OUT/work"
+mkdir -p "$WORK"
 PATH="$SDK/platform-tools:$SDK/emulator:$SDK/cmdline-tools/latest/bin:$PATH"
 
 apk="${ORE_ANKIDROID_APK:-}"
 if [ -z "$apk" ]; then
-	apk="$OUT/AnkiDroid.apk"
+	apk="$WORK/AnkiDroid.apk"
 	if [ ! -f "$apk" ]; then
 		link="$(curl -fsSL ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} https://api.github.com/repos/ankidroid/Anki-Android/releases/latest |
 			python3 -c '
@@ -50,6 +52,10 @@ serial="${ORE_ADB_SERIAL:-}"
 started=""
 if [ -z "$serial" ]; then
 	image="system-images;android-34;default;x86_64"
+	# Where the emulator is kept: named here, because the tool that makes one
+	# and the tool that starts one do not look in the same place otherwise.
+	export ANDROID_AVD_HOME="$WORK/avd"
+	mkdir -p "$ANDROID_AVD_HOME"
 	# The SDK's licences are the machine's owner's to accept (sdkmanager --licenses); this only installs.
 	echo "Installing the emulator and Android 14 for it"
 	sdkmanager --install "$image" "emulator" "platform-tools" < /dev/null > "$OUT/sdkmanager.log" 2>&1 || { tail -20 "$OUT/sdkmanager.log"; exit 1; }

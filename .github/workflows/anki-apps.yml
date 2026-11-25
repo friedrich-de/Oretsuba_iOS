@@ -87,5 +87,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ankidroid-check-${{ github.sha }}
-          path: build/ankidroid-check
+          path: |
+            build/ankidroid-check
+            !build/ankidroid-check/work
           if-no-files-found: warn
