@@ -118,6 +118,13 @@ History again closes the text log. The text advances when you look at it and pin
 
 Game controllers work too: A confirms, B opens the menu, the right trigger skips, up and down on the D-pad scroll.
 
+## Auto save and continue
+
+The launcher has a switch "Auto save and continue", off by default. With it on, the port saves without a sound every
+5 lines and whenever you leave the app, into a slot of its own that the game's menus do not show, and the game starts
+at that line: no logo, no title menu, no load screen. Your own saves and quick saves stay as they are, and the title
+menu is still reached through Menu › Title in the game. [docs/AUTOSAVE.md](docs/AUTOSAVE.md) has the details.
+
 ## Building from source
 
 The checks used Xcode 27.1 and 27.2. If the system points at the Command Line Tools, set this in the terminal first:
@@ -140,6 +147,15 @@ The test host for the command line (macOS, runs without a window and writes scre
 ```sh
 make -C engine
 build/host/orehost --data <SET_UP folder> --frames 1200 --shot 600,1200 --out /tmp/ore
+```
+
+The same test host builds for Linux, with letters from FreeType and a Japanese font file, and for Windows, with
+letters drawn by GDI as the original draws them, so that the port can run next to the original game
+(`tools/reference/README.md`):
+
+```sh
+make -C engine -f Makefile.linux   # build/host-linux/orehost, needs the FreeType headers
+make -C engine -f Makefile.win     # build/host-win/orehost.exe, with MinGW-w64
 ```
 
 `docs/ENGINE_GUIDE.md` and `docs/re/` describe the engine and hold the notes from the reverse engineering.
@@ -167,6 +183,7 @@ build/host/movie_flow /path/to/SET_UP
 python3 tools/test_save.py /path/to/SET_UP
 python3 tools/test_quick_save.py /path/to/SET_UP
 python3 tools/test_history_toggle.py /path/to/SET_UP
+python3 tools/test_autosave.py /path/to/SET_UP
 xcrun swiftc -module-cache-path build/swift-module-cache \
   app/Sources/App/FolderImport.swift app/Tests/FolderImportTests.swift \
   -o build/folder-import-tests

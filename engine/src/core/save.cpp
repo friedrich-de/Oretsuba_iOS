@@ -71,7 +71,22 @@ std::string save_file_name(int bank, int slot) {
 }
 
 constexpr size_t kThumbW = 100, kThumbH = 75;
-constexpr size_t kTitleAt = 0x57EC, kPreviewAt = 0x5818, kHeaderAt = 0x58A0;
+// The sizes and the checksum follow the 0x90 bytes of the preview. Saves written
+// by this port before it was compared with the original have them 8 bytes sooner,
+// inside the preview; those are still read.
+constexpr size_t kTitleAt = 0x57EC, kPreviewAt = 0x5818, kHeaderAt = 0x58A8, kEarlierHeaderAt = 0x58A0;
+
+// Where a save file keeps its sizes, 0 when it fits neither layout. The state
+// fills the file to its end, which tells the two apart.
+size_t header_of(const std::vector<uint8_t> &d) {
+	for (size_t at : {kHeaderAt, kEarlierHeaderAt}) {
+		if (d.size() < at + 9) continue;
+		uint32_t stored;
+		memcpy(&stored, &d[at], 4);
+		if (d.size() == at + 9 + size_t(stored)) return at;
+	}
+	return 0;
+}
 
 }  // namespace
 
@@ -203,9 +218,23 @@ static int ring_slot(Engine &e, int bank, int slot, bool for_save) {
 	return -1;
 }
 
+std::string Engine::autosave_file_name() const {
+	return save_file_name(kAutosaveBank, kAutosaveSlot);
+}
+
 int Engine::save_game(int bank, int slot) {
 	slot = ring_slot(*this, bank, slot, true);
 	if (slot < 0) return 1;
+	int r = write_save_file(bank, slot);
+	if (r != 0) return r;
+	set_opt8(0xede, 1);
+	save_options();
+	write_gamedata();
+	return 0;
+}
+
+// The save file alone; the game's own saves also note that there is one (save_game).
+int Engine::write_save_file(int bank, int slot) {
 	std::vector<uint8_t> file(kHeaderAt, 0);
 	memcpy(file.data(), "OT01", 4);
 	std::vector<uint8_t> th = thumbnail(int(kThumbW), int(kThumbH));
@@ -227,9 +256,6 @@ int Engine::save_game(int bank, int slot) {
 	w.u8(checksum(blob.data(), blob.size()));
 	w.bytes(blob);
 	if (!write_file(save_path(save_file_name(bank, slot)), w.data())) return 2;
-	set_opt8(0xede, 1);
-	save_options();
-	write_gamedata();
 	return 0;
 }
 
@@ -238,11 +264,13 @@ int Engine::load_game(int bank, int slot) {
 	if (slot < 0) return -1;
 	std::vector<uint8_t> d;
 	if (!read_save_file(save_path(save_file_name(bank, slot)), d)) return -1;
-	if (d.size() < kHeaderAt + 9 || memcmp(d.data(), "OT01", 4) != 0) return 3;
+	if (d.size() < kEarlierHeaderAt + 9 || memcmp(d.data(), "OT01", 4) != 0) return 3;
 	ByteReader r(d);
 	r.seek(4);
 	if (r.u32() != 0) return 5;
-	r.seek(kHeaderAt);
+	size_t at = header_of(d);
+	if (!at) return 3;
+	r.seek(at);
 	uint32_t stored = r.u32(), orig = r.u32();
 	uint8_t sum = r.u8();
 	std::vector<uint8_t> data = r.bytes(stored);
@@ -509,10 +537,13 @@ void register_save_natives(Engine &e) {
 		std::string path = e.save_path(save_file_name(a.i(0), a.i(1)));
 		std::vector<uint8_t> d;
 		if (!read_save_file(path, d)) return -1;
-		if (d.size() < kHeaderAt) return 1;
+		size_t at = header_of(d);
+		if (!at) return 1;
+		// In the earlier layout the sizes lie inside the last 8 bytes of the preview.
+		size_t room = at - kPreviewAt;
 		std::string t = a.s(2);
-		if (t.size() > 140) t.resize(140);
-		memset(&d[kPreviewAt], 0, 0x90);
+		if (t.size() > std::min<size_t>(140, room - 1)) t.resize(std::min<size_t>(140, room - 1));
+		memset(&d[kPreviewAt], 0, room);
 		memcpy(&d[kPreviewAt], t.data(), t.size());
 		return write_file(path, d) ? 0 : 1;
 	});

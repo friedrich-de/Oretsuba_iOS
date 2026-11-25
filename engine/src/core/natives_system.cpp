@@ -136,7 +136,11 @@ void register_system_natives(Engine &e) {
 	};
 
 	// ---- script control
-	def(0x0, "call_script", [&e](Args &a) { e.vm.request_call(a.s(0)); return 0; });
+	def(0x0, "call_script", [&e](Args &a) {
+		// Going back to the reader's place takes the place of the logo and the title (autosave.cpp).
+		if (!e.resume_instead_of(a.s(0))) e.vm.request_call(a.s(0));
+		return 0;
+	});
 	def(0x1, "goto_script", [&e](Args &a) { e.vm.request_goto(a.s(0)); return 0; });
 	def(0x2, "stop_scripts", [&e](Args &) { e.vm.request_stop(); return 0; });
 

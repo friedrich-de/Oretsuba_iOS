@@ -72,6 +72,9 @@ public:
 	bool leaving(int state, const Record &current);
 	// The window is gone.
 	void reset() { armed_ = false; }
+	// The game starts at the line it was left at (docs/AUTOSAVE.md): the next line
+	// shown is that one, and the reader had it before.
+	void next_is_known() { next_known_ = true; }
 	bool armed() const { return armed_; }
 
 private:
@@ -80,6 +83,7 @@ private:
 	bool alive(int state, const Record &current);
 	bool armed_ = false;
 	bool waited_ = false;  // the line was seen waiting for the click
+	bool next_known_ = false;
 	int64_t at_ = 0;
 	std::string key_, sent_;
 };

@@ -36,6 +36,29 @@ same Mac with voice and screenshot. The Release build for iOS, the unsigned IPA,
 **Not checked by this fork:** a real iPhone, iPad or Vision Pro, the visionOS and Mac builds of the current code, and
 the story beyond its second script.
 
+## Auto save and continue, 2026-11-25
+
+Run with the Linux build of the test host and the `SET_UP` folder of the game's disc, without `VOICE.LPK`.
+[AUTOSAVE.md](AUTOSAVE.md) describes the feature.
+
+- `tools/test_autosave.py`: an unbroken run of the story saves at every fifth line; a run ended in the middle of line
+  32 saves that line and writes no file but `DATA1200.SAV`; the next start goes back to line 32 in the same scene and
+  the nine lines after it are the ones the unbroken run shows; with an empty save folder the logo and the title come.
+- Pictures of the unbroken run and of the run after the start, taken at the same eleven lines, show the same scene,
+  name, text and buttons; the history after the start holds the lines read before it.
+- **With the switch off nothing changes.** The build before and the build after played
+  `engine/tests/inputs/mining_read.input` and `save.input` with a picture every 100 frames: all 321 pictures of the
+  first are the same files, and of the 318 of the second 297 are the same files and 21 differ only in the minute of
+  the clock that the save menu shows.
+- `save_roundtrip`, `quick_save`, `command_input`, `native_coverage`, `tools/test_save.py`, `tools/test_quick_save.py`
+  and `tools/test_history_toggle.py` pass with this build. `mining_test` has 108 checks, two of them for the line the
+  game starts at, which is not sent to a mining server a second time.
+- A save file now has its sizes where the original game has them, 8 bytes later than before; saves this port wrote
+  earlier are still read, and a save of the original game now loads (its text history does not come along yet).
+
+**Not checked:** a real iPhone, iPad or Vision Pro; the music after the start, which the test host does not play;
+the mining server not getting the line twice, beyond the unit check.
+
 ## The original project's checks on devices, 2026-10-18
 
 The original project checked its versions 0.1.0 and 0.1.1 on real devices. It played with a Chinese translation
@@ -73,6 +96,8 @@ which no script has run yet are kept for the next logic frame.
 - `tools/test_save.py`: saves and loads through the game's menus and is back in the text at the saved sentence.
 - `tools/test_quick_save.py`: quick save, its confirmation and quick load through the native commands.
 - `tools/test_history_toggle.py`: text, then HISTORY, then text again.
+- `tools/test_autosave.py`: auto save and continue: a save every fifth line and on leaving, in a file of its own, and
+  a start that goes back to that line and reads on as an unbroken run does.
 - `movie_flow`: both opening films of the game's MoviePlay script, with no input to skip them, end by themselves and
   return to the script.
 - `fx_test` checks the arithmetic of the effects, and `elg_all` decodes every ELG picture.

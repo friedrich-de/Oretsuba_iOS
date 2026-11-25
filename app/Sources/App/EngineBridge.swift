@@ -21,7 +21,10 @@ final class EngineBridge {
         var err = [CChar](repeating: 0, count: 512)
         let created: OpaquePointer? = gameFolder.path.withCString { data in
             saves.path.withCString { save in
-                var cfg = OreConfig(data_dir: data, save_dir: save)
+                let keepPlace = GamePaths.keepsPlace
+                var cfg = OreConfig(data_dir: data, save_dir: save,
+                                    autosave_lines: keepPlace ? GamePaths.autosaveLines : 0,
+                                    resume: keepPlace ? 1 : 0)
                 return ore_create(&cfg, &err, Int32(err.count))
             }
         }

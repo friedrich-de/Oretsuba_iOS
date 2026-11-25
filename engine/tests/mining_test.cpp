@@ -237,6 +237,16 @@ void test_gate() {
 		check(gate.frame(2, record(10, name, body), 11900), "going back to an earlier line sends it again");
 	}
 	{
+		// the game starts at the line it was left at (docs/AUTOSAVE.md)
+		LineGate gate;
+		gate.next_is_known();
+		gate.shown(record(10, name, body), 1000);
+		check(!gate.armed() && !gate.frame(2, record(10, name, body), 2000) && !gate.leaving(2, record(10, name, body)),
+		      "the line the game starts at is not sent again");
+		gate.shown(record(11, name, other), 3000);
+		check(gate.frame(2, record(11, name, other), 3900), "the line after it is sent");
+	}
+	{
 		LineGate gate;
 		gate.shown(record(10, name, body), 1000);
 		check(gate.leaving(1, record(10, name, body)), "leaving the app in the middle of a line sends it");

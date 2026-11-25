@@ -295,6 +295,10 @@ void LineGate::shown(const Record &record, int64_t now) {
 	key_ = key_of(record);
 	at_ = now;
 	waited_ = false;
+	if (next_known_) {
+		next_known_ = false;
+		sent_ = key_;
+	}
 	// the same record shown again (after the history screen, a menu, a load) was sent already
 	armed_ = key_ != sent_;
 }

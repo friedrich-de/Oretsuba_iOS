@@ -22,6 +22,7 @@ public:
 	void window_gone(MessageWindow &window);
 	void frame_drawn();                       // once per frame, when the screen is drawn
 	void leaving();                           // the app goes to the background
+	void resumed() { gate_.next_is_known(); } // the game starts at the line it was left at
 	MiningQueue &queue() { return queue_; }
 
 private:

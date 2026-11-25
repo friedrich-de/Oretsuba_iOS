@@ -14,7 +14,8 @@ compiler that ships with Windows builds it.
 C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /optimize /out:orewin.exe /r:System.Drawing.dll orewin.cs
 ```
 
-Start the game in a window, leave the window uncovered, then:
+`orewin` uses the real mouse and keyboard and photographs the screen, so the game's window has to be in front and
+uncovered and nobody else can use the machine meanwhile. Start the game in a window, then:
 
 ```bat
 orewin info                       the game's window and the size of its client area
