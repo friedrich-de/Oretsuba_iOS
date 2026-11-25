@@ -5,7 +5,12 @@
 //
 //   orehost --data DIR [--save DIR] [--frames N]
 //           [--input FILE] [--shot F,F,...] [--shot-every N] [--out DIR]
+//           [--shot-range A-B] [--frame-ms N]
 //           [--trace HEX,HEX,...] [--autosave LINES] [--resume]
+//
+// --shot-range writes every frame from A to B, to follow an effect frame by
+// frame. --frame-ms makes the clock advance N whole milliseconds per frame, so
+// that a run can be laid next to another program whose clock is stepped alike.
 //
 // --autosave and --resume keep the reader's place as the app's switch does
 // (docs/AUTOSAVE.md): a silent save every LINES lines, and a start at that save.
@@ -96,7 +101,7 @@ void write_png(const ore::Image &img, const std::string &path) {
 int main(int argc, char **argv) {
 	std::string data, save = "/tmp/orehost_save", input, out = "/tmp/orehost";
 	std::string trace;  // comma-separated hex native indices
-	int frames = 600, shot_every = 0, autosave = 0;
+	int frames = 600, shot_every = 0, autosave = 0, frame_ms = 0, shot_from = 0, shot_to = -1;
 	bool resume = false;
 	std::set<int> shots;
 	for (int i = 1; i < argc; ++i) {
@@ -108,6 +113,13 @@ int main(int argc, char **argv) {
 		else if (a == "--input") input = next();
 		else if (a == "--out") out = next();
 		else if (a == "--shot-every") shot_every = atoi(next().c_str());
+		else if (a == "--frame-ms") frame_ms = atoi(next().c_str());
+		else if (a == "--shot-range") {
+			std::string r = next();
+			size_t dash = r.find('-');
+			shot_from = atoi(r.c_str());
+			shot_to = dash == std::string::npos ? shot_from : atoi(r.c_str() + dash + 1);
+		}
 		else if (a == "--shot") {
 			std::stringstream ss(next());
 			std::string t;
@@ -177,7 +189,7 @@ int main(int argc, char **argv) {
 	std::multimap<int, Cmd> releases;
 	int f = 0;
 	for (; f < frames; ++f) {
-		platform.clock = int64_t(f) * 1000 / 60;
+		platform.clock = frame_ms > 0 ? int64_t(f) * frame_ms : int64_t(f) * 1000 / 60;
 		auto fire = [&](const Cmd &c) {
 			if (c.op == "click" || c.op == "rclick") {
 				int b = c.op == "click" ? 0 : 1;
@@ -232,7 +244,7 @@ int main(int argc, char **argv) {
 		engine.mixer.mix(audio.data(), 735);
 		// The host's clock runs ahead of the real one: let a mining server keep up.
 		if (engine.mining && engine.mining->queue().stats().pending >= 8) engine.mining->queue().flush(30000);
-		if (shots.count(f) || (shot_every && f % shot_every == 0)) {
+		if (shots.count(f) || (shot_every && f % shot_every == 0) || (f >= shot_from && f <= shot_to)) {
 			char name[64];
 			snprintf(name, sizeof name, "/f%05d.png", f);
 			write_png(engine.framebuffer(), out + name);
