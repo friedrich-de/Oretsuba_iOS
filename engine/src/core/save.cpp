@@ -35,6 +35,9 @@ bool write_file(const std::string &path, const std::vector<uint8_t> &data) {
 	if (!f) return false;
 	bool ok = fwrite(data.data(), 1, data.size(), f) == data.size();
 	ok = fclose(f) == 0 && ok;
+#ifdef _WIN32
+	if (ok) remove(path.c_str());  // rename does not replace a file there
+#endif
 	if (ok) ok = rename(tmp.c_str(), path.c_str()) == 0;
 	return ok;
 }

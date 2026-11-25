@@ -1,0 +1,54 @@
+# Windows build of the headless test host, with MinGW-w64 (for example the
+# portable w64devkit, or a cross compiler on Linux). The host draws letters
+# with GDI as the original game does, so on a Windows machine the port's
+# pictures can be put next to the original's (tools/reference/README.md).
+#
+#   make -C engine -f Makefile.win          build/host-win/orehost.exe
+#   make -C engine -f Makefile.win clean
+#
+# Cross compiling: add CXX=x86_64-w64-mingw32-g++-posix CC=x86_64-w64-mingw32-gcc-posix
+
+BUILD   := ../build/host-win
+CXX     := g++
+CC      := gcc
+DEFS    := -D_USE_MATH_DEFINES -D_POSIX_THREAD_SAFE_FUNCTIONS -D__USE_MINGW_ANSI_STDIO=1
+CXXFLAGS:= -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers $(DEFS) -Isrc -Ithird_party -Ihost
+CFLAGS  := -O2 -w -Ithird_party
+
+CPP_SRCS := $(wildcard src/*/*.cpp src/*/*/*.cpp src/*/*/*/*.cpp)
+C_SRCS   := $(wildcard src/*/*.c src/*/*/*.c)
+OBJS := $(CPP_SRCS:%.cpp=$(BUILD)/obj/%.o) $(C_SRCS:%.c=$(BUILD)/obj/%.o) \
+        $(BUILD)/obj/host/main.o $(BUILD)/obj/host/win_platform.o $(BUILD)/obj/host/stb_write.o
+DEPS := $(OBJS:.o=.d)
+
+all: $(BUILD)/orehost.exe
+
+$(BUILD)/obj/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
+
+$(BUILD)/obj/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
+
+$(BUILD)/obj/host/main.o: host/main.mm
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -MMD -MP -x c++ -c $< -o $@
+
+$(BUILD)/obj/host/win_platform.o: host/win/win_platform.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
+
+$(BUILD)/obj/host/stb_write.o: tests/stb_write_impl.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) -std=c++17 -O2 -w -Ithird_party -c $< -o $@
+
+$(BUILD)/orehost.exe: $(OBJS)
+	$(CXX) $(OBJS) -static -lgdi32 -o $@
+
+clean:
+	rm -rf $(BUILD)/obj $(BUILD)/orehost.exe
+
+-include $(DEPS)
+
+.PHONY: all clean

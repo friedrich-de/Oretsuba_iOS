@@ -1,6 +1,10 @@
 #include "vm/memory.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <sys/mman.h>
+#endif
 
 #include <cstdio>
 #include <cstdlib>
@@ -9,9 +13,15 @@ namespace ore {
 
 VmMemory::VmMemory(size_t capacity) : capacity_(capacity) {
 	// Reserve lazily-committed pages; untouched pages cost nothing.
+#ifdef _WIN32
+	void *p = VirtualAlloc(nullptr, capacity_, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	bool failed = p == nullptr;
+#else
 	void *p = mmap(nullptr, capacity_, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
-	if (p == MAP_FAILED) {
-		fprintf(stderr, "VmMemory: mmap of %zu bytes failed\n", capacity_);
+	bool failed = p == MAP_FAILED;
+#endif
+	if (failed) {
+		fprintf(stderr, "VmMemory: reserving %zu bytes failed\n", capacity_);
 		abort();
 	}
 	mem_ = static_cast<uint8_t *>(p);
@@ -19,7 +29,11 @@ VmMemory::VmMemory(size_t capacity) : capacity_(capacity) {
 }
 
 VmMemory::~VmMemory() {
+#ifdef _WIN32
+	VirtualFree(mem_, 0, MEM_RELEASE);
+#else
 	munmap(mem_, capacity_);
+#endif
 }
 
 uint32_t VmMemory::alloc(size_t n, const char *tag) {

@@ -1,5 +1,6 @@
-// Headless test host: runs the engine on macOS without a window, feeding
-// scripted input and writing PNG screenshots.
+// Headless test host: runs the engine without a window, feeding scripted
+// input and writing PNG screenshots. It is built for macOS (Makefile) and for
+// Windows (Makefile.win), where it stands next to the original game.
 //
 //   orehost --data DIR [--save DIR] [--frames N]
 //           [--input FILE] [--shot F,F,...] [--shot-every N] [--out DIR]
@@ -31,7 +32,13 @@
 
 #include "core/engine.h"
 #include "mining/mining_tap.h"
+#ifdef _WIN32
+#include <direct.h>
+
+#include "win/win_platform.h"
+#else
 #include "platform/apple/apple_platform.h"
+#endif
 #include "stb_image_write.h"
 #include "util/log.h"
 
@@ -43,9 +50,17 @@ struct Cmd {
 	std::string s;
 };
 
-class HostPlatform : public ore::ApplePlatform {
+#ifdef _WIN32
+using BasePlatform = ore::WinPlatform;
+void make_dir(const std::string &path) { _mkdir(path.c_str()); }
+#else
+using BasePlatform = ore::ApplePlatform;
+void make_dir(const std::string &path) { mkdir(path.c_str(), 0755); }
+#endif
+
+class HostPlatform : public BasePlatform {
 public:
-	using ApplePlatform::ApplePlatform;
+	using BasePlatform::BasePlatform;
 	int64_t clock = 0;
 	int64_t now_ms() override { return clock; }
 	void begin_dialog(const std::string &text, int kind) override {
@@ -116,7 +131,7 @@ int main(int argc, char **argv) {
 			cmds.emplace(frame, c);
 		}
 	}
-	mkdir(out.c_str(), 0755);
+	make_dir(out);
 	HostPlatform platform(save);
 	ore::EngineConfig cfg;
 	cfg.data_dir = data;

@@ -178,7 +178,11 @@ bool parse_mining_settings(const std::string &text, MiningSettings &out, std::st
 std::string find_mining_file(const std::string &game_dir) {
 	std::string dir = game_dir;
 	char resolved[PATH_MAX];
+#ifdef _WIN32
+	if (_fullpath(resolved, dir.c_str(), sizeof resolved)) dir = resolved;
+#else
 	if (realpath(dir.c_str(), resolved)) dir = resolved;
+#endif
 	while (dir.size() > 1 && dir.back() == '/') dir.pop_back();
 	for (int level = 0; level < 3 && !dir.empty(); ++level) {
 		std::string found = find_in_dir(dir);
