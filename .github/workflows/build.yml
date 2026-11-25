@@ -46,6 +46,7 @@ jobs:
           make -C engine -j4 all tests
           build/host/mining_test
           build/host/anki_app_test
+          build/host/anki_target_test engine
           build/host/image_blend
           xcrun swiftc -module-cache-path build/swift-module-cache \
             app/Sources/App/FolderImport.swift app/Tests/FolderImportTests.swift \

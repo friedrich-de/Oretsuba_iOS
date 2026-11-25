@@ -601,6 +601,7 @@ bool AnkiMobileHandover::prepare(AnkiLinkNote note, std::vector<File> files, Pre
 	std::lock_guard<std::mutex> lock(mutex_);
 	card_.clear();
 	offered_.clear();
+	left_out_.clear();
 	Prepared prepared;
 	bool any = false;
 	for (const File &file : files) any = any || (!file.bytes.empty() && anki_media_name(file.name));
@@ -632,6 +633,7 @@ bool AnkiMobileHandover::prepare(AnkiLinkNote note, std::vector<File> files, Pre
 		for (int j = 0; j < 8; ++j) card_ += kHex[(word >> (j * 4)) & 15];
 	}
 	prepared.card = card_;
+	left_out_ = prepared.left_out;
 	std::string back = return_link_ + (return_link_.find('?') == std::string::npos ? "?card=" : "&card=") + card_;
 	prepared.link = ankimobile_add_link(note, back);
 	out = std::move(prepared);
@@ -645,8 +647,10 @@ AnkiMobileHandover::Result AnkiMobileHandover::finish(Result::Kind kind) {
 	result.card = card_;
 	for (const auto &file : offered_)
 		if (server_.fetched(file.second) == 0) result.not_fetched.push_back(file.first);
+	result.left_out = std::move(left_out_);
 	card_.clear();
 	offered_.clear();
+	left_out_.clear();
 	server_.stop();
 	return result;
 }
@@ -815,6 +819,9 @@ struct AnkiMobile::State {
 			json::Value missing = json::Value::array();
 			for (const std::string &name : result.not_fetched) missing.push(name);
 			payload.set("notFetched", std::move(missing));
+			json::Value left_out = json::Value::array();
+			for (const std::string &name : result.left_out) left_out.push(name);
+			payload.set("leftOut", std::move(left_out));
 			state->say("card.added", payload);
 		} else if (head == state->scheme + "://anki/lists") {
 			{

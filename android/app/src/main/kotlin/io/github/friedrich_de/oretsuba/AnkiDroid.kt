@@ -14,7 +14,9 @@
 // The files of `media` wait in `mediaFolder` under their names; AnkiDroid
 // copies them into its own media folder and the reference to each (its
 // stored name) is put at the end of the fields it belongs to. Anything that
-// goes wrong comes back as {error: a sentence for the player, code}.
+// goes wrong comes back as {error: a sentence for the player, code}; the
+// codes are missing (AnkiDroid is not there), permission, noteType, deck,
+// empty (the first field), duplicate and failed.
 package io.github.friedrich_de.oretsuba
 
 import android.app.Activity
@@ -170,6 +172,10 @@ object AnkiDroid {
         val given = card.optJSONObject("fields") ?: JSONObject()
         val values = type.fields.map { given.optString(it, "").replace(FIELD_SEPARATOR, "") }.toMutableList()
 
+        // Anki tells its notes apart by their first field and takes none without it.
+        if (values[0].isBlank()) {
+            return problem("The card's first field, \"${type.fields[0]}\", is empty.", "empty")
+        }
         if (!card.optBoolean("allowDuplicate", false) && isKnown(resolver, type.name, type.fields[0], values[0]) == true) {
             return problem("This word is in AnkiDroid already.", "duplicate")
         }

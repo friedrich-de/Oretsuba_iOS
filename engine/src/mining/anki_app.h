@@ -141,6 +141,7 @@ public:
 		Kind kind = NotOurs;
 		std::string card;
 		std::vector<std::string> not_fetched;  // names of the files AnkiMobile was offered and did not fetch
+		std::vector<std::string> left_out;     // names of the files it was not offered (Prepared::left_out)
 	};
 
 	// `return_link` is this app's own link that AnkiMobile opens when it is
@@ -169,6 +170,7 @@ private:
 	std::string return_link_;
 	std::string card_;
 	std::vector<std::pair<std::string, std::string>> offered_;  // name, link
+	std::vector<std::string> left_out_;
 };
 
 // ---------------------------------------------------------------- what the host does for an Anki app
@@ -212,7 +214,7 @@ private:
 // app, so both answer later, through `tell`:
 //
 //   anki.lists        {"ok":true,"lists":{profiles,decks,noteTypes}}  or  {"ok":false,"problem":".."}
-//   card.added        {"card":"..","notFetched":["file", ..]}
+//   card.added        {"card":"..","notFetched":["file", ..],"leftOut":["file", ..]}
 //   card.unconfirmed  {"card":"..","reason":".."}
 //
 // `tell` is called from a thread of this object's or from the host's.
