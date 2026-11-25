@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
+#include <vector>
 
 #include "util/log.h"
 
@@ -116,6 +118,35 @@ void blit(Image &dst, const Image &src, int x, int y, Rect sr, int mode, int opa
 		for (int j = 0; j < h; ++j) memcpy(dst.row32(y + j) + x, src.row32(sr.t + j) + sr.l, size_t(w) * 4);
 		return;
 	}
+	if (!keyed && mode == kBlendAlpha && opa == 255 && !hda) {
+		// The original's kernel for this case (tvpgl, mode 2 at full opacity) walks
+		// a row in pairs of pixels that begin on an 8 byte boundary of the
+		// destination, whose rows follow each other without padding. Where both
+		// source pixels of a pair are opaque it copies them, so full white stays
+		// 255. A pixel alone at either end is copied when it is opaque. Every
+		// other pixel is mixed, an opaque one too, which then ends one short.
+		auto one = [](uint32_t d, uint32_t s) { return (s >> 24) == 255 ? (s & 0xffffff) : alpha_mix(d, s, s >> 24); };
+		for (int j = 0; j < h; ++j) {
+			const uint32_t *s = src.row32(sr.t + j) + sr.l;
+			uint32_t *d = dst.row32(y + j) + x;
+			int i = 0;
+			if (((y + j) * dst.width() + x) & 1) {
+				d[0] = one(d[0], s[0]);
+				i = 1;
+			}
+			for (; i + 1 < w; i += 2) {
+				if (((s[i] & s[i + 1]) >> 24) == 255) {
+					d[i] = s[i] & 0xffffff;
+					d[i + 1] = s[i + 1] & 0xffffff;
+				} else {
+					d[i] = alpha_mix(d[i], s[i], s[i] >> 24);
+					d[i + 1] = alpha_mix(d[i + 1], s[i + 1], s[i + 1] >> 24);
+				}
+			}
+			if (i < w) d[i] = one(d[i], s[i]);
+		}
+		return;
+	}
 	for (int j = 0; j < h; ++j) {
 		const uint32_t *s = src.row32(sr.t + j) + sr.l;
 		uint32_t *d = dst.row32(y + j) + x;
@@ -182,6 +213,42 @@ void stretch_blit(Image &dst, const Image &src, int x, int y, int dw, int dh, Re
 			drow[px] = blend_px(drow[px], s, mode, opa >= 255 ? 255 : opa, hda);
 		}
 	}
+}
+
+bool reduce_tent(Image &dst, const Image &src) {
+	const int w = dst.width(), h = dst.height();
+	if (w < 1 || h < 1 || dst.bpp() != 32 || src.bpp() != 32) return false;
+	if (src.width() % w || src.height() % h) return false;
+	const int kx = src.width() / w, ky = src.height() / h, sh = src.height();
+	// rows first: sh rows of w pixels, three channels each
+	std::vector<uint8_t> mid(size_t(sh) * w * 3);
+	for (int y = 0; y < sh; ++y) {
+		const uint32_t *s = src.row32(y);
+		uint8_t *m = &mid[size_t(y) * w * 3];
+		for (int j = 0; j < w; ++j) {
+			uint32_t sum[3] = {0, 0, 0};
+			for (int u = 1 - kx; u < kx; ++u) {
+				uint32_t p = s[std::abs(j * kx + u)], wt = uint32_t(kx - std::abs(u));
+				sum[0] += wt * (p & 255), sum[1] += wt * (p >> 8 & 255), sum[2] += wt * (p >> 16 & 255);
+			}
+			for (int c = 0; c < 3; ++c) m[j * 3 + c] = uint8_t((sum[c] + uint32_t(kx * kx / 2)) / uint32_t(kx * kx));
+		}
+	}
+	for (int i = 0; i < h; ++i) {
+		uint32_t *d = dst.row32(i);
+		for (int j = 0; j < w; ++j) {
+			uint32_t sum[3] = {0, 0, 0};
+			for (int u = 1 - ky; u < ky; ++u) {
+				const uint8_t *m = &mid[(size_t(std::abs(i * ky + u)) * w + j) * 3];
+				uint32_t wt = uint32_t(ky - std::abs(u));
+				sum[0] += wt * m[0], sum[1] += wt * m[1], sum[2] += wt * m[2];
+			}
+			uint32_t px = 0xff000000u;
+			for (int c = 0; c < 3; ++c) px |= ((sum[c] + uint32_t(ky * ky / 2)) / uint32_t(ky * ky)) << (8 * c);
+			d[j] = px;
+		}
+	}
+	return true;
 }
 
 void affine_blit(Image &dst, const Image &src, Rect sr, double a, double b, double c, double d, double tx, double ty,

@@ -174,18 +174,48 @@ int Engine::restore_state_blob(const std::vector<uint8_t> &blob) {
 
 // ---------------------------------------------------------------- save files
 
+// The small picture in a save (the original's save routine at 0x41dc00). A
+// picture made for the scene, SYS\_<name>, is stored as it is. Without one the
+// save is left blank when the script asks for that, and otherwise shows the
+// screen as it stands, reduced 8:1.
 std::vector<uint8_t> Engine::thumbnail(int w, int h) {
 	std::vector<uint8_t> out(size_t(w) * h * 3, 0);
-	bool blank = thumb_flag_ptr[1] && vm.mem().rd32(thumb_flag_ptr[1]);
-	if (blank) return out;
-	ImageRef src;
+	auto store = [&](const Image &img) {
+		for (int y = 0; y < h && y < img.height(); ++y)
+			for (int x = 0; x < w && x < img.width(); ++x) {
+				uint32_t p = img.row32(y)[x];
+				uint8_t *d = &out[(size_t(y) * w + x) * 3];
+				d[0] = uint8_t(p), d[1] = uint8_t(p >> 8), d[2] = uint8_t(p >> 16);
+			}
+	};
 	if (thumb_name_ptr) {
-		std::string name = vm.mem().cstr(thumb_name_ptr);
-		if (!name.empty() && name.find('\\') == std::string::npos) src = load_image("SYS\\_" + name + ".ELG", false);
+		// the name's last part; a backslash can be the second byte of a Shift-JIS letter
+		std::string name = vm.mem().cstr(thumb_name_ptr), base;
+		for (size_t i = 0; i < name.size(); ++i) {
+			uint8_t c = uint8_t(name[i]);
+			if (((c >= 0x81 && c <= 0x9f) || (c >= 0xe0 && c <= 0xfc)) && i + 1 < name.size()) {
+				base += name[i];
+				base += name[++i];
+			} else if (c == '\\' || c == '/') {
+				base.clear();
+			} else {
+				base += name[i];
+			}
+		}
+		std::string path = "SYS\\_" + base + ".ELG";
+		if (!base.empty() && vfs.exists(path))
+			if (ImageRef made = load_image(path, false)) {
+				if (made->bpp() == 32) store(*made);
+				return out;
+			}
 	}
-	if (!src && thumb_source) {
+	if (thumb_flag_ptr[1] && vm.mem().rd32(thumb_flag_ptr[1])) return out;
+	ImageRef src;
+	if (thumb_source) {
 		if (Surface *s = surface_of(thumb_source)) {
-			s->update(now);
+			// The page as it was last shown, so with the button under the pointer
+			// lit; it is composed anew only when the script asks (N_37, flag 0).
+			if (thumb_flag_ptr[0] && vm.mem().rd32(thumb_flag_ptr[0])) s->update(now);
 			src = s->image_ref();
 		} else {
 			src = image_of(thumb_source);
@@ -193,13 +223,8 @@ std::vector<uint8_t> Engine::thumbnail(int w, int h) {
 	}
 	if (!src) src = std::make_shared<Image>(frame_);
 	Image small(w, h, 32);
-	stretch_blit(small, *src, 0, 0, w, h, src->rect(), 0, 2, 255, false);
-	for (int y = 0; y < h; ++y)
-		for (int x = 0; x < w; ++x) {
-			uint32_t p = small.row32(y)[x];
-			uint8_t *d = &out[(size_t(y) * w + x) * 3];
-			d[0] = uint8_t(p), d[1] = uint8_t(p >> 8), d[2] = uint8_t(p >> 16);
-		}
+	if (!reduce_tent(small, *src)) stretch_blit(small, *src, 0, 0, w, h, src->rect(), 0, 2, 255, false);
+	store(small);
 	return out;
 }
 

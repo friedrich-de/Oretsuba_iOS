@@ -567,10 +567,19 @@ Before serialising, FUN_00423070 refreshes copy2 with the live values of the
 N_28-registered vars (G[806], G[807], G[785], G[786], …). Everything else is
 "as of the start of the current scene".
 
-Thumbnail source (§7.3 N_29/N_37) **[V/G]**: if `eng+0x118` names an image, the
-file `SYS\_<name>` (pre-rendered 100×75 thumbnails `_asu16c.elg`… exist in
-SYS.LPK) is used; otherwise the source object (eng+0x114) is rendered and
-stretched to 100×75; if `*(eng+0x134)` the thumbnail is blank.
+Thumbnail (§7.3 N_29/N_37, save routine at 0x41dc00 after the +0x20 shift) **[V, measured
+2026-11-25]**: the last part of the name at `eng+0x118` (Shift-JIS aware) gives
+`SYS\_<name>` (pre-rendered 100×75 thumbnails `_asu16c.elg`… exist in SYS.LPK); if that
+file loads it is stored as it is. Without it: if `*(eng+0x134)` the thumbnail stays blank;
+else the picture of the source page (`[[eng+0x114]+0x30]`) is reduced to 100×75. That
+picture is the page as it was last shown, so it holds the text window, the button bar and
+the SAVE button in the state the pointer left it in; only when `*(eng+0x130)` is set (or
+the source's `vt+0x50` returns an object) is the page composed anew into an 800×600
+picture first. The reduction (tvpgl stretch, flags 2) at 8:1 is a tent over 15 source
+pixels centred on pixel `8j`, rows first, each pass rounded:
+`h[y][j] = (Σ_{u=−7..7} (8−|u|)·s[y][8j+u] + 32) >> 6`, then the same down the columns of
+`h`; indices below 0 are mirrored. This reproduces all 7,500 pixels of a save the original
+wrote. Whether flags 2 gives the same filter at other ratios is not known.
 Text preview: last backlog entry, only if `app+0xedd` (option) and log
 non-empty and `*(eng+0x120)` (G[909]) non-zero.
 
@@ -931,9 +940,8 @@ N_6 hardware queries (constants), N_7(1) (NULL). Keep N_7(0) returning the GUID.
 * `app+0x1af0` (interrupt request) is never set in the EXE; is there any other
   path that sets ScriptBootFlg (T[1]) ≠0 besides FUN_004251d0? (MAIN's `T[1]`
   branch then only matters for the load path via `G[910]`.)
-* Thumbnail row order (top-down vs bottom-up DIB) and exact capture path when
-  `*(eng+0x130)` is set (FUN_0043bc20 renders the layer tree into an 800×600
-  surface first) — verify by decoding a real save.
+* What the object is that the thumbnail source's `vt+0x50` returns (with it, as with
+  `*(eng+0x130)`, the page is composed anew before it is reduced).
 * Exact meaning of many option bytes in app+0xe40..0xee3 (table §7.2): only
   consumers were located; the message/sound/input docs should name them.
 * N_35 animation parameters (which value goes to which keyframe).
