@@ -25,6 +25,13 @@ void blit(Image &dst, const Image &src, int x, int y, Rect src_rect, int mode, i
 void stretch_blit(Image &dst, const Image &src, int x, int y, int dw, int dh, Rect src_rect, int mode, int filter,
                   int opacity, bool hda, const Rect *clip = nullptr);
 
+// Reduction by a whole factor k, the way the original makes a save's small
+// picture (its stretch with filter 2 at 8:1): a tent over 2k-1 source pixels
+// centred on pixel k*j, weights k-|u|, rows first, each pass rounded, pixels
+// left of or above the picture mirrored. Colour only; alpha becomes 255.
+// False when src is not a whole multiple of dst in both directions.
+bool reduce_tent(Image &dst, const Image &src);
+
 // Affine blit: maps destination pixels back through the inverse of
 // (src -> dst) = [a b; c d] + (tx, ty), nearest sampling of src_rect.
 void affine_blit(Image &dst, const Image &src, Rect src_rect, double a, double b, double c, double d, double tx,

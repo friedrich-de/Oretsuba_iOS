@@ -66,6 +66,63 @@ build of the test host (without `VOICE.LPK`) and on a Mac with macOS 26.6 and Xc
 **Not checked:** a real iPhone, iPad or Vision Pro. On an iPhone in landscape the switch lies below the start
 button and is reached by scrolling.
 
+## Next to the original game, 2026-11-25
+
+`ORE_TUBA.EXE` 1.01 and this port's test host for Windows (`engine/Makefile.win`) ran side by side on one Windows
+PC, with the same settings file and the same saves, and their pictures were compared pixel by pixel. The original
+was driven by an agent inside its process that reads the script's variables and sends clicks to its window; its
+picture was read with `BitBlt` from a thread that is not DPI aware. (`PrintWindow` on a scaled screen returns the
+picture moved by a third of a pixel and made an early comparison look worse than it was.)
+
+**Same in both without any change:** the title, complete at the same frame; 40 opening lines with the same letter
+positions, line breaks and rows; the background above the text box on those lines, pixel for pixel; the list of
+saves.
+
+**Found and changed to what the original does.** The rules are written down in [docs/re](re/).
+
+| What | Before | Now |
+|---|---|---|
+| Sizes and checksum in a save file | 8 bytes too early, so a save of the original did not load | Where the original has them; both places are read |
+| Text history and RETURN in a save | A layout of the port's own; after loading an original save both were gone | The original's layout: a save the port writes has the same state bytes as one the original writes at the same line, and each game loads the other's saves with the same pictures |
+| Memo mark in the save list | On every save | Only on a save with a memo |
+| Speaker's name in the name box | 2 px too far right | The same pixels for four names |
+| Letter cells at odd sizes | Half a cell rounded down, ascent from a rule of thumb | GDI's numbers; text at the sizes the script's size tags reach sits where the original's does |
+| Name box background | The built-in 50 percent | The settings' window shade, as for the text window |
+| Shade of the text, name and choice windows | Opacity rounded down, the frame laid over it with the letters' formula | Rounded to the nearest, the frame laid over it pair by pair as the original does |
+| Choice window | Drawn from its y downwards, 37 px too low with two options | Centred on its y |
+| Scroll bar arrows | Always lit, and in the text history 3 px too far right | Grey at the end of the range they point to, at the bar's own place |
+| Small picture in a save | The page composed anew, one bilinear sample per pixel | The page as last shown, reduced with the original's filter |
+| Opaque pixels of pictures with alpha | Mixed like the soft ones: white letters 254, opaque sprite pixels one short | Copied where the original copies them |
+
+**Measured after the changes,** original against port at the same line:
+
+- A line with a character on screen and a speaker's name: 54 of the 480,000 pixels differ, each by 1 (before the
+  changes of this round 74,247 differed). The scene above the text box has no differing pixel on any of 16 lines.
+  The white of the letters is the same on both sides, 406 pixels at 255 and 22 at 254.
+- The choice window, reached by playing and through RETURN: the same frame lines, text rows and highlight; 230 of
+  its 54,225 pixels differ by 1, along the frame's edge.
+- The text history on its newest, a middle and its oldest page: the whole picture is the same, pixel for pixel.
+- A save made at the same line in the same way: the scene part of the small picture is the same; the text box part
+  differed by a few steps in 644 of 7,500 pixels before the shade was corrected and was not measured again after.
+- Saves: a player's own saves of the original load in the port with RETURN and LOG lit and 51 entries in the text
+  history, and RETURN leads to the same choice.
+- All of the engine's checks pass with these changes on a Mac with macOS 26.6 and Xcode 27.2, the four flow tests
+  with the game among them.
+
+**What still differs, each by one step of 255:** a few half-covered edge pixels of letters over the window shade
+(14 on the line above), the edge pixels of a choice's text under the pointer, the choice window's frame edge, and
+the small blue button that waits for a click (40 pixels). The likely cause is the same in all four, rounding in the
+drawing of soft pixels onto a picture that has alpha of its own; it was not traced.
+
+
+**Left as it is:** the original moves the mouse pointer onto the default button of a dialog and onto the first
+option of a choice, a setting that is on when the game is installed. The port keeps that off, since on a touch
+screen it would only light a button nobody pointed at. The original packs `GAMEDATA.DAT` and `TEXT_LOG.DAT`; the
+port writes them unpacked, and the original reads those.
+
+**Not compared:** effects and transitions between pictures, a choice with three or more options, and the menus
+other than save, load and the text history.
+
 ## The original project's checks on devices, 2026-10-18
 
 The original project checked its versions 0.1.0 and 0.1.1 on real devices. It played with a Chinese translation
@@ -91,13 +148,14 @@ which no script has run yet are kept for the next logic frame.
 
 ## Automatic checks
 
-- `save_roundtrip`: a save of a normal scene, the global progress and the read history are written and read again.
+- `save_roundtrip`: a save of a normal scene, the global progress, the read history and the text history with a
+  choice are written and read again, and the text history lies in the file the way the original game writes it.
 - `quick_save`: a negative number stands for the newest quick save, the ring overwrites its oldest entry, the state is
   restored, reading does not move the index, and an empty ring is handled.
 - `command_input`: native menu commands are taken once, following the game's own mapping; History toggles; confirm,
   cancel and the four directions are held and released.
-- `image_blend`: a transparent menu panel, a half-transparent overlay, a transparent source, extra opacity, and the
-  blending of sprites as before.
+- `image_blend`: a transparent menu panel, a half-transparent overlay, a transparent source, extra opacity, the
+  blending of sprites with opaque pixels copied pair by pair, and the reduction for a save's small picture.
 - `native_coverage`: every native a script refers to has a registered handler. This checks registration only, not
   what a handler does.
 - `tools/test_save.py`: saves and loads through the game's menus and is back in the text at the saved sentence.

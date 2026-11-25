@@ -127,7 +127,9 @@ void Font::set_antialias(int mode) {
 }
 
 int Font::ascent() const {
-	return (size * 86 + 50) / 100;  // MS Gothic tmAscent / em
+	// MS Gothic's tmAscent: 220 of the em's 256 units, rounded. GDI's answers for
+	// 8 to 48 px (orehost --font-report on Windows) are exactly these.
+	return (size * 220 + 128) / 256;
 }
 
 uint16_t Font::next_char(const char *&p, TextEncoding enc) {
@@ -144,8 +146,9 @@ uint16_t Font::next_char(const char *&p, TextEncoding enc) {
 
 namespace {
 
-// Fixed-pitch faces (MS Gothic/Mincho): full-width = em, half-width = em/2.
-// Proportional "Ｐ" faces use the platform advance.
+// Fixed-pitch faces (MS Gothic/Mincho): GDI gives a half-width letter a cell of
+// half the size, rounded up, and a full-width letter two of them, so an odd
+// size is one wider than the em. Proportional "Ｐ" faces use the platform advance.
 bool fixed_pitch(const std::string &face) {
 	return face.find("\x82\x6f") == std::string::npos;
 }
@@ -231,7 +234,7 @@ int Font::advance(uint16_t code) {
 	int cx;
 	if (code == '\n' || code == '\r') return 0;
 	if (fixed_pitch(face))
-		cx = code > 0xff ? size : size / 2;
+		cx = (size + 1) / 2 * (code > 0xff ? 2 : 1);
 	else
 		cx = get_glyph(*this, code, false, false).adv;
 	if (bold) cx = cx + 1 + cx / 50;

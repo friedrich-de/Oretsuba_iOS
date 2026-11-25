@@ -446,10 +446,22 @@ d' = rb + g                       // dest alpha := 0   (HDA variant 0x1000f6b0 k
 // mode 0, opa==255  : straight copy of the 32-bit pixel (alpha copied)
 ```
 Note the `>>8` (not /255): with a=255, s=255, d=0 the result is `(255*255)>>8 = 254`, so
-fully opaque alpha pixels are *not* exactly the source colour (error ≤ 1 per channel).
-Only the C reference kernels were read; the MMX/SSE kernels selected at run time
-(tvpgl:0x1002cf00, e.g. 0x1003bae0/0x1003c260 for mode 2) are assumed to give the same
-result (Kirikiri convention) – unverified.
+a mixed pixel that is fully opaque is *not* exactly the source colour (error ≤ 1 per channel).
+
+**The kernel that runs** for mode 2 at full opacity without HDA (tvpgl rva 0x3c260; measured
+2026-11-25 by calling it on buffers at every alignment) adds a copy rule to that formula. It
+walks a row in pairs of pixels that begin on an 8 byte boundary of the destination (a
+picture's rows follow each other without padding, so in a picture of odd width the pairs
+shift by one pixel on every other row). Where both source pixels of a pair have alpha 255,
+both are copied unchanged. A pixel alone before the first pair or after the last one is
+copied when its alpha is 255. Every other pixel is mixed with the formula above, an opaque
+one too. So a run of opaque white keeps 255 inside and can end at 254 where it meets a soft
+pixel in the same pair. The mixed pixels' alpha is `dA + (((a − dA)·a) >> 8)`. The page
+compositor calls it for the message window in strips of 8 rows over the window's full width.
+With `opa < 255` (rva 0x3c3ec): `a' = (sa·opa) >> 8`, the same colour formula, no copy rule seen.
+Of the MMX/SSE kernels selected at run time (tvpgl:0x1002cf00) only the ones for mode 2
+were measured (above); for the other modes they are assumed to give the same result as
+the C reference versions (Kirikiri convention) – unverified.
 
 Jump-table → kernel globals (tvpgl data addresses; `—` = only 2 variants):
 

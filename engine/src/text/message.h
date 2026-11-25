@@ -13,6 +13,8 @@ namespace ore {
 
 class Engine;
 struct ScriptInitEntry;
+class ByteReader;
+class ByteWriter;
 
 // One step of the body scanner (FUN_00456540).
 enum MsgCode {
@@ -91,8 +93,12 @@ public:
 	void push_backlog();         // FUN_00455590
 	Entry *backlog_at(int k);    // 0 = oldest
 	int load_backlog(int k);     // FUN_00456380, 0 ok / -1
-	std::vector<uint8_t> save_log() const;
-	void load_log(const std::vector<uint8_t> &data);
+	// The backlog inside a save, laid out as the original lays it out
+	// (docs/re/10_lifecycle_system.md §6.1). `keep` false reads past it.
+	void save_log(ByteWriter &w) const;
+	bool load_log(ByteReader &r, bool keep);
+	// "BLOG": the layout this port wrote before it was compared with the original.
+	void load_log_earlier(const std::vector<uint8_t> &data);
 
 	// ---- choices
 	bool choices_enabled = true;  // +0x3e
