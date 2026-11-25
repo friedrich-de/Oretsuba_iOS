@@ -164,7 +164,8 @@ const Glyph &get_glyph(Font &f, uint16_t code, bool edge, bool bold) {
 	Engine &e = f.engine;
 	uint32_t cp = e.platform.decode_char(code, e.encoding);
 	GlyphBitmap gb;
-	if (cp > 0x20 && cp != 0x3000 && e.platform.render_glyph(cp, f.face, f.size, bold ? 700 : 400, gb)) {
+	if (cp > 0x20 && cp != 0x3000 &&
+	    e.platform.render_glyph_aa(cp, f.face, f.size, bold ? 700 : 400, f.antialias, gb)) {
 		g.w = gb.width;
 		g.h = gb.height;
 		g.ox = gb.left;

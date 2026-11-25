@@ -1,9 +1,16 @@
-// Headless test host: runs the engine on macOS without a window, feeding
-// scripted input and writing PNG screenshots.
+// Headless test host: runs the engine without a window, feeding scripted
+// input and writing PNG screenshots. It is built for macOS (Makefile), for
+// Windows (Makefile.win), where it stands next to the original game, and for
+// Linux (Makefile.linux), where no Mac is at hand.
 //
 //   orehost --data DIR [--save DIR] [--frames N]
 //           [--input FILE] [--shot F,F,...] [--shot-every N] [--out DIR]
-//           [--trace HEX,HEX,...]
+//           [--trace HEX,HEX,...] [--autosave LINES] [--resume]
+//
+// --autosave and --resume keep the reader's place as the app's switch does
+// (docs/AUTOSAVE.md): a silent save every LINES lines, and a start at that save.
+//   orehost --font-report     (Windows only) what GDI answers for the game's two
+//                             faces at 8 to 48 px, to check the port's metrics
 //
 // The input file holds one command per line, keyed by frame number:
 //   <frame> click X Y        left click (press now, release 3 frames later)
@@ -31,7 +38,15 @@
 
 #include "core/engine.h"
 #include "mining/mining_tap.h"
+#if defined(_WIN32)
+#include <direct.h>
+
+#include "win/win_platform.h"
+#elif defined(__APPLE__)
 #include "platform/apple/apple_platform.h"
+#else
+#include "linux/linux_platform.h"
+#endif
 #include "stb_image_write.h"
 #include "util/log.h"
 
@@ -43,9 +58,20 @@ struct Cmd {
 	std::string s;
 };
 
-class HostPlatform : public ore::ApplePlatform {
+#if defined(_WIN32)
+using BasePlatform = ore::WinPlatform;
+void make_dir(const std::string &path) { _mkdir(path.c_str()); }
+#elif defined(__APPLE__)
+using BasePlatform = ore::ApplePlatform;
+void make_dir(const std::string &path) { mkdir(path.c_str(), 0755); }
+#else
+using BasePlatform = ore::LinuxPlatform;
+void make_dir(const std::string &path) { mkdir(path.c_str(), 0755); }
+#endif
+
+class HostPlatform : public BasePlatform {
 public:
-	using ApplePlatform::ApplePlatform;
+	using BasePlatform::BasePlatform;
 	int64_t clock = 0;
 	int64_t now_ms() override { return clock; }
 	void begin_dialog(const std::string &text, int kind) override {
@@ -70,7 +96,8 @@ void write_png(const ore::Image &img, const std::string &path) {
 int main(int argc, char **argv) {
 	std::string data, save = "/tmp/orehost_save", input, out = "/tmp/orehost";
 	std::string trace;  // comma-separated hex native indices
-	int frames = 600, shot_every = 0;
+	int frames = 600, shot_every = 0, autosave = 0;
+	bool resume = false;
 	std::set<int> shots;
 	for (int i = 1; i < argc; ++i) {
 		std::string a = argv[i];
@@ -87,6 +114,18 @@ int main(int argc, char **argv) {
 			while (std::getline(ss, t, ',')) shots.insert(atoi(t.c_str()));
 		} else if (a == "--debug") ore::set_log_level(ore::LogLevel::Debug);
 		else if (a == "--trace") trace = next();
+		else if (a == "--autosave") autosave = atoi(next().c_str());
+		else if (a == "--resume") resume = true;
+#ifdef _WIN32
+		else if (a == "--font-report") {
+			// "ＭＳ ゴシック" and "ＭＳ 明朝" in the game's encoding
+			const char *faces[] = {"\x82\x6c\x82\x72 \x83\x53\x83\x56\x83\x62\x83\x4e",
+			                       "\x82\x6c\x82\x72 \x96\xbe\x92\xa9"};
+			ore::WinPlatform p(".");
+			for (const char *face : faces) fputs(p.font_report(face, 8, 48).c_str(), stdout);
+			return 0;
+		}
+#endif
 		else {
 			fprintf(stderr, "unknown option %s\n", a.c_str());
 			return 2;
@@ -116,10 +155,12 @@ int main(int argc, char **argv) {
 			cmds.emplace(frame, c);
 		}
 	}
-	mkdir(out.c_str(), 0755);
+	make_dir(out);
 	HostPlatform platform(save);
 	ore::EngineConfig cfg;
 	cfg.data_dir = data;
+	cfg.autosave_lines = autosave;
+	cfg.resume = resume;
 	ore::Engine engine(platform, cfg);
 	std::string err;
 	if (!engine.boot(&err)) {

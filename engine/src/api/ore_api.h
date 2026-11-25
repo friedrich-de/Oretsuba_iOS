@@ -13,6 +13,11 @@ typedef struct OreEngine OreEngine;
 typedef struct OreConfig {
 	const char *data_dir;   /* folder holding the *.LPK archives */
 	const char *save_dir;   /* writable folder for saves and settings */
+	/* Keeping the reader's place (docs/AUTOSAVE.md): a silent save into a slot
+	   of its own every this many lines and when the app leaves the screen
+	   (0 = none), and whether the game starts at that save, past the title. */
+	int autosave_lines;
+	int resume;
 } OreConfig;
 
 /* Returns NULL on failure with a UTF-8 message in err. */

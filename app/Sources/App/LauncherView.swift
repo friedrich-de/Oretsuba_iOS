@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 struct LauncherView: View {
     @EnvironmentObject private var model: AppModel
     @State private var showingImporter = false
+    @AppStorage(GamePaths.keepsPlaceKey) private var keepsPlace = false
 
     var body: some View {
         ScrollView {
@@ -19,9 +20,11 @@ struct LauncherView: View {
                     Button {
                         model.start()
                     } label: {
-                        Text("Start game").font(.title2.bold()).frame(maxWidth: .infinity).padding(.vertical, 8)
+                        Text(keepsPlace && GamePaths.hasAutosave ? "Continue" : "Start game")
+                            .font(.title2.bold()).frame(maxWidth: .infinity).padding(.vertical, 8)
                     }
                     .buttonStyle(.borderedProminent)
+                    optionsCard
                 }
                 importCard
                 if let error = model.errorMessage {
@@ -70,6 +73,17 @@ struct LauncherView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var optionsCard: some View {
+        GroupBox("Options") {
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle("Auto save and continue", isOn: $keepsPlace)
+                Text("Saves without a sound every \(GamePaths.autosaveLines) lines and when you leave the app, into a slot of its own that the game's menus do not show. The game then starts at that line, past the title menu. Your saves and quick saves stay as they are.")
+                    .font(.footnote).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

@@ -308,6 +308,7 @@ MessageWindow::MessageWindow(Engine &e, UiSystem &ui, MessageManager &m) : TextW
 
 MessageWindow::~MessageWindow() {
 	if (engine.mining) engine.mining->window_gone(*this);
+	engine.autosave_window_gone(*this);
 	if (ctrl) {
 		ctrl->win = nullptr;
 		engine.tasks.kill(ctrl);
@@ -386,6 +387,7 @@ int MessageWindow::show(bool allow_skip) {
 	int result = start(false, allow_skip);
 	// The game shows a line to the reader here; the history screen goes through show_instant.
 	if (result == 0 && engine.mining) engine.mining->line_shown(*this);
+	if (result == 0) engine.autosave_line_started(*this);
 	return result;
 }
 

@@ -52,7 +52,8 @@ asks once for access to the local network.
   still appearing has only its first words in the picture.
 * The text goes without the engine's tags and line breaks. The voice is the game's own Ogg file, as it is. The
   screenshot is the 800x600 screen at that moment, with the text box, as a JPEG of about 100 KB.
-* The history screen sends nothing. A line shown again after a menu or a load is not sent twice.
+* The history screen sends nothing. A line shown again after a menu or a load is not sent twice, and neither is
+  the line the game starts at with [auto save and continue](AUTOSAVE.md).
 
 Sending happens beside the game, which never waits for the network. Without a connection up to 64 lines are kept
 and sent in their order once the server answers again; beyond that the oldest go. If the server does not take the

@@ -26,9 +26,15 @@ class TextSystem;
 class UiSystem;
 class Font;
 class MiningTap;
+class MessageWindow;
 
 struct EngineConfig {
 	std::string data_dir;
+	// Keeping the reader's place (docs/AUTOSAVE.md). A silent save into a slot of
+	// its own every this many lines and when the app leaves the screen; 0 = none.
+	int autosave_lines = 0;
+	// Start at that save, past the logo and the title, when there is one.
+	bool resume = false;
 };
 
 class Engine {
@@ -156,10 +162,29 @@ public:
 	// Sends the lines the player reads to a mining server; null without a mining.txt (docs/MINING.md).
 	std::unique_ptr<MiningTap> mining;
 
+	// Keeping the reader's place (autosave.cpp, docs/AUTOSAVE.md). Bank 12 is one
+	// no menu of the game shows: banks 0 to 9 are its pages, 10 and 11 its own rings.
+	static constexpr int kAutosaveBank = 12, kAutosaveSlot = 0;
+	std::string autosave_file_name() const;
+	void autosave_line_started(MessageWindow &window);  // native 0x2fa began a line
+	void autosave_window_gone(MessageWindow &window);
+	// MAIN is about to call this script: true when the engine answers in its place.
+	bool resume_instead_of(const std::string &script);
+
 private:
 	void register_natives();
 	void render_frame();
 	bool run_vm();
+	int write_save_file(int bank, int slot);
+	bool autosave_in_scene();
+	void autosave_after_step();
+	void autosave_on_leaving();
+	void autosave_write();
+	MessageWindow *autosave_window_ = nullptr;  // the window of the line on the screen
+	bool autosave_fresh_ = false;               // a line began in the script's last step
+	int autosave_count_ = 0;                    // lines begun since the last save
+	int64_t autosave_last_ = -1;
+	bool resume_pending_ = false;
 
 	std::string error_;
 	Image frame_{kWidth, kHeight, 32};

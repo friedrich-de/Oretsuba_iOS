@@ -49,6 +49,7 @@ Engine::Engine(Platform &p, EngineConfig cfg)
 
 Engine::~Engine() {
 	if (booted_) {
+		autosave_on_leaving();
 		write_gamedata();
 		write_textlog();
 		save_options();
@@ -95,6 +96,7 @@ bool Engine::boot(std::string *err) {
 	rng_state = uint32_t(platform.now_ms()) | 1;
 	if (!vm.start("MAIN", err)) return false;
 	mining = MiningTap::open(*this);
+	resume_pending_ = config.resume;
 	booted_ = true;
 	return true;
 }
@@ -104,6 +106,7 @@ void Engine::set_paused(bool p) {
 	sound.set_paused(p);
 	if (p && mining) mining->leaving();
 	if (p) {
+		autosave_on_leaving();
 		write_gamedata();
 		write_textlog();
 		save_options();
@@ -136,6 +139,7 @@ int Engine::frame(int64_t t) {
 	tasks.tick(now);
 	for (int i = 0; i < steps; ++i) {
 		if (!run_vm()) return -1;
+		autosave_after_step();
 		if (quit_requested) break;
 		if (i == 0) input.clear_edges();
 	}

@@ -30,6 +30,14 @@ public:
 	// (e.g. "ＭＳ ゴシック"), em size `size` px. `weight` follows LOGFONT (400/700).
 	virtual bool render_glyph(uint32_t codepoint, const std::string &face, int size, int weight,
 	                          GlyphBitmap &out) = 0;
+	// The same, told the font's antialias mode (0 = one bit, 1 = 17 grey levels,
+	// 2 = 65 levels), for a host whose rasterizer has these modes as the original's
+	// GDI does. Every other host draws full coverage and the font reduces it.
+	virtual bool render_glyph_aa(uint32_t codepoint, const std::string &face, int size, int weight, int antialias,
+	                             GlyphBitmap &out) {
+		(void)antialias;
+		return render_glyph(codepoint, face, size, weight, out);
+	}
 
 	// Monotonic milliseconds.
 	virtual int64_t now_ms() = 0;

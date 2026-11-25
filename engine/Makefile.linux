@@ -1,0 +1,55 @@
+# Linux build of the headless test host, for a machine without a Mac (a
+# container, a build server). Letters come from FreeType and a font file
+# (ORE_FONT, or one of the usual Japanese fonts), so they do not look like the
+# original's; everything else is the same engine.
+#
+#   make -C engine -f Makefile.linux        build/host-linux/orehost
+#   make -C engine -f Makefile.linux clean
+#
+# Needs g++, make and the FreeType headers (Debian: libfreetype-dev).
+
+BUILD   := ../build/host-linux
+CXX     := g++
+CC      := gcc
+FT_CFLAGS := $(shell pkg-config --cflags freetype2)
+FT_LIBS   := $(shell pkg-config --libs freetype2)
+CXXFLAGS:= -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -Isrc -Ithird_party -Ihost
+CFLAGS  := -O2 -w -Ithird_party
+
+CPP_SRCS := $(wildcard src/*/*.cpp src/*/*/*.cpp src/*/*/*/*.cpp)
+C_SRCS   := $(wildcard src/*/*.c src/*/*/*.c)
+OBJS := $(CPP_SRCS:%.cpp=$(BUILD)/obj/%.o) $(C_SRCS:%.c=$(BUILD)/obj/%.o) \
+        $(BUILD)/obj/host/main.o $(BUILD)/obj/host/linux_platform.o $(BUILD)/obj/host/stb_write.o
+DEPS := $(OBJS:.o=.d)
+
+all: $(BUILD)/orehost
+
+$(BUILD)/obj/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
+
+$(BUILD)/obj/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
+
+$(BUILD)/obj/host/main.o: host/main.mm
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -MMD -MP -x c++ -c $< -o $@
+
+$(BUILD)/obj/host/linux_platform.o: host/linux/linux_platform.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(FT_CFLAGS) -MMD -MP -c $< -o $@
+
+$(BUILD)/obj/host/stb_write.o: tests/stb_write_impl.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) -std=c++17 -O2 -w -Ithird_party -c $< -o $@
+
+$(BUILD)/orehost: $(OBJS)
+	$(CXX) $(OBJS) $(FT_LIBS) -lpthread -o $@
+
+clean:
+	rm -rf $(BUILD)/obj $(BUILD)/orehost
+
+-include $(DEPS)
+
+.PHONY: all clean

@@ -31,6 +31,15 @@ enum GamePaths {
         return url
     }
 
+    /// Keeping the reader's place (docs/AUTOSAVE.md): the launcher's switch,
+    /// how often the engine saves, and the save it writes.
+    static let keepsPlaceKey = "keepsPlace"
+    static var keepsPlace: Bool { UserDefaults.standard.bool(forKey: keepsPlaceKey) }
+    static let autosaveLines: Int32 = 5
+    static var hasAutosave: Bool {
+        fileManager.fileExists(atPath: saves.appendingPathComponent("DATA1200.SAV").path)
+    }
+
     /// The folder the player picked on the Mac (a security-scoped bookmark is
     /// not needed: Catalyst apps here are not sandboxed).
     static var chosenGameFolder: URL? {

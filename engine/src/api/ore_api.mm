@@ -24,6 +24,8 @@ OreEngine *ore_create(const OreConfig *config, char *err, int err_len) {
 	e->platform = std::make_unique<ore::ApplePlatform>(config->save_dir ? config->save_dir : "");
 	ore::EngineConfig cfg;
 	cfg.data_dir = config->data_dir ? config->data_dir : "";
+	cfg.autosave_lines = config->autosave_lines;
+	cfg.resume = config->resume != 0;
 	e->engine = std::make_unique<ore::Engine>(*e->platform, cfg);
 	std::string error;
 	if (!e->engine->boot(&error)) {
