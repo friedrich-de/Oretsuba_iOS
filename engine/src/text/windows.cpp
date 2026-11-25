@@ -210,6 +210,7 @@ void TextWindow::redraw_background() {
 	next_overflow = false;
 	relayout();
 	touch();
+	page_wiped();
 }
 
 void TextWindow::clear_page() {
@@ -255,6 +256,7 @@ int TextWindow::put_char(uint16_t code) {
 		adv = f->draw_char(*surface, cx, gy, code, true);
 	}
 	prev_char = code;
+	glyph_drawn(code, cx, cy, adv, line_h);
 	cx += char_spacing + adv;
 	touch();
 	return result;
@@ -267,9 +269,23 @@ void TextWindow::draw_string(const std::string &s, int x, int y) {
 	if (y >= 0) cy = mt + y;
 	relayout();
 	prev_char = 0;
+	tell_string_drawn(s, cx, cy);
 	int end = f->draw(*surface, cx, cy + (line_h - f->size), s, true);
 	cx = end + char_spacing;
 	touch();
+}
+
+// The characters of a string drawn in one go, each with the cell it takes.
+void TextWindow::tell_string_drawn(const std::string &s, int x, int y) {
+	Font *f = font();
+	const char *p = s.c_str();
+	while (f && *p) {
+		uint16_t code = Font::next_char(p, engine.encoding);
+		if (code == '\r' || code == '\n') continue;
+		int adv = f->advance(code);
+		glyph_drawn(code, x, y, adv, line_h);
+		x += adv;
+	}
 }
 
 void TextWindow::print_aligned(const std::string &s, int mode) {
@@ -308,6 +324,7 @@ MessageWindow::MessageWindow(Engine &e, UiSystem &ui, MessageManager &m) : TextW
 
 MessageWindow::~MessageWindow() {
 	if (engine.mining) engine.mining->window_gone(*this);
+	engine.kit_window_gone(*this);
 	engine.autosave_window_gone(*this);
 	if (ctrl) {
 		ctrl->win = nullptr;
@@ -387,6 +404,7 @@ int MessageWindow::show(bool allow_skip) {
 	int result = start(false, allow_skip);
 	// The game shows a line to the reader here; the history screen goes through show_instant.
 	if (result == 0 && engine.mining) engine.mining->line_shown(*this);
+	if (result == 0) engine.kit_line_shown(*this);
 	if (result == 0) engine.autosave_line_started(*this);
 	return result;
 }

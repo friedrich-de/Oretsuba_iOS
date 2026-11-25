@@ -911,6 +911,20 @@ void test_kit(const std::string &root) {
 	ask(*kit, "settings.set", R"({"anki":{"target":"connect"}})");
 
 	check(!ask(*kit, "nonsense").ok && !ask(*kit, "settings.get", "{not json").ok, "a call that is not understood says so");
+	kit->set_method("host.double", [](const json::Value &params, json::Value &result, AnkiProblem &problem) {
+		if (!params["n"].is_number()) {
+			problem.message = "No number to double.";
+			return false;
+		}
+		result = json::Value(params["n"].as_number() * 2);
+		return true;
+	});
+	call = ask(*kit, "host.double", R"({"n":21})");
+	check(call.ok && call.result.as_number() == 42, "a host adds a method of its own");
+	call = ask(*kit, "host.double");
+	check(!call.ok && call.error == "No number to double." && call.kind == "anki", "which may fail with its reason");
+	kit->set_method("host.double", nullptr);
+	check(!ask(*kit, "host.double", R"({"n":21})").ok, "and is taken away again");
 
 	// ---- what is kept
 	kit.reset();

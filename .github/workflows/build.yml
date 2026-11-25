@@ -45,6 +45,8 @@ jobs:
         run: |
           make -C engine -j4 all tests
           build/host/mining_test
+          build/host/dict_test engine
+          build/host/kit_test engine
           build/host/image_blend
           xcrun swiftc -module-cache-path build/swift-module-cache \
             app/Sources/App/FolderImport.swift app/Tests/FolderImportTests.swift \

@@ -177,7 +177,18 @@ MiningKit::MiningKit(Options options, std::shared_ptr<const dict::Deinflector> r
 	if (read_file(options_.folder + "/settings.json", text) && json::parse(text, saved) && saved.is_object()) settings_.merge(saved);
 }
 
-MiningKit::~MiningKit() = default;
+MiningKit::~MiningKit() {
+	// What a host added goes first, while the kit is whole: a target's last word still finds its listener.
+	std::map<std::string, std::shared_ptr<CardTarget>> targets;
+	std::map<std::string, KitMethod> methods;
+	{
+		std::lock_guard<std::mutex> lock(gate_);
+		targets.swap(targets_);
+		methods.swap(methods_);
+	}
+	targets.clear();
+	methods.clear();
+}
 
 KitSettings MiningKit::settings() const {
 	std::lock_guard<std::mutex> lock(gate_);
@@ -224,6 +235,14 @@ std::shared_ptr<const KitLine> MiningKit::line(int64_t *id) const {
 void MiningKit::set_target(const std::string &name, std::shared_ptr<CardTarget> target) {
 	std::lock_guard<std::mutex> lock(gate_);
 	targets_[name] = std::move(target);
+}
+
+void MiningKit::set_method(const std::string &name, KitMethod method) {
+	std::lock_guard<std::mutex> lock(gate_);
+	if (method)
+		methods_[name] = std::move(method);
+	else
+		methods_.erase(name);
 }
 
 void MiningKit::set_events(std::function<void(const std::string &, const std::string &)> sink) {
@@ -467,6 +486,18 @@ json::Value MiningKit::dispatch(const std::string &method, const json::Value &pa
 		made.speaker = params.str("speaker");
 		json::Value result = json::Value::object();
 		result.set("id", set_line(std::move(made)));
+		return result;
+	}
+	KitMethod added;
+	{
+		std::lock_guard<std::mutex> lock(gate_);
+		auto found = methods_.find(method);
+		if (found != methods_.end()) added = found->second;
+	}
+	if (added) {
+		json::Value result;
+		AnkiProblem problem;
+		if (!added(params, result, problem)) fail(problem);
 		return result;
 	}
 	throw Failure{"The app does not know what \"" + method + "\" asks for.", "internal"};
