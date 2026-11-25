@@ -5,6 +5,8 @@
 //   orehost --data DIR [--save DIR] [--frames N]
 //           [--input FILE] [--shot F,F,...] [--shot-every N] [--out DIR]
 //           [--trace HEX,HEX,...]
+//   orehost --font-report     (Windows only) what GDI answers for the game's two
+//                             faces at 8 to 48 px, to check the port's metrics
 //
 // The input file holds one command per line, keyed by frame number:
 //   <frame> click X Y        left click (press now, release 3 frames later)
@@ -102,6 +104,16 @@ int main(int argc, char **argv) {
 			while (std::getline(ss, t, ',')) shots.insert(atoi(t.c_str()));
 		} else if (a == "--debug") ore::set_log_level(ore::LogLevel::Debug);
 		else if (a == "--trace") trace = next();
+#ifdef _WIN32
+		else if (a == "--font-report") {
+			// "ＭＳ ゴシック" and "ＭＳ 明朝" in the game's encoding
+			const char *faces[] = {"\x82\x6c\x82\x72 \x83\x53\x83\x56\x83\x62\x83\x4e",
+			                       "\x82\x6c\x82\x72 \x96\xbe\x92\xa9"};
+			ore::WinPlatform p(".");
+			for (const char *face : faces) fputs(p.font_report(face, 8, 48).c_str(), stdout);
+			return 0;
+		}
+#endif
 		else {
 			fprintf(stderr, "unknown option %s\n", a.c_str());
 			return 2;

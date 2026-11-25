@@ -4,6 +4,7 @@
 
 #include <direct.h>
 
+#include <cstdio>
 #include <ctime>
 #include <vector>
 
@@ -85,7 +86,10 @@ void *WinPlatform::font_for(const std::string &face, int size, int weight) {
 	return font;
 }
 
-bool WinPlatform::render_glyph(uint32_t codepoint, const std::string &face, int size, int weight, GlyphBitmap &out) {
+// The original asks GetGlyphOutline for one bit, 17 levels or 65 levels, as the
+// font's antialias mode says, and scales the levels to 0..255 (40_text.md §9).
+bool WinPlatform::render_glyph_aa(uint32_t codepoint, const std::string &face, int size, int weight, int antialias,
+                                  GlyphBitmap &out) {
 	std::lock_guard<std::mutex> lock(mu_);
 	if (codepoint > 0xFFFF) return false;  // nothing in the game's code page lies above
 	HDC dc = static_cast<HDC>(dc_);
@@ -98,8 +102,8 @@ bool WinPlatform::render_glyph(uint32_t codepoint, const std::string &face, int 
 	out = GlyphBitmap();
 	out.advance = extent.cx;
 
-	UINT format = glyph_levels_ == 0 ? GGO_BITMAP : glyph_levels_ == 2 ? GGO_GRAY8_BITMAP : GGO_GRAY4_BITMAP;
-	int scale = glyph_levels_ == 2 ? 4 : 16;  // 65 levels times 4, 17 levels times 16
+	UINT format = antialias == 0 ? GGO_BITMAP : antialias == 2 ? GGO_GRAY8_BITMAP : GGO_GRAY4_BITMAP;
+	int scale = antialias == 2 ? 4 : 16;  // 65 levels times 4, 17 levels times 16
 	const MAT2 identity = {{0, 1}, {0, 0}, {0, 0}, {0, 1}};
 	GLYPHMETRICS gm = {};
 	DWORD bytes = GetGlyphOutlineW(dc, ch, format, &gm, 0, nullptr, &identity);
@@ -131,6 +135,61 @@ bool WinPlatform::render_glyph(uint32_t codepoint, const std::string &face, int 
 	}
 	SelectObject(dc, old);
 	return ok;
+}
+
+std::string WinPlatform::font_report(const std::string &face, int from, int to) {
+	std::lock_guard<std::mutex> lock(mu_);
+	HDC dc = static_cast<HDC>(dc_);
+	std::string out = "face asked\t" + narrow(widen(face, kCodePage), CP_UTF8) + "\n";
+	if (!dc) return out + "no device context\n";
+	// Hiragana, a kanji, a full stop, an opening bracket, a Latin letter and a half-width kana.
+	const wchar_t samples[] = {0x3042, 0x7FFC, 0x3002, 0x300C, L'A', 0xFF71};
+	const MAT2 identity = {{0, 1}, {0, 0}, {0, 0}, {0, 1}};
+	char line[256];
+	for (int size = from; size <= to; ++size) {
+		for (int weight = 400; weight <= 700; weight += 300) {
+			HFONT font = static_cast<HFONT>(font_for(face, size, weight));
+			if (!font) continue;
+			HGDIOBJ old = SelectObject(dc, font);
+			wchar_t chosen[LF_FACESIZE] = {0};
+			GetTextFaceW(dc, LF_FACESIZE, chosen);
+			TEXTMETRICW tm = {};
+			GetTextMetricsW(dc, &tm);
+			snprintf(line, sizeof line,
+			         "font\tsize %d\tweight %d\tascent %ld\tport ascent %d\tdescent %ld\theight %ld\t"
+			         "internal leading %ld\taverage width %ld\tgreatest width %ld\tgot ",
+			         size, weight, long(tm.tmAscent), (size * 86 + 50) / 100, long(tm.tmDescent), long(tm.tmHeight),
+			         long(tm.tmInternalLeading), long(tm.tmAveCharWidth), long(tm.tmMaxCharWidth));
+			out += line + narrow(chosen, CP_UTF8) + "\n";
+			for (wchar_t ch : samples) {
+				SIZE extent = {0, 0};
+				GetTextExtentPoint32W(dc, &ch, 1, &extent);
+				GLYPHMETRICS gm = {};
+				DWORD bytes = GetGlyphOutlineW(dc, ch, GGO_GRAY4_BITMAP, &gm, 0, nullptr, &identity);
+				int levels = 0;
+				if (bytes != GDI_ERROR && bytes > 0) {
+					std::vector<uint8_t> raw(bytes);
+					bool seen[17] = {};
+					if (GetGlyphOutlineW(dc, ch, GGO_GRAY4_BITMAP, &gm, bytes, raw.data(), &identity) != GDI_ERROR) {
+						size_t pitch = (size_t(gm.gmBlackBoxX) + 3) & ~size_t(3);
+						for (UINT y = 0; y < gm.gmBlackBoxY && (size_t(y) + 1) * pitch <= raw.size(); ++y)
+							for (UINT x = 0; x < gm.gmBlackBoxX; ++x) {
+								uint8_t v = raw[size_t(y) * pitch + x];
+								seen[v > 16 ? 16 : v] = true;
+							}
+						for (bool s : seen) levels += s ? 1 : 0;
+					}
+				}
+				snprintf(line, sizeof line,
+				         "glyph\tsize %d\tweight %d\tU+%04X\tadvance %ld\tbox %ux%u\torigin %ld,%ld\tcell %d\tlevels %d\n",
+				         size, weight, unsigned(ch), long(extent.cx), gm.gmBlackBoxX, gm.gmBlackBoxY,
+				         long(gm.gmptGlyphOrigin.x), long(gm.gmptGlyphOrigin.y), int(gm.gmCellIncX), levels);
+				out += line;
+			}
+			SelectObject(dc, old);
+		}
+	}
+	return out;
 }
 
 int64_t WinPlatform::now_ms() {
