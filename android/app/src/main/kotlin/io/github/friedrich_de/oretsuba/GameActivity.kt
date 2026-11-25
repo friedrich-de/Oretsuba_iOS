@@ -79,6 +79,8 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
             window.attributes.layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
+        // 60 pictures a second are all the game makes: a screen that can go slower may.
+        window.attributes = window.attributes.apply { preferredRefreshRate = 60f }
         // The picture stands in the middle of the whole screen, with a camera hole in
         // one of its black bars. From Android 15 on the content reaches from edge to
         // edge by itself; before that the system would keep it clear of the hole, which
@@ -203,10 +205,22 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
         Choreographer.getInstance().postFrameCallback(this)
     }
 
-    /** Once per display frame, on the engine's thread. */
+    private var lastStepNanos = 0L
+
+    /**
+     * Once per display frame, on the engine's thread. Nothing in the game needs more
+     * than 60 steps a second, and every step composes the picture in software: on a
+     * screen that refreshes 120 times a second, a frame that comes sooner than 10 ms
+     * after the last step is left out, which halves the work.
+     */
     override fun doFrame(frameTimeNanos: Long) {
         framePosted = false
         if (!booted || !visible || stopped) return
+        if (frameTimeNanos - lastStepNanos < MIN_STEP_NANOS) {
+            postFrame()
+            return
+        }
+        lastStepNanos = frameTimeNanos
         val result = Native.frame(session)
         Native.present(session)
         if (result != 0) {
@@ -521,6 +535,7 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
         private const val GAME_WIDTH = 800
         private const val GAME_HEIGHT = 600
         private const val HOLD_MS = 600L
+        private const val MIN_STEP_NANOS = 10_000_000L
         private const val LEFT = 0
         private const val RIGHT = 1
         private const val MIDDLE = 2
