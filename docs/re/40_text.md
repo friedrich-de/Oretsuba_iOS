@@ -810,8 +810,13 @@ table (FUN at ore_tuba.c ~11530) and config1 "reset".
 5. Ruby (`vtbl+0x114`, ruby font +0x2c) and `<"str">`, `@nnn` gaiji, `[`
    blocks, `%` interpolation, record type≠0 are implemented but unused by
    the Japanese scripts.
-6. tmAscent of MS Gothic 22 px and whether GDI used embedded bitmaps
-   (affects pixel-exact baseline/edge look).
+6. Answered on Windows (`orehost --font-report`, and the port next to the
+   original): tmAscent of MS Gothic is `(size*220 + 128) / 256` for 8 to 48 px
+   (19 at 22 px); its half-width cell is `(size + 1) / 2` and the full-width
+   cell twice that; GDI returns 17 grey levels for these faces, no stored
+   bitmaps, and the game turns level v into `v*16` saturated to 255
+   (0x44c460). With the same glyphs the port's letters and edge are the
+   original's within 1 of 255.
 8. Who sets G[905]/G[906]/G[908] on load / back-to-choice (probably native
    save restore), and the N_1f8/N_1fc "LAG" object format (logo only).
 9. TEXT_LOG.DAT write trigger (FUN_00423e30 callers) and exact compressor
