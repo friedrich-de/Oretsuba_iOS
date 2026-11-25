@@ -9,13 +9,14 @@
 // Needs the test host (make -C engine -f Makefile.linux, or make -C engine on a Mac) and
 // Playwright with Chromium. --shots DIR keeps pictures of the popup.
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { fakeAnki, fakeAudioSource, smallDictionary } from './mining_page/fakes.mjs';
+import { fakeAnki, fakeAudioSource } from './mining_page/fakes.mjs';
 import { startHarness } from './mining_page/harness.mjs';
+import { firstJapanese, firstLine, importDictionary, setUpKit, until } from './mining_page/setup.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 
@@ -30,42 +31,6 @@ let checks = 0;
 function check(condition, what) {
   checks += 1;
   assert.ok(condition, what);
-}
-
-async function until(what, test, seconds = 20) {
-  const end = Date.now() + seconds * 1000;
-  for (;;) {
-    const value = await test();
-    if (value) return value;
-    if (Date.now() > end) throw new Error(`Waited in vain for ${what}`);
-    await new Promise((done) => setTimeout(done, 50));
-  }
-}
-
-/** Sets the kit up as the launcher's settings would: a dictionary, Anki with the Lapis defaults, an audio source. */
-async function setUp(harness, scratch, anki, audio, extraWords = []) {
-  const zip = join(scratch, `words-${extraWords.length}.zip`);
-  writeFileSync(zip, smallDictionary(extraWords));
-  await harness.kit('dict.import', { path: zip, name: 'words.zip' });
-  const list = await until('the dictionary', async () => {
-    const now = await harness.kit('dict.list');
-    if (now.import.state === 'failed') throw new Error(now.import.error);
-    return now.import.state === 'done' || now.import.state === 'idle' ? now : null;
-  });
-  check(list.dictionaries.length === 1 && list.dictionaries[0].title === 'Test Words', 'the dictionary is imported');
-
-  await harness.kit('settings.set', { direct: true, anki: { address: anki.url } });
-  const found = await harness.kit('anki.check', { adopt: true });
-  check(found.lapis?.noteType === 'Lapis', 'the Lapis note type is found');
-  check(found.settings.anki.noteType === 'Lapis', 'and taken as the note type');
-  const roles = Object.fromEntries(found.settings.anki.fields.map(({ field, role }) => [field, role]));
-  check(roles.Expression === 'word' && roles.Sentence === 'sentence' && roles.Picture === 'picture', 'with the Lapis fields filled as usual');
-  await harness.kit('anki.choose', { deck: 'Mining' });
-  await harness.kit('secrets.set', { audioAddress: audio.address });
-  const sounds = await harness.kit('audio.check');
-  check(sounds.names.length === 2, 'the audio source answers with its sounds');
-  const page = await harness.kit('page.init');
-  check(page.direct === true && page.cards.possible === true && page.wordAudio === true, 'the kit is ready for the popup');
 }
 
 async function openStage(browser, harness, viewport) {
@@ -173,29 +138,17 @@ async function madeUpLine(browser, harness, anki, audio) {
   await context.close();
 }
 
-async function realLine(browser, harness, anki) {
-  // START, then through the opening to the first line of the story.
-  await harness.command('run 900');
-  await harness.command('click 730 384');
-  await harness.command('run 495');
-  let standing = null;
-  for (let clicks = 0; clicks < 200 && standing === null; clicks++) {
-    await harness.command('click 400 300');
-    await harness.command('run 145');
-    const now = await harness.command('text');
-    if (now.ok !== true) throw new Error('The game stopped on the way to the first line.');
-    if (now.standing && now.standing.text.length >= 4) standing = now.standing;
-  }
-  check(standing !== null, 'the game reaches a line of the story');
+async function realLine(browser, harness, anki, scratch) {
+  const standing = await firstLine(harness);
   console.log(`  line: ${standing.speaker ? `【${standing.speaker}】` : ''}${standing.sentence}`);
   check([...standing.text].length === standing.rects.length, 'every character of the page of text has its cell');
 
   // The first character a word of the game's own text starts at: the dictionary gets that word.
   const characters = [...standing.text];
-  const start = characters.findIndex((character) => /[぀-ヿ一-鿿]/u.test(character));
+  const start = firstJapanese(standing.text);
   check(start >= 0, 'the line has Japanese text');
   const word = characters.slice(start, start + 2).join('');
-  await setUp.again(word);
+  await importDictionary(harness, scratch, [{ expression: word, reading: '', meanings: ['a word of this line'] }]);
 
   const { page, popup, problems, context } = await openStage(browser, harness, { width: 844, height: 390 });
   const [x, y, w, h] = standing.rects[start];
@@ -278,7 +231,7 @@ let harness = null;
 try {
   console.log('The kit and the page on a made-up line');
   harness = await startHarness({ kit: join(scratch, 'kit'), debug });
-  await setUp(harness, scratch, anki, audio);
+  await setUpKit(harness, scratch, anki, audio, check);
   await madeUpLine(browser, harness, anki, audio);
   await harness.stop();
   harness = null;
@@ -286,21 +239,8 @@ try {
   if (game) {
     console.log('With the game');
     harness = await startHarness({ kit: join(scratch, 'kit-game'), data: game, save: join(scratch, 'save'), debug });
-    await setUp(harness, scratch, anki, audio);
-    // The game's own word is added to the dictionary once the line is known.
-    setUp.again = async (word) => {
-      const { dictionaries } = await harness.kit('dict.list');
-      await harness.kit('dict.remove', { id: dictionaries[0].id });
-      const zip = join(scratch, 'game-words.zip');
-      writeFileSync(zip, smallDictionary([{ expression: word, reading: '', meanings: ['a word of this line'] }]));
-      await harness.kit('dict.import', { path: zip, name: 'game-words.zip' });
-      await until('the dictionary', async () => {
-        const now = await harness.kit('dict.list');
-        if (now.import.state === 'failed') throw new Error(now.import.error);
-        return now.import.state !== 'importing' && now.import.state !== 'downloading' && now.dictionaries.length === 1;
-      });
-    };
-    await realLine(browser, harness, anki);
+    await setUpKit(harness, scratch, anki, audio, check);
+    await realLine(browser, harness, anki, scratch);
   }
   console.log(`ok: ${checks} checks`);
 } finally {

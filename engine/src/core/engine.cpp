@@ -142,7 +142,7 @@ void Engine::set_reading_hold(bool hold) {
 	if (hold == reading_hold_) return;
 	reading_hold_ = hold;
 	// What was pressed before or during the hold is not a press after it.
-	input.clear();
+	input.set_muted(hold);
 }
 
 bool Engine::run_vm() {
