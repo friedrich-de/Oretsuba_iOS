@@ -15,9 +15,10 @@ esac
 derived="$ROOT/build/package-$platform"
 out="$ROOT/build/packages"
 mkdir -p "$out"
+# ORE_BUILD_NUMBER, when set, becomes the package's build number (the build on GitHub passes its run number).
 xcodebuild -project "$ROOT/app/Oretsuba.xcodeproj" -scheme Oretsuba \
     -configuration Release -destination "$destination" -derivedDataPath "$derived" \
-    CODE_SIGNING_ALLOWED=NO build
+    CODE_SIGNING_ALLOWED=NO ${ORE_BUILD_NUMBER:+"CURRENT_PROJECT_VERSION=$ORE_BUILD_NUMBER"} build
 app="$derived/Build/Products/$product/Oretsuba.app"
 # Packaging only the built application prevents inclusion of local game folders.
 if [ "$platform" = macos ]; then

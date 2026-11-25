@@ -41,6 +41,18 @@ the release [Latest build](../../releases/latest), so that package always comes 
 [Checks and packages](#checks-and-packages). The builds of the
 [original project](https://github.com/galhack/Oretsuba_iOS/releases) come without mining.
 
+### iPhone / iPad (a source for Feather, AltStore or SideStore)
+
+Apps that install from sources can take the newest build straight from this address. Add it as a source (in Feather
+under Sources) and the app appears there with its build number and date:
+
+```text
+https://github.com/friedrich-de/Oretsuba_iOS/releases/latest/download/source.json
+```
+
+Every build of `main` writes that file anew, so it always points to the newest package. The package is unsigned; the
+app that installs it signs it with your own certificate.
+
 ### iPhone / iPad (sideloading)
 
 1. Download `Oretsuba-iOS-unsigned.ipa` from the [latest build](../../releases/latest), or build it yourself with

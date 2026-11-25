@@ -1,7 +1,8 @@
 # Builds the unsigned iPhone and iPad package from the code of the commit and
 # runs the checks that need no game files. A build of main is published as
 # the release "Latest build", so the package there always comes from the code
-# in this repository.
+# in this repository. The release also carries source.json, the source file
+# that sideloading apps read to offer that package.
 #
 # The job runs on GitHub's standard macOS runner, which costs nothing for a
 # public repository.
@@ -51,7 +52,15 @@ jobs:
           build/folder-import-tests
 
       - name: Build the package
+        env:
+          ORE_BUILD_NUMBER: ${{ github.run_number }}
         run: tools/apple/package.sh ios
+
+      - name: Write the source file for sideloading apps
+        run: |
+          python3 tools/apple/source_json.py --ipa build/packages/Oretsuba-iOS-unsigned.ipa \
+            --repository "$GITHUB_REPOSITORY" --commit "$GITHUB_SHA" --out build/packages/source.json
+          cat build/packages/source.json
 
       - name: Keep the package with the run
         uses: actions/upload-artifact@v4
@@ -60,6 +69,7 @@ jobs:
           path: |
             build/packages/Oretsuba-iOS-unsigned.ipa
             build/packages/Oretsuba-iOS-unsigned.ipa.sha256
+            build/packages/source.json
           if-no-files-found: error
 
       - name: Publish as the latest build
@@ -76,6 +86,8 @@ jobs:
             echo
             echo "SHA-256 of \`Oretsuba-iOS-unsigned.ipa\`: \`$sum\`"
             echo
+            echo "Source for Feather, AltStore and SideStore, which always offers this newest build: \`$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/latest/download/source.json\`"
+            echo
             echo "[The run that built it]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
           } > build/release-notes.md
           if gh release view latest-build > /dev/null 2>&1; then
@@ -84,6 +96,7 @@ jobs:
           gh release create latest-build \
             build/packages/Oretsuba-iOS-unsigned.ipa \
             build/packages/Oretsuba-iOS-unsigned.ipa.sha256 \
+            build/packages/source.json \
             --target "$GITHUB_SHA" \
             --title "Latest build ($short)" \
             --notes-file build/release-notes.md \
