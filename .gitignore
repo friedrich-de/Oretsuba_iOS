@@ -1,7 +1,5 @@
 # Game data: players must buy the game themselves
 data/
-中文三号补丁/
-ORE_TUBA_Chinese/
 extract/
 *.LPK
 *.lpk

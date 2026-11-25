@@ -42,9 +42,6 @@ public:
 	int poll_text_input(std::string &utf8_result) override;
 	HttpSend http_sender() override;  // apple_http.mm
 
-	// Chinese text should use Chinese glyph shapes even for shared Han code points.
-	void set_chinese_fonts(bool on) { chinese_fonts_ = on; }
-
 private:
 	const void *font_for(const std::string &face, int size, int weight);
 	std::string save_dir_;
@@ -53,10 +50,9 @@ private:
 	int dialog_result_ = 1;
 	int text_result_ = 0;
 	std::string text_value_;
-	bool chinese_fonts_ = false;
 	std::mutex mu_;
 	std::map<std::string, const void *> fonts_;  // CTFontRef cache
-	std::map<uint32_t, uint32_t> char_cache_[2];
+	std::map<uint32_t, uint32_t> char_cache_;
 };
 
 }  // namespace ore

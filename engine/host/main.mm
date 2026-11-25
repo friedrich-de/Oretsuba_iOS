@@ -1,7 +1,7 @@
 // Headless test host: runs the engine on macOS without a window, feeding
 // scripted input and writing PNG screenshots.
 //
-//   orehost --data DIR [--patch DIR --chs] [--save DIR] [--frames N]
+//   orehost --data DIR [--save DIR] [--frames N]
 //           [--input FILE] [--shot F,F,...] [--shot-every N] [--out DIR]
 //           [--trace HEX,HEX,...]
 //
@@ -68,8 +68,7 @@ void write_png(const ore::Image &img, const std::string &path) {
 }  // namespace
 
 int main(int argc, char **argv) {
-	std::string data, patch, save = "/tmp/orehost_save", input, out = "/tmp/orehost";
-	bool chs = false;
+	std::string data, save = "/tmp/orehost_save", input, out = "/tmp/orehost";
 	std::string trace;  // comma-separated hex native indices
 	int frames = 600, shot_every = 0;
 	std::set<int> shots;
@@ -77,8 +76,6 @@ int main(int argc, char **argv) {
 		std::string a = argv[i];
 		auto next = [&]() { return i + 1 < argc ? std::string(argv[++i]) : std::string(); };
 		if (a == "--data") data = next();
-		else if (a == "--patch") patch = next();
-		else if (a == "--chs") chs = true;
 		else if (a == "--save") save = next();
 		else if (a == "--frames") frames = atoi(next().c_str());
 		else if (a == "--input") input = next();
@@ -121,11 +118,8 @@ int main(int argc, char **argv) {
 	}
 	mkdir(out.c_str(), 0755);
 	HostPlatform platform(save);
-	platform.set_chinese_fonts(chs);
 	ore::EngineConfig cfg;
 	cfg.data_dir = data;
-	cfg.patch_dir = patch;
-	cfg.chinese = chs;
 	ore::Engine engine(platform, cfg);
 	std::string err;
 	if (!engine.boot(&err)) {

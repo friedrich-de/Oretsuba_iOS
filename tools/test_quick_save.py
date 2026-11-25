@@ -12,10 +12,9 @@ ROOT = Path(__file__).resolve().parent.parent
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("data", type=Path)
-    parser.add_argument("patch", type=Path)
     args = parser.parse_args()
     # Reuse the existing title/story fixture; replace its normal save/load tail.
-    setup = (ROOT / "engine/tests/inputs/chs_save.input").read_text().splitlines()
+    setup = (ROOT / "engine/tests/inputs/save.input").read_text().splitlines()
     setup = [line for line in setup if int(line.split()[0]) < 24000]
     setup += ["24200 command 0", "24600 click 400 500", "24900 click 400 500",
               "25300 command 1", "25800 click 350 340"]
@@ -24,7 +23,7 @@ def main():
         input_file = out / "quick.input"
         input_file.write_text("\n".join(setup) + "\n")
         command = [str(ROOT / "build/host/orehost"), "--data", str(args.data.resolve()),
-                   "--patch", str(args.patch.resolve()), "--chs", "--save", str(out / "saves"),
+                   "--save", str(out / "saves"),
                    "--frames", "27000", "--input", str(input_file), "--trace", "2a,2b,2c", "--out", str(out)]
         result = subprocess.run(command, capture_output=True, text=True, timeout=180)
         log = result.stdout + result.stderr

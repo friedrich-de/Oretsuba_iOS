@@ -67,7 +67,6 @@ std::string mini_format(Args &a, const char *fmt, int first) {
 }
 
 const char *kFontsSjis[] = {"\x82\x6c\x82\x72 \x83\x53\x83\x56\x83\x62\x83\x4e", "\x82\x6c\x82\x72 \x96\xbe\x92\xa9"};
-const char *kFontsGbk[] = {"\x82\x6c\x82\x72 \x83\x53\x83\x56\x83\x62\x83\x4e", "\xba\xda\xcc\xe5", "\xcb\xce\xcc\xe5"};
 
 }  // namespace
 
@@ -225,13 +224,10 @@ void register_text_natives(Engine &e) {
 	def(0xba, "draw_text", [draw_on](Args &a) { return draw_on(a, a.s(3), a.u(4)); });
 	def(0xbb, "draw_text2", [draw_on](Args &a) { return draw_on(a, a.s(3), a.u(4)); });
 	def(0xbc, "draw_text3", [draw_on](Args &a) { return draw_on(a, a.s(3), a.u(4)); });
-	def(0xbd, "font_enum", [&e, ts](Args &) {
+	def(0xbd, "font_enum", [ts](Args &) {
 		auto &l = ts().font_list;
 		l.clear();
-		if (e.encoding == TextEncoding::Gbk)
-			for (const char *s : kFontsGbk) l.push_back(s);
-		else
-			for (const char *s : kFontsSjis) l.push_back(s);
+		for (const char *s : kFontsSjis) l.push_back(s);
 		return int32_t(l.size());
 	});
 	def(0xbe, "font_enum_copy", [ts](Args &a) {

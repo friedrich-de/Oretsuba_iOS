@@ -33,12 +33,6 @@ const char kSmallW[] = "\x81\x45\x81\x48\x81\x49\x81\x5b\x82\x9f\x82\xa1\x82\xa3
                        "\x83\x95\x83\x96";
 const char kSmallN[] = "!.?\xa4\xa5\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0";
 
-// GBK equivalents for the Chinese patch (the patched EXE keeps the SJIS tables,
-// which never match GBK punctuation; these keep 。，、 etc. off line starts).
-const char kOpenGbk[] = "\xa3\xa8\xa1\xb8\xa1\xba\xa1\xbe\xa1\xb6\xa1\xb4\xa1\xb0\xa1\xae";
-const char kCloseGbk[] = "\xa1\xa3\xa3\xac\xa1\xa2\xa3\xae\xa3\xba\xa3\xbb\xa3\xbf\xa3\xa1\xa3\xa9\xa1\xb9"
-                         "\xa1\xbb\xa1\xbf\xa1\xb7\xa1\xb5\xa1\xb1\xa1\xaf\xa1\xad";
-
 bool in_table(uint16_t c, const char *wide, const char *narrow) {
 	if (c > 0xff) {
 		for (const char *p = wide; p[0] && p[1]; p += 2)
@@ -245,12 +239,8 @@ int TextWindow::put_char(uint16_t code) {
 	if (!f || !surface) return 0;
 	int size = f->size, result = 0;
 	if (autowrap && cx > wrap_x) {
-		bool soft;
-		if (engine.encoding == TextEncoding::Gbk)
-			soft = in_table(prev_char, kOpenGbk, kOpenN) || in_table(code, kCloseGbk, kCloseN);
-		else
-			soft = in_table(prev_char, kOpenW, kOpenN) || in_table(code, kCloseW, kCloseN) ||
-			       in_table(code, kSmallW, kSmallN);
+		bool soft = in_table(prev_char, kOpenW, kOpenN) || in_table(code, kCloseW, kCloseN) ||
+		            in_table(code, kSmallW, kSmallN);
 		if (!soft || cx + size > box_w - mr) {
 			if (newline()) return 1;
 			result = -1;

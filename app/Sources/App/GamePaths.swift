@@ -3,10 +3,10 @@ import Foundation
 /// Where the port finds the player's game files and keeps its own.
 ///
 /// * iPhone, iPad, Vision Pro: the game folder (the DVD's SET_UP folder, or
-///   the whole disc) and the optional Chinese patch folder are copied into
-///   the app's Documents (Finder file sharing, the Files app, AirDrop, or the
-///   in-app import). Saves live in Application Support.
-/// * Mac: the player points at the folders where they are; nothing is copied.
+///   the whole disc) is copied into the app's Documents (Finder file sharing,
+///   the Files app, AirDrop, or the in-app import). Saves live in Application
+///   Support.
+/// * Mac: the player points at the folder where it is; nothing is copied.
 enum GamePaths {
     static let fileManager = FileManager.default
 
@@ -23,24 +23,19 @@ enum GamePaths {
         return url
     }
 
-    /// Saves and settings, one folder per language (the Chinese scripts are
-    /// different files, so their saves cannot be shared with the original's).
-    static func saves(for language: GameLanguage) -> URL {
-        let url = applicationSupport.appendingPathComponent("Saves/\(language.rawValue)", isDirectory: true)
+    /// Saves and settings. The folder keeps the name earlier versions gave
+    /// the Japanese original's saves, so those are still found.
+    static var saves: URL {
+        let url = applicationSupport.appendingPathComponent("Saves/jpn", isDirectory: true)
         try? fileManager.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
 
-    /// Folders the player picked on the Mac (security-scoped bookmarks are not
-    /// needed: Catalyst apps here are not sandboxed).
+    /// The folder the player picked on the Mac (a security-scoped bookmark is
+    /// not needed: Catalyst apps here are not sandboxed).
     static var chosenGameFolder: URL? {
         get { UserDefaults.standard.string(forKey: "gameFolderPath").map { URL(fileURLWithPath: $0, isDirectory: true) } }
         set { UserDefaults.standard.set(newValue?.path, forKey: "gameFolderPath") }
-    }
-
-    static var chosenPatchFolder: URL? {
-        get { UserDefaults.standard.string(forKey: "patchFolderPath").map { URL(fileURLWithPath: $0, isDirectory: true) } }
-        set { UserDefaults.standard.set(newValue?.path, forKey: "patchFolderPath") }
     }
 
     /// The folder holding SCRIPT.LPK, searched a few levels deep.
@@ -52,19 +47,6 @@ enum GamePaths {
         #endif
         for root in roots {
             if let found = search(root, depth: 3, where: { hasFile($0, named: "SCRIPT.LPK") }) { return found }
-        }
-        return nil
-    }
-
-    /// The Chinese patch: a folder holding SCRIPT_CHS.
-    static func findPatchFolder() -> URL? {
-        var roots: [URL] = []
-        if let chosen = chosenPatchFolder { roots.append(chosen) }
-        #if !targetEnvironment(macCatalyst)
-        roots.append(documents)
-        #endif
-        for root in roots {
-            if let found = search(root, depth: 3, where: { hasDirectory($0, named: "SCRIPT_CHS") }) { return found }
         }
         return nil
     }
@@ -86,27 +68,5 @@ enum GamePaths {
 
     private static func hasFile(_ dir: URL, named name: String) -> Bool {
         names(in: dir).contains(name)
-    }
-
-    private static func hasDirectory(_ dir: URL, named name: String) -> Bool {
-        guard let items = try? fileManager.contentsOfDirectory(atPath: dir.path) else { return false }
-        return items.contains { item in
-            var isDir: ObjCBool = false
-            return item.uppercased() == name
-                && fileManager.fileExists(atPath: dir.appendingPathComponent(item).path, isDirectory: &isDir) && isDir.boolValue
-        }
-    }
-}
-
-enum GameLanguage: String, CaseIterable, Identifiable {
-    case chinese = "chs"
-    case japanese = "jpn"
-
-    var id: String { rawValue }
-    var title: String {
-        switch self {
-        case .chinese: return "简体中文（汉化补丁）"
-        case .japanese: return "日本語（原版）"
-        }
     }
 }

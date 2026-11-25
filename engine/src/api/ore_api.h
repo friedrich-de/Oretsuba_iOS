@@ -12,9 +12,7 @@ typedef struct OreEngine OreEngine;
 
 typedef struct OreConfig {
 	const char *data_dir;   /* folder holding the *.LPK archives */
-	const char *patch_dir;  /* Chinese patch folder (SCRIPT_CHS, SYS, DATA), or NULL */
 	const char *save_dir;   /* writable folder for saves and settings */
-	int chinese;            /* 1: play the Chinese patch (requires patch_dir) */
 } OreConfig;
 
 /* Returns NULL on failure with a UTF-8 message in err. */

@@ -1,4 +1,4 @@
-// All original/overlay script native references must have engine handlers.
+// All native references of the game's scripts must have engine handlers.
 // This checks registration coverage, not every handler's runtime behaviour.
 #include <cstdio>
 #include <filesystem>
@@ -10,7 +10,7 @@
 #include "util/bytes.h"
 
 int main(int argc, char **argv) {
-	if (argc < 2 || argc > 3) { fprintf(stderr, "usage: native_coverage DATA [PATCH]\n"); return 2; }
+	if (argc != 2) { fprintf(stderr, "usage: native_coverage DATA\n"); return 2; }
 	char saves[] = "/tmp/ore-native-coverage-XXXXXX";
 	if (!mkdtemp(saves)) return 2;
 	bool ok = true;
@@ -18,7 +18,6 @@ int main(int argc, char **argv) {
 		ore::ApplePlatform platform(saves);
 		ore::EngineConfig config;
 		config.data_dir = argv[1];
-		if (argc == 3) config.chinese = true, config.patch_dir = argv[2];
 		ore::Engine engine(platform, config);
 		std::string error;
 		if (!engine.boot(&error)) { fprintf(stderr, "%s\n", error.c_str()); return 1; }
@@ -50,8 +49,7 @@ int main(int argc, char **argv) {
 		for (uint32_t index : indices) {
 			if (!engine.vm.native(int(index))) { fprintf(stderr, "missing N_%x\n", index); ok = false; }
 		}
-		if (ok) printf("native_coverage: %d scripts, %zu referenced natives registered (%s)\n", scripts,
-		               indices.size(), config.chinese ? "Chinese overlay" : "original");
+		if (ok) printf("native_coverage: %d scripts, %zu referenced natives registered\n", scripts, indices.size());
 		else fprintf(stderr, "FAIL: script/native registration coverage\n");
 	}
 	std::filesystem::remove_all(saves);

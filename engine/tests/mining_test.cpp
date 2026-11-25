@@ -65,9 +65,6 @@ const char SJ_WAITS_PLAIN[] = "\x81\x40\x82\xa0\x82\xa0\x81\x41\x82\xbb\x82\xa4\
 // a<<b@@c@12d<"外字">e<x
 const char SJ_MARKS[] = "\x61\x3c\x3c\x62\x40\x40\x63\x40\x31\x32\x64\x3c\x22\x8a\x4f\x8e\x9a\x22\x3e\x65\x3c\x78";
 const char SJ_MARKS_PLAIN[] = "\x61\x3c\x62\x40\x63\x64\x8a\x4f\x8e\x9a\x65\x3c\x78";
-// GBK: <2>\「我们没有翅膀」$
-const char GB_BODY[] = "\x3c\x32\x3e\x5c\xa1\xb8\xce\xd2\xc3\xc7\xc3\xbb\xd3\xd0\xb3\xe1\xb0\xf2\xa1\xb9\x24";
-const char GB_PLAIN[] = "\xa1\xb8\xce\xd2\xc3\xc7\xc3\xbb\xd3\xd0\xb3\xe1\xb0\xf2\xa1\xb9";
 // UTF-8: full-width blank, blank, tab, 「うん」, full-width blank, line end
 const char U8_PADDED[] = "\xe3\x80\x80\x20\x09\xe3\x80\x8c\xe3\x81\x86\xe3\x82\x93\xe3\x80\x8d\xe3\x80\x80\x0d\x0a";
 const char U8_TRIMMED[] = "\xe3\x80\x8c\xe3\x81\x86\xe3\x82\x93\xe3\x80\x8d";
@@ -162,7 +159,6 @@ void test_text() {
 	check(mining_plain_text(SJ_WAITS, TextEncoding::ShiftJis) == SJ_WAITS_PLAIN, "the text goes on behind waits and page breaks");
 	check(mining_plain_text(SJ_MARKS, TextEncoding::ShiftJis) == SJ_MARKS_PLAIN,
 	      "doubled marks stand for themselves, text tags are kept, an unclosed bracket is text");
-	check(mining_plain_text(GB_BODY, TextEncoding::Gbk) == GB_PLAIN, "the Chinese patch's text is read the same way");
 	check(mining_plain_text("", TextEncoding::ShiftJis).empty() && mining_plain_text("$", TextEncoding::ShiftJis).empty(),
 	      "an empty record gives no text");
 	check(mining_trim(U8_PADDED) == U8_TRIMMED, "blanks, full-width ones too, are cut from both ends");

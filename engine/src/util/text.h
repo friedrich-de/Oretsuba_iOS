@@ -21,11 +21,10 @@ inline std::string normalize_path(const std::string &in) {
 }
 
 // Multibyte encoding of script text. The original engine treats SJIS lead
-// bytes (0x81-0x9F, 0xE0-0xFC); the Chinese patch widens this to 0x81-0xFE.
-enum class TextEncoding { ShiftJis, Gbk };
+// bytes (0x81-0x9F, 0xE0-0xFC).
+enum class TextEncoding { ShiftJis };
 
-inline bool is_lead_byte(uint8_t c, TextEncoding enc) {
-	if (enc == TextEncoding::Gbk) return c >= 0x81 && c <= 0xFE;
+inline bool is_lead_byte(uint8_t c, TextEncoding) {
 	return (c >= 0x81 && c <= 0x9F) || (c >= 0xE0 && c <= 0xFC);
 }
 

@@ -1,7 +1,7 @@
 // MPEG-1 program stream movie player (op1/op2): pl_mpeg for demuxing and
-// video, minimp3 for the audio track (MP2 in the original, MP3 in the
-// Chinese patch's re-encodes). Audio goes to the mixer; video frames are
-// paced by the audio clock.
+// video, minimp3 for the audio track (MP2 in the original, MP3 in
+// re-encoded files). Audio goes to the mixer; video frames are paced by the
+// audio clock.
 #pragma once
 
 #include <cstdint>

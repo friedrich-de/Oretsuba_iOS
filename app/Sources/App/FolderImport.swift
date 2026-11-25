@@ -7,7 +7,7 @@ enum FolderImport {
         case alreadyExists
 
         var errorDescription: String? {
-            "已有同名文件夹。请先在「文件」App 中重命名新文件夹，再导入。"
+            "A folder with this name is already there. Rename the new folder in the Files app first, then import it."
         }
     }
 

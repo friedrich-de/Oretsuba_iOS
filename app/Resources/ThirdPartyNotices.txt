@@ -1,7 +1,7 @@
 Third-party notices
 ===================
 
-Game and Chinese patch assets are supplied separately by the player and are not included in this application.
+The game's files are supplied separately by the player and are not included in this application.
 
 pl_mpeg
 https://github.com/phoboslab/pl_mpeg

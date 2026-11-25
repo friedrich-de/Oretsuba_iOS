@@ -10,7 +10,6 @@
 
 #include "audio/mixer.h"
 #include "audio/sound_manager.h"
-#include "core/chs_extras.h"
 #include "core/object.h"
 #include "core/scheduler.h"
 #include "gfx/image.h"
@@ -30,8 +29,6 @@ class MiningTap;
 
 struct EngineConfig {
 	std::string data_dir;
-	std::string patch_dir;  // empty = none
-	bool chinese = false;
 };
 
 class Engine {
@@ -151,12 +148,11 @@ public:
 
 	void request_quit() { quit_requested = true; }
 
-	// Pointer input from the host; presses on the Chinese patch overlay are consumed.
+	// Pointer input from the host.
 	void mouse_move(int x, int y) { input.on_mouse_move(x, y); }
 	void mouse_button(int button, bool down);
 	// Native toolbar action; history also closes its own screen.
 	void game_command(int command);
-	std::unique_ptr<ChsExtras> chs;
 	// Sends the lines the player reads to a mining server; null without a mining.txt (docs/MINING.md).
 	std::unique_ptr<MiningTap> mining;
 
@@ -169,8 +165,6 @@ private:
 	Image frame_{kWidth, kHeight, 32};
 	uint64_t frame_serial_ = 1;
 	uint64_t rendered_gen_ = 0;
-	uint64_t overlay_gen_ = 0;
-	bool swallow_release_ = false;
 	uint32_t opt_block_ = 0;
 	int64_t last_logic_ = -1;
 	bool paused_ = false;

@@ -22,11 +22,8 @@ extern "C" {
 OreEngine *ore_create(const OreConfig *config, char *err, int err_len) {
 	auto e = std::make_unique<OreEngine>();
 	e->platform = std::make_unique<ore::ApplePlatform>(config->save_dir ? config->save_dir : "");
-	e->platform->set_chinese_fonts(config->chinese != 0);
 	ore::EngineConfig cfg;
 	cfg.data_dir = config->data_dir ? config->data_dir : "";
-	cfg.patch_dir = config->patch_dir ? config->patch_dir : "";
-	cfg.chinese = config->chinese != 0 && !cfg.patch_dir.empty();
 	e->engine = std::make_unique<ore::Engine>(*e->platform, cfg);
 	std::string error;
 	if (!e->engine->boot(&error)) {
