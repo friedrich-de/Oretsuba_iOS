@@ -11,7 +11,7 @@
 BUILD   := ../build/host-win
 CXX     := g++
 CC      := gcc
-DEFS    := -D_USE_MATH_DEFINES -D_POSIX_THREAD_SAFE_FUNCTIONS -D__USE_MINGW_ANSI_STDIO=1
+DEFS    := -D_USE_MATH_DEFINES -D_POSIX_THREAD_SAFE_FUNCTIONS -D__USE_MINGW_ANSI_STDIO=1 -D_FILE_OFFSET_BITS=64
 CXXFLAGS:= -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers $(DEFS) -Isrc -Ithird_party -Ihost
 CFLAGS  := -O2 -w -Ithird_party
 
