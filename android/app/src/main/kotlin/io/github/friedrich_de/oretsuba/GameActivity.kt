@@ -79,6 +79,14 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
             window.attributes.layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
+        // The picture stands in the middle of the whole screen, with a camera hole in
+        // one of its black bars. From Android 15 on the content reaches from edge to
+        // edge by itself; before that the system would keep it clear of the hole, which
+        // moves the picture off the middle.
+        if (Build.VERSION.SDK_INT in 30..34) {
+            @Suppress("DEPRECATION")
+            window.setDecorFitsSystemWindows(false)
+        }
         picture = PictureView(this)
         picture.holder.setFixedSize(GAME_WIDTH, GAME_HEIGHT)
         picture.holder.setFormat(PixelFormat.RGBX_8888)
