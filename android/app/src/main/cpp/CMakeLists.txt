@@ -40,4 +40,8 @@ target_include_directories(oretsuba PRIVATE
 target_compile_options(oretsuba PRIVATE
     -O2 -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers)
 
+# The dictionary of the mining kit (engine/src/dict) needs SQLite and zlib, which
+# this build does not link yet: the kit stays off here until it does.
+target_compile_definitions(oretsuba PRIVATE ORE_MINING_KIT=0)
+
 target_link_libraries(oretsuba PRIVATE android log aaudio m)
