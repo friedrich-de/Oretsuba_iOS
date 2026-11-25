@@ -11,6 +11,11 @@ final class AppModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var importing = false
     @Published var importProgress = ""
+    /// Mining (docs/MINING.md): what the game folder's mining.txt leads to.
+    /// `nil` until the server was asked, `0` without a mining.txt, `1` when
+    /// lines will arrive, `-1` when something is wrong; the text says what.
+    @Published var miningState: Int32?
+    @Published var miningText = ""
 
     @Published var language: GameLanguage {
         didSet { UserDefaults.standard.set(language.rawValue, forKey: "language") }
@@ -35,6 +40,28 @@ final class AppModel: ObservableObject {
     func refresh() {
         gameFolder = GamePaths.findGameFolder()
         patchFolder = GamePaths.findPatchFolder()
+        checkMining()
+    }
+
+    /// Asks the mining server named in mining.txt whether it takes the key,
+    /// away from the main thread: the answer can take some seconds.
+    private func checkMining() {
+        guard let path = gameFolder?.path else {
+            miningState = nil
+            miningText = ""
+            return
+        }
+        Task.detached {
+            var text = [CChar](repeating: 0, count: 512)
+            let size = Int32(text.count)
+            let state = ore_mining_check(path, &text, size)
+            let message = String(cString: text)
+            await MainActor.run {
+                guard self.gameFolder?.path == path else { return }
+                self.miningState = state
+                self.miningText = message
+            }
+        }
     }
 
     func start() {

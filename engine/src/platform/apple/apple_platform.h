@@ -40,6 +40,7 @@ public:
 	int poll_dialog() override { return dialog_result_; }
 	void begin_text_input(const std::string &utf8_initial) override;
 	int poll_text_input(std::string &utf8_result) override;
+	HttpSend http_sender() override;  // apple_http.mm
 
 	// Chinese text should use Chinese glyph shapes even for shared Han code points.
 	void set_chinese_fonts(bool on) { chinese_fonts_ = on; }

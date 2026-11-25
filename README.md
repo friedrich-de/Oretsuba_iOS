@@ -9,6 +9,10 @@
 
 **本仓库不包含任何游戏内容。** 你需要自己购买游戏，并使用你自己的游戏文件。
 
+> **Mining.** This fork can send every line you read, with its voice and a screenshot, to a
+> [VN Mining Server](https://github.com/friedrich-de/VN-Mining-Server), where you look words up and make
+> Anki cards from any device. It is off until a `mining.txt` lies in the game folder: see [docs/MINING.md](docs/MINING.md).
+
 ## 支持的设备
 
 | 设备 | 方式 | 构建最低系统要求 |
@@ -125,6 +129,7 @@ build/host/command_input /path/to/SET_UP
 build/host/native_coverage /path/to/SET_UP
 build/host/native_coverage /path/to/SET_UP /path/to/中文三号补丁
 build/host/image_blend
+build/host/mining_test
 build/host/movie_flow /path/to/SET_UP /path/to/中文三号补丁
 python3 tools/test_chinese_save.py /path/to/SET_UP /path/to/中文三号补丁
 python3 tools/test_quick_save.py /path/to/SET_UP /path/to/中文三号补丁

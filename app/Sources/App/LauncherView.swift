@@ -76,6 +76,19 @@ struct LauncherView: View {
                     Label("未找到汉化补丁（可选：含 SCRIPT_CHS 的文件夹）", systemImage: "character.book.closed")
                         .foregroundStyle(.secondary)
                 }
+                if model.gameFolder != nil, let mining = model.miningState {
+                    if mining > 0 {
+                        Label(model.miningText, systemImage: "antenna.radiowaves.left.and.right")
+                            .foregroundStyle(Color.green)
+                    } else if mining < 0 {
+                        Label(model.miningText, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(Color.orange)
+                    } else {
+                        Label("Mining is off (optional: put mining.txt next to SCRIPT.LPK)",
+                              systemImage: "antenna.radiowaves.left.and.right")
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

@@ -7,6 +7,7 @@
 #include "core/engine.h"
 #include "gfx/blend.h"
 #include "gfx/surface.h"
+#include "mining/mining_tap.h"
 #include "text/font.h"
 #include "text/message.h"
 #include "text/text_system.h"
@@ -316,6 +317,7 @@ void TextWindow::set_value_str(const char *s) {
 MessageWindow::MessageWindow(Engine &e, UiSystem &ui, MessageManager &m) : TextWindow(e, ui), mm(m) {}
 
 MessageWindow::~MessageWindow() {
+	if (engine.mining) engine.mining->window_gone(*this);
 	if (ctrl) {
 		ctrl->win = nullptr;
 		engine.tasks.kill(ctrl);
@@ -391,7 +393,10 @@ int MessageWindow::show(bool allow_skip) {
 		ctrl = t.get();
 		engine.tasks.add(std::move(t));
 	}
-	return start(false, allow_skip);
+	int result = start(false, allow_skip);
+	// The game shows a line to the reader here; the history screen goes through show_instant.
+	if (result == 0 && engine.mining) engine.mining->line_shown(*this);
+	return result;
 }
 
 int MessageWindow::show_instant() {

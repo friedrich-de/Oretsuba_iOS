@@ -58,6 +58,13 @@ void ore_answer_text_input(OreEngine *engine, int ok, const char *utf8);
 /* App lifecycle. */
 void ore_set_paused(OreEngine *engine, int paused);
 
+/* Mining (docs/MINING.md). Looks for mining.txt in the game folder data_dir or
+   above it and asks the server it names whether it takes the key. Returns 1
+   when lines will arrive, 0 when there is no mining.txt, -1 when something is
+   wrong; text gets a sentence for the player (UTF-8, empty for 0). It waits
+   for the server for some seconds: call it away from the main thread. */
+int ore_mining_check(const char *data_dir, char *text, int text_len);
+
 #if DEBUG
 /* Device smoke test; the host must supply an isolated temporary save directory. */
 int ore_debug_start_movie(OreEngine *engine, int index);
