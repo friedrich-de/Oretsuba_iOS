@@ -213,6 +213,7 @@ private:
 	};
 	void set_frame(Item &it, int f);
 	int item_at(int lx, int ly) const;
+	int item_gap() const;
 	void attach(Sprite *s);
 	void refresh_frames();
 	FrameSet item_bg_, top_, bottom_;

@@ -601,6 +601,19 @@ int ScrollBar::set_range(int length, int total, int page, int v, int p5, int min
 	return 0;
 }
 
+// FUN_004c9100: at the start of the range the first arrow is switched off, at
+// its end the second one; a switched-off arrow shows its grey frame and takes
+// neither the pointer nor a click.
+void ScrollBar::update_arrows() {
+	bool first = enabled(), second = enabled();
+	if (first) {
+		if (knob_px_ <= 0 && value_ <= 0) first = false;
+		else if (value_ >= max_) second = false;
+	}
+	if (arrow1_) arrow1_->set_enabled(first);
+	if (arrow2_) arrow2_->set_enabled(second);
+}
+
 void ScrollBar::layout() {
 	int tx = x_ + ox_, ty = y_ + oy_;
 	if (knob_) knob_->set_pos(vertical_ ? tx : tx + knob_px_, vertical_ ? ty + knob_px_ : ty);
@@ -643,6 +656,7 @@ void ScrollBar::set_value(int v) {
 	value_ = v;
 	knob_px_ = px_of(v);
 	layout();
+	update_arrows();
 	notify();
 }
 
@@ -654,6 +668,7 @@ void ScrollBar::set_knob_px(int px) {
 	knob_px_ = px;
 	value_ = nv;
 	layout();
+	update_arrows();
 	notify();
 }
 
@@ -706,9 +721,9 @@ void ScrollBar::set_z(int z) {
 }
 
 bool ScrollBar::set_enabled(bool e) {
-	if (arrow1_) arrow1_->set_enabled(e);
-	if (arrow2_) arrow2_->set_enabled(e);
-	if (!UiControl::set_enabled(e)) return false;
+	bool changed = UiControl::set_enabled(e);
+	update_arrows();
+	if (!changed) return false;
 	set_knob_state(0);
 	return true;
 }

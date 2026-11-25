@@ -791,8 +791,15 @@ int SelectWindow::highlight(int i, bool on) {
 	return 0;
 }
 
+// The original (0x49ac6c) centres the window on the y it was created with:
+// its top edge lies at y - H / 2, where H is the two frames and the items.
+// The spacing comes between items only in a window without frames.
+int SelectWindow::item_gap() const {
+	return top_spr_ || bottom_spr_ ? 0 : spacing;
+}
+
 void SelectWindow::layout() {
-	int y = y_;
+	int y = y_ - height() / 2;
 	bool any = !items_.empty();
 	if (top_spr_) {
 		top_spr_->set_pos(x_, y);
@@ -802,7 +809,7 @@ void SelectWindow::layout() {
 	for (auto &it : items_) {
 		it->spr->set_pos(x_, y);
 		it->spr->set_visible(visible_);
-		y += it->fh + spacing;
+		y += it->fh + item_gap();
 	}
 	if (bottom_spr_) {
 		bottom_spr_->set_pos(x_, y);
@@ -821,15 +828,22 @@ int SelectWindow::width() const {
 int SelectWindow::height() const {
 	int h = 0;
 	if (top_spr_) h += top_spr_->src.h();
-	for (auto &it : items_) h += it->fh + spacing;
+	for (auto &it : items_) h += it->fh;
+	if (items_.size() > 1) h += int(items_.size() - 1) * item_gap();
 	if (bottom_spr_) h += bottom_spr_->src.h();
 	return h;
 }
 
+// N_2eb (0x49caa0): the point the scripts move the cursor to. With a window
+// background (+0x48, +0x49: mode and alpha) it lies near the right end of the
+// item, without one near the left.
 bool SelectWindow::item_pos(int i, int &px, int &py) {
 	if (i < 0 || i >= int(items_.size())) return false;
 	const Item &it = *items_[size_t(i)];
-	px = it.spr->x + ml + 8;
+	if (bg_mode == 0 && bg_alpha == 0)
+		px = it.spr->x + ml - 8;
+	else
+		px = it.spr->x + width() + (mr >> 2) - mr + 1;
 	py = it.spr->y + it.fh / 2;
 	return true;
 }

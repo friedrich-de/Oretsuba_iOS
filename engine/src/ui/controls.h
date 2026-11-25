@@ -219,6 +219,7 @@ public:
 
 private:
 	void layout();
+	void update_arrows();
 	void set_knob_state(int s);
 	void notify();
 	int axis(int lx, int ly) const { return vertical_ ? ly - oy_ : lx - ox_; }

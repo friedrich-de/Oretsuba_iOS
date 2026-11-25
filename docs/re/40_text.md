@@ -624,7 +624,10 @@ dest alpha kept. drawOver (used by text objects): ARGB "over":
   6/7/8 window bg mode/alpha/colour (+0xe85 def 1, +0xe86 def 140, +0xe88
   def 0). Applied by FUN_0041d770 (native N_c): effect = cfg, shadow
   offset forced (2,2), gradient = cfg, AA = cfg, re-init if bold/face
-  changed; window/name/selection bg via vtbl+0x84. (No literal
+  changed; window and selection bg via vtbl+0x84 / vtbl+0x88. The message
+  window's vtbl+0x84 (0x409970 after the +0x20 shift) first hands mode, colour
+  and alpha to its linked name window (+0x2c0), then takes them itself; N_2fe
+  copies no style when it links the name window. (No literal
   "cf_bold"/"cf_edge" strings exist in the EXE; these are the equivalents.)
 * Default look: 22 px MS Gothic, GRAY4 AA, white, soft black edge r=2,
   no gradient, window bg mode 1 colour 0 alpha 140.
