@@ -51,10 +51,13 @@ started=""
 if [ -z "$serial" ]; then
 	image="system-images;android-34;default;x86_64"
 	# The SDK's licences are the machine's owner's to accept (sdkmanager --licenses); this only installs.
+	echo "Installing the emulator and Android 14 for it"
 	sdkmanager --install "$image" "emulator" "platform-tools" < /dev/null > "$OUT/sdkmanager.log" 2>&1 || { tail -20 "$OUT/sdkmanager.log"; exit 1; }
-	echo no | avdmanager create avd --force --name ore-ankidroid-check --package "$image" --device pixel_5 > "$OUT/avdmanager.log" 2>&1
+	echo no | avdmanager create avd --force --name ore-ankidroid-check --package "$image" --device pixel_5 > "$OUT/avdmanager.log" 2>&1 ||
+		{ tail -20 "$OUT/avdmanager.log"; exit 1; }
 	port="${ORE_EMULATOR_PORT:-5570}"
 	serial="emulator-$port"
+	echo "Starting the emulator"
 	emulator -avd ore-ankidroid-check -port "$port" -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect \
 		-memory 2048 > "$OUT/emulator.log" 2>&1 &
 	started=yes
@@ -67,7 +70,13 @@ finish() {
 }
 trap finish EXIT
 
-run wait-for-device
+# adb waits without end for a device that never comes, so the wait gets an end here.
+i=0
+until [ "$(run get-state 2>/dev/null | tr -d '\r')" = device ]; do
+	i=$((i + 1))
+	[ "$i" -lt 90 ] || { echo "The device did not appear." >&2; tail -20 "$OUT/emulator.log" 2>/dev/null; exit 1; }
+	sleep 2
+done
 i=0
 until [ "$(run shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ]; do
 	i=$((i + 1))
