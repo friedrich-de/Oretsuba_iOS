@@ -110,7 +110,9 @@ Android installs an update only over a package that was signed with the same key
   repository, `ANDROID_KEYSTORE_BASE64` (the keystore file, base64) and `ANDROID_KEYSTORE_PASSWORD`, and hands it to
   Gradle through `ORE_KEYSTORE`, `ORE_KEYSTORE_PASSWORD`, `ORE_KEY_ALIAS` and `ORE_KEY_PASSWORD`. The key itself is
   not in the repository. Where the secrets are not to be had, as in a pull request from a fork, the package is built
-  and checked but not published.
+  and checked but not published. The certificate of the published builds has the SHA-256 fingerprint
+  `FB:7B:16:8A:C9:5B:14:5C:25:3B:AF:B2:4A:05:E9:33:4D:5E:A3:ED:E8:30:68:5E:4C:46:D6:AC:5D:AB:BF:62`
+  (`apksigner verify --print-certs Oretsuba-Android.apk` shows it).
 
 A fork that publishes its own builds makes its own key once and keeps it safe, because a lost key means that users
 have to uninstall before the next update:
