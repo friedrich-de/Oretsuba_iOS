@@ -9,8 +9,10 @@
 #
 # Without ORE_ADB_SERIAL it makes an emulator of its own (Android 14, x86_64;
 # needs hardware virtualisation), starts it without a window and shuts it down
-# at the end. With ORE_ADB_SERIAL it uses that device instead: use only one
-# whose AnkiDroid collection does not matter, the check adds notes to it.
+# at the end; there it runs the check a second time with the two apps
+# installed in the other order. With ORE_ADB_SERIAL it uses that device
+# instead: use only one whose AnkiDroid collection does not matter, the check
+# adds notes to it.
 # ORE_ANKIDROID_APK names an AnkiDroid package to install; without it the
 # newest release is downloaded from AnkiDroid's page on GitHub. What it found
 # is in build/ankidroid-check.
@@ -87,5 +89,22 @@ status=0
 run shell am instrument -w ${ORE_CHECK_DECK:+-e deck "$ORE_CHECK_DECK"} "$PACKAGE/.AnkiDroidCheck" > "$OUT/check.txt" 2>&1 || status=$?
 cat "$OUT/check.txt"
 grep -q "AnkiDroid check passed" "$OUT/check.txt" || status=1
+
+# The other order, in the script's own emulator only (it removes both apps):
+# this app first, AnkiDroid after it. The permission is AnkiDroid's, so this
+# shows whether Android still offers it to an app that was there before.
+if [ "$status" = 0 ] && [ -n "$started" ]; then
+	echo "---- installed in the other order: this app first, then AnkiDroid"
+	run uninstall "$PACKAGE" > /dev/null
+	run uninstall com.ichi2.anki > /dev/null
+	run install -r "$APP" > /dev/null
+	run install -r -g "$apk" > /dev/null
+	run shell monkey -p com.ichi2.anki -c android.intent.category.LAUNCHER 1 > /dev/null 2>&1 || true
+	sleep 15
+	run shell dumpsys package "$PACKAGE" | grep "com.ichi2.anki.permission" | tr -d '\r' | sed 's/^ */  /' || echo "  (Android does not list the permission for this app)"
+	run shell am instrument -w "$PACKAGE/.AnkiDroidCheck" > "$OUT/check-other-order.txt" 2>&1 || status=$?
+	tail -n 3 "$OUT/check-other-order.txt"
+	grep -q "AnkiDroid check passed" "$OUT/check-other-order.txt" || status=1
+fi
 [ "$status" = 0 ] || echo "AnkiDroid check FAILED"
 exit "$status"
