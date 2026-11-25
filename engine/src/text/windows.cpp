@@ -97,7 +97,8 @@ void FrameSet::compose(int mode, uint32_t rgb, int alpha) {
 		uint32_t *d = out->row32(y);
 		for (int x = 0; x < out->width(); ++x) {
 			int v = mask_at(*m, x, y);
-			if (alpha < 255) v = v * alpha / 255;
+			// rounded to the nearest, as the original's composed frames show
+			if (alpha < 255) v = (v * alpha + 127) / 255;
 			d[x] = uint32_t(v) << 24 | (rgb & 0xffffff);
 		}
 	}

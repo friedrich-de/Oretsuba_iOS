@@ -623,11 +623,14 @@ void ScrollBar::layout() {
 		                       : Rect(0, 0, std::min(len, fill_img_->width()), fill_img_->height());
 		fill_->set_pos(tx, ty);
 	}
+	// Across the bar the arrows lie at the bar's own place; the track offset
+	// moves only the knob (the history's bar: x 765, track 3 further right,
+	// arrows 23 wide around a knob of 17).
 	if (arrow1_) {
 		int a = vertical_ ? arrow1_->height() : arrow1_->width();
-		arrow1_->set_pos(vertical_ ? tx : tx - a, vertical_ ? ty - a : ty);
+		arrow1_->set_pos(vertical_ ? x_ : tx - a, vertical_ ? ty - a : y_);
 	}
-	if (arrow2_) arrow2_->set_pos(vertical_ ? tx : tx + track_len_, vertical_ ? ty + track_len_ : ty);
+	if (arrow2_) arrow2_->set_pos(vertical_ ? x_ : tx + track_len_, vertical_ ? ty + track_len_ : y_);
 }
 
 void ScrollBar::set_knob_state(int s) {
