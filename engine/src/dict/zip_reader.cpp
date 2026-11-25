@@ -2,6 +2,7 @@
 #include "dict/zip_reader.h"
 #if ORE_MINING_KIT
 
+#include <unistd.h>
 #include <zlib.h>
 
 #include <algorithm>
@@ -21,8 +22,17 @@ uint64_t u64(const uint8_t *p) {
 	return uint64_t(u32(p)) | uint64_t(u32(p + 4)) << 32;
 }
 
+// Reads at a place of the file without moving it, so that several threads may read at once.
 bool read_at(FILE *f, uint64_t offset, void *out, size_t size) {
-	return fseeko(f, off_t(offset), SEEK_SET) == 0 && fread(out, 1, size, f) == size;
+	uint8_t *to = static_cast<uint8_t *>(out);
+	while (size > 0) {
+		ssize_t got = pread(fileno(f), to, size, off_t(offset));
+		if (got <= 0) return false;
+		to += got;
+		offset += uint64_t(got);
+		size -= size_t(got);
+	}
+	return true;
 }
 
 // A zip's directory is never larger than this here: a dictionary has some thousand files.
@@ -111,7 +121,7 @@ bool ZipReader::read_directory() {
 	return true;
 }
 
-bool ZipReader::read(const Entry &entry, uint64_t limit, std::string &out, std::string &problem) {
+bool ZipReader::read(const Entry &entry, uint64_t limit, std::string &out, std::string &problem) const {
 	out.clear();
 	if (entry.size > limit) {
 		problem = "large";
@@ -123,12 +133,11 @@ bool ZipReader::read(const Entry &entry, uint64_t limit, std::string &out, std::
 	if (entry.offset > file_size_ || !read_at(file_, entry.offset, header, 30) || u32(header) != 0x04034b50) return false;
 	uint64_t data = entry.offset + 30 + u16(header + 26) + u16(header + 28);
 	if (data > file_size_ || entry.packed > file_size_ - data) return false;
-	if (fseeko(file_, off_t(data), SEEK_SET) != 0) return false;
 
 	if (entry.method == 0) {
 		if (entry.packed != entry.size) return false;
 		out.resize(size_t(entry.size));
-		if (entry.size && fread(out.data(), 1, out.size(), file_) != out.size()) return false;
+		if (entry.size && !read_at(file_, data, out.data(), out.size())) return false;
 	} else {
 		z_stream z;
 		memset(&z, 0, sizeof z);
@@ -141,7 +150,7 @@ bool ZipReader::read(const Entry &entry, uint64_t limit, std::string &out, std::
 		while (result != Z_STREAM_END) {
 			if (z.avail_in == 0) {
 				size_t want = size_t(std::min<uint64_t>(left, chunk.size()));
-				if (want == 0 || fread(chunk.data(), 1, want, file_) != want) break;
+				if (want == 0 || !read_at(file_, data + (entry.packed - left), chunk.data(), want)) break;
 				left -= want;
 				z.next_in = chunk.data();
 				z.avail_in = uInt(want);

@@ -4,9 +4,15 @@
 
 #include <algorithm>
 #include <cmath>
+#include <condition_variable>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <exception>
+#include <mutex>
+#include <system_error>
+#include <thread>
 
 #include "dict/zip_reader.h"
 #include "util/json.h"
@@ -48,19 +54,40 @@ std::string trimmed(const std::string &s) {
 	return s.substr(a, b - a);
 }
 
-// A number that fits a whole number of 64 bits.
-bool number(const json::Value &value, double &out) {
-	out = value.as_number();
-	return value.is_number() && std::fabs(out) < 9e15;
-}
-
-bool key(const json::Value &value, std::string &out) {
+// The text a row's item is, when it is one. Most have nothing to undo, and are taken as written.
+bool text_of(std::string_view item, std::string &out) {
+	if (item.size() < 2 || item.front() != '"' || item.back() != '"') return false;
+	std::string_view inner = item.substr(1, item.size() - 2);
+	if (inner.find('\\') == std::string_view::npos) {
+		out.assign(inner);
+		return true;
+	}
+	json::Value value;
+	if (!json::parse(item, value) || !value.is_string()) return false;
 	out = value.as_string();
-	return value.is_string() && !out.empty() && utf8::length16(out) <= kMaxKeyLength;
+	return true;
 }
 
-std::string tags_of(const json::Value &value) {
-	return value.is_string() ? trimmed(value.as_string()) : std::string();
+// The number a row's item is, when it is one that fits a whole number of 64 bits.
+bool number_of(std::string_view item, double &out) {
+	char buffer[48];
+	if (item.empty() || item.size() >= sizeof buffer || !(item[0] == '-' || (item[0] >= '0' && item[0] <= '9'))) return false;
+	memcpy(buffer, item.data(), item.size());
+	buffer[item.size()] = 0;
+	char *end = nullptr;
+	out = strtod(buffer, &end);
+	return end == buffer + item.size() && std::fabs(out) < 9e15;
+}
+
+// A word as it is written or read: a text that is not empty and not overlong.
+bool key_of(std::string_view item, std::string &out) {
+	return text_of(item, out) && !out.empty() && utf8::length16(out) <= kMaxKeyLength;
+}
+
+// Tags, which a row may leave out with null.
+std::string tags_of(std::string_view item) {
+	std::string text;
+	return text_of(item, text) ? trimmed(text) : std::string();
 }
 
 int64_t whole(double value) {
@@ -139,82 +166,175 @@ DictionaryInfo read_index(const std::string &text) {
 	return info;
 }
 
-void read_terms(const std::string &name, const std::string &bank, DictionaryWriter &writer, DictionaryInfo &info) {
+// What a bank of words came to.
+struct Words {
+	TermBatch batch;
+	int64_t skipped = 0;
+};
+
+Words read_terms(const std::string &name, const std::string &bank, int format) {
+	Words words;
 	json::ArrayWalk rows(bank);
 	std::string_view row;
 	std::vector<std::string_view> items;
-	std::string glossary, expression;
+	std::string wrapped;
 	while (rows.next(row)) {
 		// Format 3: [expression, reading, definitionTags, rules, score, glossary[], sequence, termTags];
 		// format 1: [expression, reading, definitionTags, rules, score, ...glossary strings].
+		TermBatch::Row word;
 		double score = 0;
-		if (row.empty() || row[0] != '[' || !row_items(row, items) || items.size() < 5 || !key(value_of(items[0]), expression)) {
-			++info.skipped;
+		if (row.empty() || row[0] != '[' || !row_items(row, items) || items.size() < 5 || !key_of(items[0], word.expression) ||
+		    !text_of(items[1], word.reading) || !number_of(items[4], score)) {
+			++words.skipped;
 			continue;
 		}
-		json::Value read_as = value_of(items[1]);
-		if (!read_as.is_string() || !number(value_of(items[4]), score)) {
-			++info.skipped;
+		if (word.reading.empty()) {
+			word.reading = word.expression;
+		} else if (utf8::length16(word.reading) > kMaxKeyLength) {
+			++words.skipped;
 			continue;
 		}
-		std::string reading = read_as.as_string();
-		if (reading.empty()) {
-			reading = expression;
-		} else if (utf8::length16(reading) > kMaxKeyLength) {
-			++info.skipped;
-			continue;
-		}
+		word.definition_tags = tags_of(items[2]);
+		word.rules = tags_of(items[3]);
+		word.score = whole(score);
 
-		int64_t sequence = 0;
-		std::string term_tags;
-		glossary.clear();
-		if (info.format == 1) {
-			glossary += '[';
-			for (size_t i = 5; i < items.size(); ++i) {
-				if (i > 5) glossary += ',';
-				glossary += json::compact(items[i]);
-			}
-			glossary += ']';
+		// The definitions are kept as the bank writes them: nothing is read into them here.
+		std::string_view glossary;
+		if (format == 1) {
+			wrapped = "[";
+			if (items.size() > 5) wrapped.append(items[5].data(), size_t(items.back().data() + items.back().size() - items[5].data()));
+			wrapped += ']';
+			glossary = wrapped;
 		} else {
 			if (items.size() < 6 || items[5].empty() || items[5][0] != '[') {
-				++info.skipped;
+				++words.skipped;
 				continue;
 			}
-			glossary = json::compact(items[5]);
+			glossary = items[5];
 			double n = 0;
-			if (items.size() > 6 && number(value_of(items[6]), n)) sequence = whole(n);
-			if (items.size() > 7) term_tags = tags_of(value_of(items[7]));
+			if (items.size() > 6 && number_of(items[6], n)) word.sequence = whole(n);
+			if (items.size() > 7) word.term_tags = tags_of(items[7]);
 		}
-		writer.add_term(expression, reading, tags_of(value_of(items[2])), tags_of(value_of(items[3])), whole(score), glossary, sequence,
-		                term_tags);
-		++info.terms;
+		words.batch.add(std::move(word), glossary);
 	}
 	if (!rows.ok()) throw DictError(name + " in that dictionary is not a list of rows.");
+	words.batch.finish();
+	return words;
 }
 
-void read_metas(const std::string &name, const std::string &bank, DictionaryWriter &writer, DictionaryInfo &info) {
+// What a bank of frequencies, pitch accents and pronunciations came to.
+struct Metas {
+	std::vector<MetaRow> rows;
+	int64_t skipped = 0, frequencies = 0, pitches = 0;
+};
+
+Metas read_metas(const std::string &name, const std::string &bank) {
+	Metas metas;
 	json::ArrayWalk rows(bank);
 	std::string_view row;
 	std::vector<std::string_view> items;
-	std::string expression;
 	while (rows.next(row)) {
 		// [expression, "freq" | "pitch" | "ipa", data]
-		if (row.empty() || row[0] != '[' || !row_items(row, items) || items.size() < 3 || !key(value_of(items[0]), expression)) {
-			++info.skipped;
+		MetaRow meta;
+		if (row.empty() || row[0] != '[' || !row_items(row, items) || items.size() < 3 || !key_of(items[0], meta.expression) ||
+		    !text_of(items[1], meta.mode) || (meta.mode != "freq" && meta.mode != "pitch" && meta.mode != "ipa") || items[2] == "null") {
+			++metas.skipped;
 			continue;
 		}
-		std::string mode = value_of(items[1]).as_string();
-		if ((mode != "freq" && mode != "pitch" && mode != "ipa") || items[2] == "null") {
-			++info.skipped;
-			continue;
-		}
-		writer.add_meta(expression, mode, json::compact(items[2]));
-		if (mode == "freq")
-			++info.frequencies;
+		meta.data = json::compact(items[2]);
+		if (meta.mode == "freq")
+			++metas.frequencies;
 		else
-			++info.pitches;
+			++metas.pitches;
+		metas.rows.push_back(std::move(meta));
 	}
 	if (!rows.ok()) throw DictError(name + " in that dictionary is not a list of rows.");
+	return metas;
+}
+
+// Makes `count` things on a few threads and hands them over one by one in
+// their order, never more than a few ahead of the one handed over, so that
+// what waits stays small. What `make` or `take` throws ends it and is thrown on.
+template <class T, class Make, class Take>
+void in_order(size_t count, const Make &make, const Take &take) {
+	if (count == 0) return;
+	size_t threads = std::min<size_t>(std::min<size_t>(std::max(1u, std::thread::hardware_concurrency()), 4), count);
+	const size_t ahead = threads + 2;
+	struct Slot {
+		bool ready = false;
+		T value;
+		std::exception_ptr error;
+	};
+	std::vector<Slot> slots(count);
+	std::mutex gate;
+	std::condition_variable changed;
+	size_t next = 0, taken = 0;
+	bool over = false;
+
+	auto work = [&] {
+		for (;;) {
+			size_t i;
+			{
+				std::unique_lock<std::mutex> lock(gate);
+				changed.wait(lock, [&] { return over || next >= count || next < taken + ahead; });
+				if (over || next >= count) return;
+				i = next++;
+			}
+			Slot made;
+			try {
+				made.value = make(i);
+			} catch (...) {
+				made.error = std::current_exception();
+			}
+			made.ready = true;
+			{
+				std::lock_guard<std::mutex> lock(gate);
+				slots[i] = std::move(made);
+			}
+			changed.notify_all();
+		}
+	};
+	struct Workers {
+		std::vector<std::thread> threads;
+		std::mutex &gate;
+		std::condition_variable &changed;
+		bool &over;
+		~Workers() {
+			{
+				std::lock_guard<std::mutex> lock(gate);
+				over = true;
+			}
+			changed.notify_all();
+			for (std::thread &thread : threads) thread.join();
+		}
+	} workers{{}, gate, changed, over};
+	for (size_t t = 0; t < threads; ++t) {
+		try {
+			workers.threads.emplace_back(work);
+		} catch (const std::system_error &) {
+			break;
+		}
+	}
+
+	for (size_t i = 0; i < count; ++i) {
+		Slot slot;
+		if (workers.threads.empty()) {
+			// No thread could be started: one by one, here.
+			slot.value = make(i);
+		} else {
+			std::unique_lock<std::mutex> lock(gate);
+			changed.wait(lock, [&] { return slots[i].ready; });
+			slot = std::move(slots[i]);
+			slots[i] = Slot();
+		}
+		if (slot.error) std::rethrow_exception(slot.error);
+		take(i, slot.value);
+		{
+			std::lock_guard<std::mutex> lock(gate);
+			taken = i + 1;
+		}
+		changed.notify_all();
+	}
 }
 
 void read_tags(const std::string &name, const std::string &bank, DictionaryWriter &writer, DictionaryInfo &info) {
@@ -231,9 +351,13 @@ void read_tags(const std::string &name, const std::string &bank, DictionaryWrite
 		TagRow tag;
 		tag.name = v[0].as_string();
 		tag.category = v[1].as_string();
-		tag.order = number(v[2], n) ? whole(n) : 0;
+		auto number = [&n](const json::Value &value) {
+			n = value.as_number();
+			return value.is_number() && std::fabs(n) < 9e15;
+		};
+		tag.order = number(v[2]) ? whole(n) : 0;
 		tag.notes = v[3].as_string();
-		tag.score = number(v[4], n) ? whole(n) : 0;
+		tag.score = number(v[4]) ? whole(n) : 0;
 		writer.add_tag(tag);
 	}
 	if (!rows.ok()) throw DictError(name + " in that dictionary is not a list of rows.");
@@ -295,16 +419,33 @@ DictionaryInfo import_into(const std::string &zip_path, const std::string &datab
 		read_tags(bank->name, read(*zip, *bank, kMaxBankBytes), writer, info);
 		advance(*bank);
 	}
-	for (const Entry *bank : terms) {
-		check();
-		read_terms(bank->name, read(*zip, *bank, kMaxBankBytes), writer, info);
-		advance(*bank);
-	}
-	for (const Entry *bank : metas) {
-		check();
-		read_metas(bank->name, read(*zip, *bank, kMaxBankBytes), writer, info);
-		advance(*bank);
-	}
+	in_order<Words>(
+	    terms.size(),
+	    [&](size_t i) {
+		    check();
+		    return read_terms(terms[i]->name, read(*zip, *terms[i], kMaxBankBytes), info.format);
+	    },
+	    [&](size_t i, Words &words) {
+		    check();
+		    writer.add_terms(words.batch);
+		    info.terms += int64_t(words.batch.rows.size());
+		    info.skipped += words.skipped;
+		    advance(*terms[i]);
+	    });
+	in_order<Metas>(
+	    metas.size(),
+	    [&](size_t i) {
+		    check();
+		    return read_metas(metas[i]->name, read(*zip, *metas[i], kMaxBankBytes));
+	    },
+	    [&](size_t i, Metas &found) {
+		    check();
+		    for (const MetaRow &meta : found.rows) writer.add_meta(meta.expression, meta.mode, meta.data);
+		    info.frequencies += found.frequencies;
+		    info.pitches += found.pitches;
+		    info.skipped += found.skipped;
+		    advance(*metas[i]);
+	    });
 	for (const Entry *entry : media) {
 		check();
 		writer.add_media(entry->name, read(*zip, *entry, kMaxMediaBytes));

@@ -34,7 +34,8 @@ public:
 	const std::vector<Entry> &entries() const { return entries_; }
 	// Reads a file whole, but never more of it than `limit`. False with the
 	// reason in `problem`: "large" when it is over the limit, else "damaged".
-	bool read(const Entry &entry, uint64_t limit, std::string &out, std::string &problem);
+	// Several threads may read at once.
+	bool read(const Entry &entry, uint64_t limit, std::string &out, std::string &problem) const;
 
 private:
 	ZipReader() = default;
