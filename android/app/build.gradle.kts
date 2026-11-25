@@ -68,3 +68,28 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 }
+
+// The notices of the libraries inside the engine go into the package as they
+// are, from the one file the Apple app carries too.
+abstract class CopyNotices : DefaultTask() {
+    @get:InputFile
+    abstract val notices: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val assets: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        notices.get().asFile.copyTo(assets.get().file("ThirdPartyNotices.txt").asFile, overwrite = true)
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        val name = "copy" + variant.name.replaceFirstChar { it.uppercase() } + "Notices"
+        val copy = tasks.register<CopyNotices>(name) {
+            notices.set(rootProject.file("../app/Resources/ThirdPartyNotices.txt"))
+        }
+        variant.sources.assets?.addGeneratedSourceDirectory(copy, CopyNotices::assets)
+    }
+}

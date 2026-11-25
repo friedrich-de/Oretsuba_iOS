@@ -86,6 +86,8 @@ bool AudioOut::start(OreEngine *engine) {
 
 void AudioOut::set_paused(bool paused) {
 	std::lock_guard<std::mutex> lock(state_->mu);
+	// Asking a stream that is already starting to start again is an error.
+	if (state_->paused == paused) return;
 	state_->paused = paused;
 	if (!state_->stream) return;
 	if (paused)
