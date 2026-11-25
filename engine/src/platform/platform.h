@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "mining/anki_app.h"
 #include "mining/mining.h"
 #include "util/text.h"
 
@@ -62,6 +63,10 @@ public:
 	// HTTP for the mining tap (mining/mining.h); an empty function when the host has none.
 	// The function is called from a thread of the tap's and must work without this object.
 	virtual HttpSend http_sender() { return nullptr; }
+
+	// The Anki app on the same device (mining/anki_app.h): AnkiMobile is
+	// reached by links, AnkiDroid by requests. Empty functions when the host has none.
+	virtual AnkiAppHost anki_app() { return AnkiAppHost(); }
 };
 
 }  // namespace ore

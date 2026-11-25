@@ -68,6 +68,11 @@ void ore_set_paused(OreEngine *engine, int paused);
    for the server for some seconds: call it away from the main thread. */
 int ore_mining_check(const char *data_dir, char *text, int text_len);
 
+/* Cards for the Anki app on the same device (docs/MINING.md). AnkiMobile
+   answers by opening this app with a link of the app's own scheme: pass every
+   link the app is opened with here (UTF-8). Any thread. */
+void ore_app_opened_with(const char *link);
+
 #if DEBUG
 /* Device smoke test; the host must supply an isolated temporary save directory. */
 int ore_debug_start_movie(OreEngine *engine, int index);

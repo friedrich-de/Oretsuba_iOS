@@ -6,6 +6,7 @@
 #include <string>
 
 #include "core/engine.h"
+#include "mining/anki_app.h"
 #include "mining/mining.h"
 #include "platform/apple/apple_http.h"
 #include "platform/apple/apple_platform.h"
@@ -122,6 +123,10 @@ int ore_mining_check(const char *data_dir, char *text, int text_len) {
 		text[text_len - 1] = 0;
 	}
 	return result;
+}
+
+void ore_app_opened_with(const char *link) {
+	if (link && *link) ore::AppReturns::shared().opened_with(link);
 }
 
 #if DEBUG

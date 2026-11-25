@@ -51,8 +51,6 @@ bool anki_app_info_from_text(std::string_view json, AnkiAppInfo &out);
 // ---------------------------------------------------------------- links
 
 inline constexpr char kAnkiMobileClipboardType[] = "net.ankimobile.json";
-// The link that tells whether AnkiMobile is on the device (it only has to open).
-inline constexpr char kAnkiMobileProbeLink[] = "anki://";
 
 // A text as one value of a link's query: everything but letters, digits and -._~ as %XX.
 std::string link_escape(std::string_view text);
@@ -188,8 +186,8 @@ struct AnkiAppHost {
 };
 
 // The links this app is opened with and its coming back to the front, on
-// their way from the host to whoever waits for them. The host calls
-// opened_with() and in_front() (ore_app_opened_with, ore_app_in_front).
+// their way from the host to whoever waits for them. The app passes its links
+// on through ore_app_opened_with; the host's platform code calls in_front().
 class AppReturns {
 public:
 	static AppReturns &shared();

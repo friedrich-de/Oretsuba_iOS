@@ -9,6 +9,8 @@ struct OreApp: App {
             RootView()
                 .environmentObject(model)
                 .preferredColorScheme(.dark)
+                // AnkiMobile's way back after a card or its lists (docs/MINING.md).
+                .onOpenURL { link in ore_app_opened_with(link.absoluteString) }
         }
         #if os(visionOS)
         .defaultSize(width: 1600, height: 1200)
