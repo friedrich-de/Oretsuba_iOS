@@ -627,7 +627,14 @@ dest alpha kept. drawOver (used by text objects): ARGB "over":
   changed; window and selection bg via vtbl+0x84 / vtbl+0x88. The message
   window's vtbl+0x84 (0x409970 after the +0x20 shift) first hands mode, colour
   and alpha to its linked name window (+0x2c0), then takes them itself; N_2fe
-  copies no style when it links the name window. (No literal
+  copies no style when it links the name window. The composed frame
+  (`+0x240`, measured 2026-11-25 on all pixels of the message window): shade
+  alpha = `(A·alpha + 127) / 255` from the mask byte A, shade colour = the
+  setting; then the frame picture goes over it by pairs of pixels that begin
+  on an 8 byte boundary: both frame alphas 0 → shade kept; both 255 → both
+  frame pixels copied; else per pixel `A' = 255 − (((255−sa)(255−dA)) >> 8)`,
+  `c' = d + (((s−d)·w) >> 8)` with `w = 255` when `dA = 0`, else
+  `(sa·255)/A'` (that last case was not seen in the data). (No literal
   "cf_bold"/"cf_edge" strings exist in the EXE; these are the equivalents.)
 * Default look: 22 px MS Gothic, GRAY4 AA, white, soft black edge r=2,
   no gradient, window bg mode 1 colour 0 alpha 140.

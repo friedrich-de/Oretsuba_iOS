@@ -47,15 +47,51 @@ int mask_at(const Image &m, int x, int y) {
 	return int(m.pixel(x, y) & 0xff);
 }
 
+// The frame picture laid over the shade, as the original composes a window
+// frame (measured on its composed message window, every pixel). It goes by
+// pairs of pixels that begin on an 8 byte boundary of the destination, whose
+// rows follow each other without padding: a pair of two transparent frame
+// pixels leaves the shade as it is, a pair of two opaque ones is copied, and
+// in any other pair each pixel is mixed, which gives a transparent one one
+// step more alpha and leaves an opaque one one step short of its colour.
 void blend_over(Image &dst, const Image &src) {
 	int w = std::min(dst.width(), src.width()), h = std::min(dst.height(), src.height());
+	const bool alpha = src.bpp() == 32 && src.has_alpha;
+	auto mix = [](uint32_t d, uint32_t s, int sa) {
+		int da = int(d >> 24);
+		int a = 255 - (((255 - sa) * (255 - da)) >> 8);
+		int wt = da == 0 ? 255 : sa * 255 / a;
+		uint32_t out = uint32_t(a) << 24;
+		for (int shift = 0; shift < 24; shift += 8) {
+			int dc = int(d >> shift & 255), sc = int(s >> shift & 255);
+			int v = dc + (((sc - dc) * wt) >> 8);  // the shift rounds down, below zero too
+			out |= uint32_t(v & 255) << shift;
+		}
+		return out;
+	};
 	for (int y = 0; y < h; ++y) {
 		uint32_t *d = dst.row32(y);
-		for (int x = 0; x < w; ++x) {
-			uint32_t s = src.pixel(x, y);
-			int a = src.bpp() == 32 && src.has_alpha ? int(s >> 24) : 255;
-			blend_text_pixel(d[x], s & 0xffffff, a, true);
+		int x = 0;
+		auto px = [&](int i) { return src.pixel(i, y); };
+		auto sa = [&](int i) { return alpha ? int(px(i) >> 24) : 255; };
+		auto one = [&](int i) {
+			int a = sa(i);
+			if (a == 255) d[i] = px(i) | 0xff000000u;
+			else if (a) d[i] = mix(d[i], px(i), a);
+		};
+		if ((y * dst.width()) & 1) one(x++);
+		for (; x + 1 < w; x += 2) {
+			int a0 = sa(x), a1 = sa(x + 1);
+			if (a0 == 0 && a1 == 0) continue;
+			if (a0 == 255 && a1 == 255) {
+				d[x] = px(x) | 0xff000000u;
+				d[x + 1] = px(x + 1) | 0xff000000u;
+			} else {
+				d[x] = mix(d[x], px(x), a0);
+				d[x + 1] = mix(d[x + 1], px(x + 1), a1);
+			}
 		}
+		if (x < w) one(x);
 	}
 }
 
