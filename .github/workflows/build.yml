@@ -1,0 +1,90 @@
+# Builds the unsigned iPhone and iPad package from the code of the commit and
+# runs the checks that need no game files. A build of main is published as
+# the release "Latest build", so the package there always comes from the code
+# in this repository.
+#
+# The job runs on GitHub's standard macOS runner, which costs nothing for a
+# public repository.
+name: Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "engine/**"
+      - "tools/apple/**"
+      - ".github/workflows/build.yml"
+  pull_request:
+    paths:
+      - "app/**"
+      - "engine/**"
+      - "tools/apple/**"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    name: iPhone and iPad package
+    runs-on: macos-26
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode version
+        run: xcodebuild -version
+
+      - name: Checks without game files
+        run: |
+          make -C engine -j4 all tests
+          build/host/mining_test
+          build/host/image_blend
+          xcrun swiftc -module-cache-path build/swift-module-cache \
+            app/Sources/App/FolderImport.swift app/Tests/FolderImportTests.swift \
+            -o build/folder-import-tests
+          build/folder-import-tests
+
+      - name: Build the package
+        run: tools/apple/package.sh ios
+
+      - name: Keep the package with the run
+        uses: actions/upload-artifact@v4
+        with:
+          name: Oretsuba-iOS-unsigned-${{ github.sha }}
+          path: |
+            build/packages/Oretsuba-iOS-unsigned.ipa
+            build/packages/Oretsuba-iOS-unsigned.ipa.sha256
+          if-no-files-found: error
+
+      - name: Publish as the latest build
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          short="${GITHUB_SHA:0:7}"
+          sum="$(cut -d ' ' -f 1 build/packages/Oretsuba-iOS-unsigned.ipa.sha256)"
+          {
+            echo "Built by GitHub Actions from commit [$short]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA) with $(xcodebuild -version | tr '\n' ' ')."
+            echo
+            echo "The package is unsigned. Sign it with your own Apple account, for example with a sideloading tool: see the README. It contains nothing of the game."
+            echo
+            echo "SHA-256 of \`Oretsuba-iOS-unsigned.ipa\`: \`$sum\`"
+            echo
+            echo "[The run that built it]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
+          } > build/release-notes.md
+          if gh release view latest-build > /dev/null 2>&1; then
+            gh release delete latest-build --yes --cleanup-tag
+          fi
+          gh release create latest-build \
+            build/packages/Oretsuba-iOS-unsigned.ipa \
+            build/packages/Oretsuba-iOS-unsigned.ipa.sha256 \
+            --target "$GITHUB_SHA" \
+            --title "Latest build ($short)" \
+            --notes-file build/release-notes.md \
+            --latest

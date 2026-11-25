@@ -35,13 +35,16 @@ installed on Windows.
 
 ## Installing
 
-This fork publishes no builds. The packages named below are built on a Mac, see
+GitHub builds the unsigned iPhone and iPad package from the code of `main` after every change and publishes it as
+the release [Latest build](../../releases/latest), so that package always comes from the code in this repository
+([the workflow](.github/workflows/build.yml)). The Vision Pro and Mac packages are built on a Mac, see
 [Checks and packages](#checks-and-packages). The builds of the
 [original project](https://github.com/galhack/Oretsuba_iOS/releases) come without mining.
 
 ### iPhone / iPad (sideloading)
 
-1. Build `Oretsuba-iOS-unsigned.ipa` with `tools/apple/package.sh ios`.
+1. Download `Oretsuba-iOS-unsigned.ipa` from the [latest build](../../releases/latest), or build it yourself with
+   `tools/apple/package.sh ios`.
 2. Connect the device with a cable, open [Sideloadly](https://sideloadly.io/), choose the device and the IPA, enter
    your Apple ID and press Start. An app signed with a free Apple ID has to be signed again after 7 days, and a device
    takes at most 3 apps signed this way at a time.
