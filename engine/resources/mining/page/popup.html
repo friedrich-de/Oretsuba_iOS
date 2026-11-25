@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; connect-src 'self'; font-src 'self' data:"
+    />
+    <title>Dictionary</title>
+    <link rel="stylesheet" href="popup.css" />
+    <script type="module" src="main.js"></script>
+  </head>
+  <body>
+    <div id="marks" aria-hidden="true"></div>
+    <div id="panel" class="word-popup" role="dialog" aria-label="Dictionary" data-testid="word-popup" hidden>
+      <p id="note" class="note" role="status" data-testid="word-note" hidden></p>
+      <div id="holder" class="holder" hidden></div>
+      <p id="status" class="status" data-testid="word-status" hidden></p>
+    </div>
+  </body>
+</html>
