@@ -59,6 +59,20 @@ object AnkiDroid {
     /** Shows the system's question; the answer arrives in the activity's onRequestPermissionsResult. */
     fun ask(activity: Activity, requestCode: Int) = activity.requestPermissions(arrayOf(PERMISSION), requestCode)
 
+    /** The app itself, which outlives every screen. Set as the app starts (AnkiMediaProvider). */
+    @Volatile
+    private var appContext: Context? = null
+
+    fun attach(context: Context) {
+        appContext = context.applicationContext
+    }
+
+    /** One request of the mining kit, as native code makes it (Native.ankiDroid). */
+    fun request(method: String, json: String): String {
+        val app = appContext ?: return problem(NO_ANSWER, "failed").toString()
+        return call(app, method, json)
+    }
+
     /** One request of the mining kit. Never throws; may take a moment, so not on the main thread. */
     fun call(context: Context, method: String, json: String): String {
         val app = context.applicationContext

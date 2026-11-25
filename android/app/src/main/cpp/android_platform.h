@@ -39,6 +39,7 @@ public:
 	void begin_text_input(const std::string &utf8_initial) override;
 	int poll_text_input(std::string &utf8_result) override;
 	HttpSend http_sender() override;
+	AnkiAppHost anki_app() override;
 
 private:
 	std::string save_dir_;
@@ -52,6 +53,10 @@ private:
 // Sends one request and waits for its answer. Needs nothing but the Java
 // machine, so it may be called from any thread for as long as the app runs.
 HttpSend android_http_sender();
+
+// AnkiDroid on this device, asked through the app's Kotlin (AnkiDroid.kt). Like
+// the sender above it needs nothing but the Java machine.
+AnkiAppHost android_anki_host();
 
 // Monotonic milliseconds, the clock of now_ms() and of the frames.
 int64_t android_now_ms();

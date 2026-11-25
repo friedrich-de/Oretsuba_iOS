@@ -88,4 +88,14 @@ HttpSend AndroidPlatform::http_sender() {
 	return android_http_sender();
 }
 
+AnkiAppHost android_anki_host() {
+	AnkiAppHost host;
+	host.ankidroid = jni_ankidroid;
+	return host;
+}
+
+AnkiAppHost AndroidPlatform::anki_app() {
+	return android_anki_host();
+}
+
 }  // namespace ore

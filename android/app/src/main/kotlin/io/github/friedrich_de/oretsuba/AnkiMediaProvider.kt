@@ -53,7 +53,11 @@ class AnkiMediaProvider : ContentProvider() {
         }
     }
 
-    override fun onCreate(): Boolean = true
+    /** Android makes a provider before anything else of the app: AnkiDroid.kt gets the app here. */
+    override fun onCreate(): Boolean {
+        context?.let { AnkiDroid.attach(it) }
+        return true
+    }
 
     private fun fileOf(uri: Uri): File? {
         val context = context ?: return null
