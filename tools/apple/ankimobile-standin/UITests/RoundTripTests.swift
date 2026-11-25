@@ -17,6 +17,8 @@ final class RoundTripTests: XCTestCase {
         app.launch()
 
         let allow = NSPredicate(format: "label BEGINSWITH[c] 'Allow'")
+        // Should the system ask before it opens the other app.
+        let open = NSPredicate(format: "label ==[c] 'Open'")
         let end = Date().addingTimeInterval(240)
         var last = ""
         var wentBack = false
@@ -25,7 +27,8 @@ final class RoundTripTests: XCTestCase {
             // "Oretsuba would like to paste from Anki stand-in": the system asks, or the app's own window does.
             var answered = false
             for owner in [system, app] {
-                let button = owner.buttons.matching(allow).firstMatch
+                var button = owner.buttons.matching(allow).firstMatch
+                if !button.exists { button = owner.alerts.buttons.matching(open).firstMatch }
                 if button.exists {
                     keep("paste question \(shot)")
                     shot += 1

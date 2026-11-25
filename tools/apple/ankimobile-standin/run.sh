@@ -43,19 +43,27 @@ XG="$(command -v xcodegen || true)"
 [ -n "$XG" ] || XG="$ROOT/build/tools/xcodegen/bin/xcodegen"
 "$XG" generate --spec "$HERE/project.yml" --project "$HERE"
 
+# The stand-in and the UI test that plays the player.
+xcodebuild build-for-testing -project "$HERE/AnkiStandIn.xcodeproj" -scheme AnkiStandIn \
+	-destination "platform=iOS Simulator,id=$device" -derivedDataPath "$OUT/standin" \
+	> "$OUT/results/build-standin.log" 2>&1 || { tail -60 "$OUT/results/build-standin.log"; exit 1; }
+standin="$OUT/standin/Build/Products/Debug-iphonesimulator/AnkiStandIn.app"
+
 xcrun simctl boot "$device" 2>/dev/null || true
 xcrun simctl bootstatus "$device" -b > /dev/null
 xcrun simctl uninstall "$device" "$bundle" 2>/dev/null || true
 xcrun simctl uninstall "$device" org.local.ankistandin 2>/dev/null || true
 xcrun simctl install "$device" "$app"
+xcrun simctl install "$device" "$standin"
+echo "Installed: $(xcrun simctl listapps "$device" | grep -c -E "CFBundleIdentifier = \"(org.local.ankistandin|$bundle)\"") of 2 apps"
 
-# The UI test installs the stand-in, starts the app with the check and plays the player.
+# The UI test starts the app with the check and plays the player.
 rm -rf "$OUT/result.xcresult"
 status=0
-ORE_APP_BUNDLE="$bundle" TEST_RUNNER_ORE_APP_BUNDLE="$bundle" xcodebuild test -project "$HERE/AnkiStandIn.xcodeproj" -scheme AnkiStandIn \
+ORE_APP_BUNDLE="$bundle" TEST_RUNNER_ORE_APP_BUNDLE="$bundle" xcodebuild test-without-building -project "$HERE/AnkiStandIn.xcodeproj" -scheme AnkiStandIn \
 	-destination "platform=iOS Simulator,id=$device" -derivedDataPath "$OUT/standin" -resultBundlePath "$OUT/result.xcresult" \
 	> "$OUT/results/test.log" 2>&1 || status=$?
-grep -E "Test Case|error:|passed|failed|XCTAssert" "$OUT/results/test.log" | tail -30 || true
+grep -E "Test Case|error:|passed|failed|XCTAssert|    t = " "$OUT/results/test.log" | tail -60 || true
 
 xcrun simctl io "$device" screenshot "$OUT/results/end.png" > /dev/null 2>&1 || true
 data="$(xcrun simctl get_app_container "$device" "$bundle" data 2>/dev/null || true)"
