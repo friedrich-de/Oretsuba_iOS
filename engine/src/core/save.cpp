@@ -124,8 +124,11 @@ std::vector<uint8_t> Engine::state_blob(bool with_log) {
 	bool has_log = with_log && opt8(0xe5b);
 	w.u8(has_log);
 	if (has_log) {
-		std::vector<uint8_t> log = text ? text->save_backlog() : std::vector<uint8_t>();
-		w.blob(log);
+		// The backlog, then the state at the last choice (N_31), itself a blob like this one.
+		if (text)
+			text->save_backlog(w);
+		else
+			w.u32(0);
 		w.blob(has_mem_snapshot ? mem_snapshot : std::vector<uint8_t>());
 	}
 	return w.take();
@@ -147,10 +150,19 @@ int Engine::restore_state_blob(const std::vector<uint8_t> &blob) {
 	has_mem_snapshot = false;
 	mem_snapshot.clear();
 	bool has_log = r.u8();
-	if (has_log && !r.bad()) {
+	if (has_log && !r.bad() && text && r.remaining() >= 8) {
+		// This port first wrote the backlog as a length, "BLOG" and its own entries;
+		// the original writes the count and its entries (message.cpp).
+		size_t at = r.pos();
 		uint32_t n = r.u32();
-		std::vector<uint8_t> log = r.bytes(n);
-		if (text && opt8(0xe5b)) text->load_backlog(log);
+		bool earlier = r.u32() == 0x474f4c42;
+		r.seek(at + (earlier ? 4 : 0));
+		if (earlier) {
+			std::vector<uint8_t> log = r.bytes(n);
+			if (opt8(0xe5b)) text->load_backlog_earlier(log);
+		} else if (!text->load_backlog(r, opt8(0xe5b) != 0)) {
+			return 0;
+		}
 		uint32_t m = r.u32();
 		if (m && !r.bad()) {
 			mem_snapshot = r.bytes(m);
@@ -519,6 +531,8 @@ void register_save_natives(Engine &e) {
 			std::string p(reinterpret_cast<const char *>(&d[kPreviewAt]), strnlen(reinterpret_cast<const char *>(&d[kPreviewAt]), 0x90));
 			if (a.b(6) && e.text) p = e.text->reflow(p, 34, 4);
 			a.out_str(4, p);
+			// The load screen tests the first four bytes for "this save has a memo" (0x41e9e4).
+			if (p.empty()) memset(e.vm.mem().host(a.u(4), 4), 0, 4);
 		}
 		if (!a.null(5)) {
 			struct stat st;

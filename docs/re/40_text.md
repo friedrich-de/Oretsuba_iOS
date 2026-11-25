@@ -429,8 +429,12 @@ Return 0 drawn, -1 drawn after wrap, 1 page full (not drawn).
 
 Name-box print (vtbl+0x118, FUN_0045d270(str, mode)): measures the string
 and calls vtbl+0xb8(str, x, y) with, horizontally, mode 0 = centred in the
-padded box both ways, 1 = x 0 / current y, 2 = right aligned, 3 = x from
+padded box both ways, 1 = centred / current y, 2 = right aligned, 3 = x from
 cursor (−1); advinit uses mode 1. (Vertical table at 0x45d3c0 similar.)
+Centred is `x = (boxW + padL + padR − marginL − marginR − width) >> 1`, where
+`width` is the measured rectangle's, edge included, and the rectangle's
+offset is not taken off again. Read at run time for the name box (boxW 222,
+margins 23, pads 2, so 180 left): width 26 gives 77, 48 gives 66, 114 gives 33.
 
 Message window effective values: font = G[900] ("ＭＳ ゴシック" 22 px per
 gameinit, the default font N_a6; passed to N_2b2 as args[4]) → cell 22,

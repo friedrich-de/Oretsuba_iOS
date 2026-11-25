@@ -275,13 +275,15 @@ void TextWindow::draw_string(const std::string &s, int x, int y) {
 void TextWindow::print_aligned(const std::string &s, int mode) {
 	Font *f = font();
 	if (!f) return;
-	int tw = 0, th = 0, ox = 0, oy = 0;
-	f->measure(s, tw, th, &ox, &oy);
+	int tw = 0, th = 0;
+	f->measure(s, tw, th, nullptr, nullptr);
 	int aw = box_w - ml - mr + pl + pr, ah = box_h - mt - mb + pt + pb;
 	int x = -1, y = -1;
+	// The measured size includes the edge around the letters; the original
+	// halves what is left and does not take the edge off again (0x45d35f).
 	switch (mode) {
-	case 0: x = (aw - tw) / 2 - ox, y = (ah - th) / 2 - oy; break;
-	case 1: x = (aw - tw) / 2 - ox; break;
+	case 0: x = (aw - tw) >> 1, y = (ah - th) >> 1; break;
+	case 1: x = (aw - tw) >> 1; break;
 	case 2: x = 0; break;
 	case 3: x = aw - tw; break;
 	default: break;
