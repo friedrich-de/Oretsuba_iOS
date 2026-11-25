@@ -44,6 +44,9 @@ void ore_key(OreEngine *engine, int vk, int down);
    3 save, 4 load, 5 skip, 6 auto, 7 toggle history, 8 menu, 9 hide text,
    10 settings, 11 title. The script decides whether it is currently allowed. */
 void ore_game_command(OreEngine *engine, int command);
+/* 1 while one of the game's films plays. Escape is the key that ends a film
+   early; a host whose player has no keyboard can send it for another input then. */
+int ore_movie_playing(OreEngine *engine);
 
 /* Audio: interleaved stereo float at ore_audio_rate(). Called from the audio thread. */
 int ore_audio_rate(void);

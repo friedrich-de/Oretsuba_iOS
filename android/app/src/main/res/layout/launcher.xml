@@ -13,6 +13,7 @@
 
         <!-- One column, centred and no wider than is good to read on a wide screen. -->
         <LinearLayout
+            android:id="@+id/column"
             android:layout_width="@dimen/column_width"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
@@ -166,6 +167,12 @@
                 style="@style/Note"
                 android:layout_marginTop="4dp"
                 android:text="@string/controls_other" />
+
+            <Button
+                android:id="@+id/licences"
+                style="@style/PlainButton"
+                android:layout_marginTop="8dp"
+                android:text="@string/licences" />
         </LinearLayout>
     </FrameLayout>
 </ScrollView>

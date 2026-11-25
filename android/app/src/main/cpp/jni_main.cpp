@@ -200,6 +200,11 @@ void game_command(JNIEnv *, jclass, jlong handle, jint command) {
 	if (Session *s = session_of(handle); s->engine) ore_game_command(s->engine, command);
 }
 
+jboolean movie_playing(JNIEnv *, jclass, jlong handle) {
+	Session *s = session_of(handle);
+	return s->engine && ore_movie_playing(s->engine) ? JNI_TRUE : JNI_FALSE;
+}
+
 void answer_dialog(JNIEnv *, jclass, jlong handle, jint result) {
 	if (Session *s = session_of(handle); s->engine) ore_answer_dialog(s->engine, result);
 }
@@ -237,6 +242,7 @@ const JNINativeMethod kMethods[] = {
     {"mouseWheel", "(JI)V", reinterpret_cast<void *>(mouse_wheel)},
     {"key", "(JIZ)V", reinterpret_cast<void *>(key)},
     {"gameCommand", "(JI)V", reinterpret_cast<void *>(game_command)},
+    {"moviePlaying", "(J)Z", reinterpret_cast<void *>(movie_playing)},
     {"answerDialog", "(JI)V", reinterpret_cast<void *>(answer_dialog)},
     {"answerTextInput", "(JZ[B)V", reinterpret_cast<void *>(answer_text_input)},
     {"miningCheck", "([B[I)[B", reinterpret_cast<void *>(mining_check)},

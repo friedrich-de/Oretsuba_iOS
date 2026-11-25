@@ -37,6 +37,8 @@
     <string name="controls_touch">Controls: tap = left button · tap with two fingers or back = right button (menu) · swipe up or down = wheel (history) · long press = skip.</string>
     <string name="controls_other">A mouse, a keyboard or a game controller works too, as on the PC.</string>
 
+    <string name="licences">Licences</string>
+
     <string name="ok">OK</string>
     <string name="yes">Yes</string>
     <string name="no">No</string>

@@ -62,6 +62,9 @@ object Native {
 
     @JvmStatic external fun gameCommand(session: Long, command: Int)
 
+    /** Whether one of the game's films plays at the moment. */
+    @JvmStatic external fun moviePlaying(session: Long): Boolean
+
     @JvmStatic external fun answerDialog(session: Long, result: Int)
 
     @JvmStatic external fun answerTextInput(session: Long, ok: Boolean, text: ByteArray?)

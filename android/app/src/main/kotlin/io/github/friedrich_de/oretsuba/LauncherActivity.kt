@@ -3,6 +3,7 @@ package io.github.friedrich_de.oretsuba
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -87,9 +88,41 @@ class LauncherActivity : Activity() {
             errorMessage = null
             refresh()
         }
+        findViewById<Button>(R.id.licences).setOnClickListener {
+            // The notices of the libraries inside the engine, the file the Apple app carries too.
+            val notices = assets.open("ThirdPartyNotices.txt").use { it.readBytes().toString(Charsets.UTF_8) }
+            AlertDialog.Builder(this).setTitle(R.string.licences).setMessage(unwrapped(notices))
+                .setPositiveButton(R.string.ok, null).show()
+        }
         refresh()
         // For tests: "am start ... --ez autostart true" goes straight into the game.
         if (savedInstanceState == null && intent.getBooleanExtra("autostart", false)) startGame()
+    }
+
+    // The notices file is wrapped at 80 columns and a dialog is narrower, which
+    // would break every line twice. Lines that were wrapped are joined again:
+    // a long line of words that another line of the paragraph follows.
+    private fun unwrapped(text: String): String {
+        val lines = text.lines()
+        val out = StringBuilder()
+        for ((index, line) in lines.withIndex()) {
+            out.append(line.trimEnd())
+            val next = lines.getOrNull(index + 1)?.trim().orEmpty()
+            val rule = next.isNotEmpty() && next.all { it == '-' || it == '=' }
+            val wrapped = line.length >= 60 && ' ' in line.trim() && next.isNotEmpty() && !rule
+            out.append(if (wrapped) ' ' else '\n')
+        }
+        return out.toString().trimEnd()
+    }
+
+    // The screen was turned or the window resized. The activity stays (an import
+    // may be running), so the column takes its width for the new shape here.
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val column = findViewById<View>(R.id.column)
+        val params = column.layoutParams
+        params.width = resources.getDimensionPixelSize(R.dimen.column_width)
+        column.layoutParams = params
     }
 
     override fun onResume() {
