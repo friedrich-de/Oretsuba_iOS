@@ -295,6 +295,9 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
                     false
                 }
             }
+            // The dialog is for typing: the keyboard comes up with it.
+            dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+            field.requestFocus()
             dialog.show()
         }
     }
