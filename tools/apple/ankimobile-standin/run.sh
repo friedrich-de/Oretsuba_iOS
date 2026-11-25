@@ -13,7 +13,7 @@
 # (verify.py). Everything it makes is under build/ankimobile-standin; what it
 # found is in build/ankimobile-standin/results. Needs no game files.
 set -eu
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 HERE="$ROOT/tools/apple/ankimobile-standin"
 OUT="$ROOT/build/ankimobile-standin"
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
