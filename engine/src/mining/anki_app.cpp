@@ -590,4 +590,87 @@ int MediaServer::offered() const {
 	return int(state_->items.size());
 }
 
+// ---------------------------------------------------------------- one card on its way to AnkiMobile
+
+AnkiMobileHandover::AnkiMobileHandover(std::string return_link) : return_link_(std::move(return_link)) {}
+
+AnkiMobileHandover::~AnkiMobileHandover() = default;
+
+bool AnkiMobileHandover::prepare(AnkiLinkNote note, std::vector<File> files, Prepared &out, std::string &problem) {
+	std::lock_guard<std::mutex> lock(mutex_);
+	card_.clear();
+	offered_.clear();
+	Prepared prepared;
+	bool any = false;
+	for (const File &file : files) any = any || (!file.bytes.empty() && anki_media_name(file.name));
+	// A fresh server for every card: an app that slept in between may have lost its sockets.
+	if (any && !server_.start(problem)) return false;
+	if (!any) server_.stop();
+	for (File &file : files) {
+		std::string name = anki_media_safe_name(file.name);
+		bool placed = false;
+		if (!file.bytes.empty() && anki_media_name(name)) {
+			std::string link;
+			for (const std::string &field_name : file.fields) {
+				auto field = std::find_if(note.fields.begin(), note.fields.end(),
+				                          [&](const std::pair<std::string, std::string> &f) { return f.first == field_name; });
+				if (field == note.fields.end() || !field->second.empty()) continue;
+				if (link.empty()) link = server_.offer(name, std::move(file.bytes));
+				if (link.empty()) break;
+				field->second = link;
+				placed = true;
+			}
+			if (placed) offered_.emplace_back(name, link);
+		}
+		if (!placed) prepared.left_out.push_back(file.name);
+	}
+	static const char kHex[] = "0123456789abcdef";
+	std::random_device device;
+	for (int i = 0; i < 2; ++i) {
+		uint32_t word = device();
+		for (int j = 0; j < 8; ++j) card_ += kHex[(word >> (j * 4)) & 15];
+	}
+	prepared.card = card_;
+	std::string back = return_link_ + (return_link_.find('?') == std::string::npos ? "?card=" : "&card=") + card_;
+	prepared.link = ankimobile_add_link(note, back);
+	out = std::move(prepared);
+	problem.clear();
+	return true;
+}
+
+AnkiMobileHandover::Result AnkiMobileHandover::finish(Result::Kind kind) {
+	Result result;
+	result.kind = kind;
+	result.card = card_;
+	for (const auto &file : offered_)
+		if (server_.fetched(file.second) == 0) result.not_fetched.push_back(file.first);
+	card_.clear();
+	offered_.clear();
+	server_.stop();
+	return result;
+}
+
+AnkiMobileHandover::Result AnkiMobileHandover::returned(std::string_view link) {
+	std::lock_guard<std::mutex> lock(mutex_);
+	std::string card;
+	size_t mark = link.find('?');
+	bool ours = !card_.empty() && link.substr(0, mark) == std::string_view(return_link_).substr(0, return_link_.find('?')) &&
+	            link_query_value(link, "card", card) && card == card_;
+	if (!ours) return Result();
+	return finish(Result::Added);
+}
+
+AnkiMobileHandover::Result AnkiMobileHandover::gave_up() {
+	std::lock_guard<std::mutex> lock(mutex_);
+	if (card_.empty()) return Result();
+	Result result = finish(Result::Unconfirmed);
+	result.not_fetched.clear();  // nothing is known of a card that never came back
+	return result;
+}
+
+bool AnkiMobileHandover::waiting() const {
+	std::lock_guard<std::mutex> lock(mutex_);
+	return !card_.empty();
+}
+
 }  // namespace ore

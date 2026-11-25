@@ -16,6 +16,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -115,6 +116,58 @@ public:
 private:
 	struct State;
 	std::shared_ptr<State> state_;
+};
+
+// ---------------------------------------------------------------- one card on its way to AnkiMobile
+
+// Takes a card to AnkiMobile and learns what became of it. AnkiMobile is
+// handed one link; it fetches the card's files from the media server while it
+// adds the note, then opens the way back. When it opens nothing (a word it
+// has already and refuses, a note type that is gone, the player turning
+// away), the card counts as not confirmed once this app is in front again.
+class AnkiMobileHandover {
+public:
+	struct File {
+		std::string name;                 // "oretsuba_3f2a.jpg"
+		std::vector<uint8_t> bytes;
+		std::vector<std::string> fields;  // the fields it belongs to
+	};
+	struct Prepared {
+		std::string card;                   // names this card in the way back
+		std::string link;                   // the link to open
+		std::vector<std::string> left_out;  // names of the files AnkiMobile cannot take
+	};
+	struct Result {
+		enum Kind { NotOurs, Added, Unconfirmed };
+		Kind kind = NotOurs;
+		std::string card;
+		std::vector<std::string> not_fetched;  // names of the files AnkiMobile was offered and did not fetch
+	};
+
+	// `return_link` is this app's own link that AnkiMobile opens when it is
+	// done, such as "oretsuba://anki/added".
+	explicit AnkiMobileHandover(std::string return_link);
+	~AnkiMobileHandover();
+
+	// Offers the files and writes the link. AnkiMobile keeps a file only in a
+	// field that holds nothing else, so a file goes into those of its fields
+	// that are empty; one without such a field, or without a media ending, is
+	// left out. A card still on its way is given up.
+	bool prepare(AnkiLinkNote note, std::vector<File> files, Prepared &out, std::string &problem);
+	// A link this app was opened with. Added when it is the way back of the
+	// card on its way; the files are then offered no longer.
+	Result returned(std::string_view link);
+	// This app is in front again and no way back came. Unconfirmed when a card was on its way.
+	Result gave_up();
+	bool waiting() const;
+
+private:
+	Result finish(Result::Kind kind);
+	mutable std::mutex mutex_;
+	MediaServer server_;
+	std::string return_link_;
+	std::string card_;
+	std::vector<std::pair<std::string, std::string>> offered_;  // name, link
 };
 
 }  // namespace ore

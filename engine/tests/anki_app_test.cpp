@@ -371,6 +371,110 @@ void test_server() {
 	// leaving scope stops both
 }
 
+// ---------------------------------------------------------------- one card on its way to AnkiMobile
+
+AnkiLinkNote lapis_note() {
+	AnkiLinkNote note;
+	note.deck = "Mining";
+	note.note_type = "Lapis";
+	note.fields = {{"Expression", U8_WORD}, {"Sentence", "a <b>b</b> c"}, {"Picture", ""}, {"SentenceAudio", ""}, {"ExpressionAudio", ""}, {"Glossary", "<ol><li>to eat</li></ol>"}};
+	note.tags = {"oretsuba"};
+	return note;
+}
+
+void test_handover() {
+	AnkiMobileHandover handover("oretsuba://anki/added");
+	check(!handover.waiting(), "no card is on its way at first");
+	check(handover.gave_up().kind == AnkiMobileHandover::Result::NotOurs, "giving up without a card is nothing");
+	check(handover.returned("oretsuba://anki/added?card=1").kind == AnkiMobileHandover::Result::NotOurs, "a way back without a card is not ours");
+
+	std::vector<uint8_t> picture(70000, 0x5a), voice(20000, 0x33), word(9000, 0x11);
+	AnkiMobileHandover::Prepared p;
+	std::string problem = "old";
+	bool made = handover.prepare(lapis_note(),
+	                             {{"oretsuba_shot.jpg", picture, {"Picture"}},
+	                              {"TAK1004.ogg", voice, {"SentenceAudio"}},
+	                              {"word.mp3", word, {"ExpressionAudio"}}},
+	                             p, problem);
+	check(made && problem.empty() && handover.waiting(), "a card with picture, voice and word sound is prepared");
+	check(p.left_out.empty() && p.card.size() == 16, "nothing is left out and the card has a name");
+	std::string v, picture_link, voice_link, word_link;
+	check(p.link.compare(0, 37, "anki://x-callback-url/addnote?type=La") == 0, "the link goes to AnkiMobile's addnote");
+	check(link_query_value(p.link, "fldPicture", picture_link) && picture_link.compare(0, 17, "http://localhost:") == 0 &&
+	          picture_link.compare(picture_link.size() - 18, 18, "/oretsuba_shot.jpg") == 0,
+	      "the picture's field holds a link on this device that ends in the file's name");
+	check(link_query_value(p.link, "fldSentenceAudio", voice_link) && voice_link.compare(voice_link.size() - 12, 12, "/TAK1004.ogg") == 0 &&
+	          link_query_value(p.link, "fldExpressionAudio", word_link) && word_link.compare(word_link.size() - 9, 9, "/word.mp3") == 0,
+	      "voice and word sound each have their link");
+	check(link_query_value(p.link, "fldExpression", v) && v == U8_WORD && link_query_value(p.link, "fldGlossary", v) &&
+	          v == "<ol><li>to eat</li></ol>",
+	      "the text fields are as they were");
+	check(link_query_value(p.link, "x-success", v) && v == "oretsuba://anki/added?card=" + p.card, "the way back names the card");
+
+	int port = atoi(picture_link.c_str() + 17);
+	Answer a = get(false, port, path_of(picture_link));
+	check(a.status == 200 && a.body.size() == picture.size(), "the picture can be fetched as AnkiMobile will");
+	a = get(false, port, path_of(voice_link));
+	check(a.status == 200 && a.body.size() == voice.size(), "and the voice");
+
+	check(handover.returned("oretsuba://anki/info").kind == AnkiMobileHandover::Result::NotOurs && handover.waiting(),
+	      "another link of this app is not the way back");
+	check(handover.returned("oretsuba://anki/added?card=0000000000000000").kind == AnkiMobileHandover::Result::NotOurs && handover.waiting(),
+	      "the way back of another card is not this one's");
+	check(handover.returned("other://anki/added?card=" + p.card).kind == AnkiMobileHandover::Result::NotOurs && handover.waiting(),
+	      "nor is another app's link with this card's name");
+	AnkiMobileHandover::Result r = handover.returned("oretsuba://anki/added?card=" + p.card);
+	check(r.kind == AnkiMobileHandover::Result::Added && r.card == p.card, "the way back says the card was added");
+	check(r.not_fetched == std::vector<std::string>{"word.mp3"}, "and names the file AnkiMobile did not fetch");
+	check(!handover.waiting(), "no card is on its way any more");
+	check(!ask(false, port, "GET / HTTP/1.1\r\n\r\n").connected, "the files are offered no longer: the server is gone");
+	check(handover.returned("oretsuba://anki/added?card=" + p.card).kind == AnkiMobileHandover::Result::NotOurs, "the same way back twice counts once");
+
+	// AnkiMobile never comes back
+	check(handover.prepare(lapis_note(), {{"oretsuba_shot.jpg", picture, {"Picture"}}}, p, problem) && handover.waiting(), "a second card is prepared");
+	std::string second = p.card;
+	check(link_query_value(p.link, "fldPicture", picture_link), "with its picture");
+	port = atoi(picture_link.c_str() + 17);
+	r = handover.gave_up();
+	check(r.kind == AnkiMobileHandover::Result::Unconfirmed && r.card == second && r.not_fetched.empty(), "giving up says the card is not confirmed");
+	check(!handover.waiting() && !ask(false, port, "GET / HTTP/1.1\r\n\r\n").connected, "and ends the offer");
+	check(handover.returned("oretsuba://anki/added?card=" + second).kind == AnkiMobileHandover::Result::NotOurs, "a way back that comes too late is not counted");
+
+	// what AnkiMobile cannot take
+	AnkiLinkNote note = lapis_note();
+	note.fields[2].second = "<i>already here</i>";  // Picture holds text
+	check(handover.prepare(note,
+	                       {{"shot.jpg", picture, {"Picture"}},          // its field is taken
+	                        {"voice.ogg", voice, {"SentenceAudio", "ExpressionAudio"}},  // two fields, both empty
+	                        {"word.mp3", word, {"SentenceAudio"}},        // its field went to the voice
+	                        {"notes.txt", word, {"ExpressionAudio"}},     // no media ending
+	                        {"gone.jpg", {}, {"Picture"}},                // no bytes
+	                        {"else.png", word, {"NoSuchField"}}},         // a field the note type lacks
+	                       p, problem),
+	      "a card with files that cannot all be taken is still prepared");
+	check(p.left_out == (std::vector<std::string>{"shot.jpg", "word.mp3", "notes.txt", "gone.jpg", "else.png"}), "the files left out are named");
+	check(link_query_value(p.link, "fldPicture", v) && v == "<i>already here</i>", "a field that holds text keeps it");
+	std::string v2;
+	check(link_query_value(p.link, "fldSentenceAudio", v) && link_query_value(p.link, "fldExpressionAudio", v2) && v == v2 &&
+	          v.compare(v.size() - 10, 10, "/voice.ogg") == 0,
+	      "a file for two empty fields is linked in both");
+	std::string third = p.card;
+	check(third != second, "every card has its own name");
+
+	// preparing again gives the card before up without a word
+	check(handover.prepare(lapis_note(), {}, p, problem) && p.card != third, "a card without files is prepared over the one on its way");
+	check(p.link.find("localhost") == std::string::npos && p.left_out.empty(), "it names no file");
+	check(handover.returned("oretsuba://anki/added?card=" + third).kind == AnkiMobileHandover::Result::NotOurs, "the card before is forgotten");
+	r = handover.returned("oretsuba://anki/added?card=" + p.card + "&extra=1");
+	check(r.kind == AnkiMobileHandover::Result::Added && r.not_fetched.empty(), "the newer one comes back, whatever else the link carries");
+
+	AnkiMobileHandover with_query("oretsuba://anki/added?from=game");
+	check(with_query.prepare(lapis_note(), {}, p, problem) && link_query_value(p.link, "x-success", v) &&
+	          v == "oretsuba://anki/added?from=game&card=" + p.card,
+	      "a way back that has a query already gets the card added to it");
+	check(with_query.returned(v).kind == AnkiMobileHandover::Result::Added, "and is recognised");
+}
+
 }  // namespace
 
 int main() {
@@ -380,6 +484,7 @@ int main() {
 	test_info();
 	test_media_names();
 	test_server();
+	test_handover();
 	printf("%s: %d checks\n", ok ? "anki_app_test passed" : "anki_app_test FAILED", checks);
 	return ok ? 0 : 1;
 }
