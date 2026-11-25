@@ -93,6 +93,69 @@ static class OreWin
     static extern uint SendInput(uint count, INPUT[] inputs, int size);
     [DllImport("user32.dll")] static extern uint MapVirtualKey(uint code, uint type);
 
+    // The per-application volume of the Windows mixer (Core Audio sessions).
+
+    [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
+    class MMDeviceEnumerator { }
+
+    [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IMMDeviceEnumerator
+    {
+        [PreserveSig] int EnumAudioEndpoints(int dataFlow, int stateMask, out IntPtr devices);
+        [PreserveSig] int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice device);
+    }
+
+    [ComImport, Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IMMDevice
+    {
+        [PreserveSig]
+        int Activate(ref Guid iid, int context, IntPtr activationParams,
+                     [MarshalAs(UnmanagedType.IUnknown)] out object instance);
+    }
+
+    [ComImport, Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IAudioSessionManager2
+    {
+        [PreserveSig] int GetAudioSessionControl(IntPtr session, int flags, out IntPtr control);
+        [PreserveSig] int GetSimpleAudioVolume(IntPtr session, int flags, out IntPtr volume);
+        [PreserveSig] int GetSessionEnumerator(out IAudioSessionEnumerator sessions);
+    }
+
+    [ComImport, Guid("E2F5BB11-0570-40CA-ACDD-3AA01277DEE8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IAudioSessionEnumerator
+    {
+        [PreserveSig] int GetCount(out int count);
+        [PreserveSig] int GetSession(int index, out IAudioSessionControl2 session);
+    }
+
+    [ComImport, Guid("BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IAudioSessionControl2
+    {
+        // IAudioSessionControl; only the slots are needed here.
+        [PreserveSig] int GetState(out int state);
+        [PreserveSig] int GetDisplayName(out IntPtr name);
+        [PreserveSig] int SetDisplayName(IntPtr name, IntPtr context);
+        [PreserveSig] int GetIconPath(out IntPtr path);
+        [PreserveSig] int SetIconPath(IntPtr path, IntPtr context);
+        [PreserveSig] int GetGroupingParam(out Guid group);
+        [PreserveSig] int SetGroupingParam(IntPtr group, IntPtr context);
+        [PreserveSig] int RegisterAudioSessionNotification(IntPtr notifications);
+        [PreserveSig] int UnregisterAudioSessionNotification(IntPtr notifications);
+        // IAudioSessionControl2
+        [PreserveSig] int GetSessionIdentifier(out IntPtr id);
+        [PreserveSig] int GetSessionInstanceIdentifier(out IntPtr id);
+        [PreserveSig] int GetProcessId(out uint pid);
+    }
+
+    [ComImport, Guid("87CE5498-68D6-44E5-9215-6DA47EF883D8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface ISimpleAudioVolume
+    {
+        [PreserveSig] int SetMasterVolume(float level, ref Guid context);
+        [PreserveSig] int GetMasterVolume(out float level);
+        [PreserveSig] int SetMute([MarshalAs(UnmanagedType.Bool)] bool mute, ref Guid context);
+        [PreserveSig] int GetMute([MarshalAs(UnmanagedType.Bool)] out bool mute);
+    }
+
     // ------------------------------------------------------------- settings
 
     static string processName = "ORE_TUBA";
@@ -407,6 +470,53 @@ static class OreWin
         return shown == 0 ? 1 : 0;
     }
 
+    // Mutes or unmutes the game in the Windows volume mixer, and nothing else.
+    // Windows remembers this for the program, so take it back when done. The
+    // game has a session there only once it has opened its sound.
+    static int Mute(Options o)
+    {
+        string word = o.Positional.Count > 0 ? o.Positional[0] : "on";
+        bool show = word == "show";
+        bool mute = word != "off";
+        var pids = new HashSet<uint>();
+        foreach (Process p in Process.GetProcesses())
+        {
+            try
+            {
+                if (p.ProcessName.IndexOf(processName, StringComparison.OrdinalIgnoreCase) >= 0) pids.Add((uint)p.Id);
+            }
+            catch (Exception) { }
+            p.Dispose();
+        }
+        var enumerator = (IMMDeviceEnumerator)new MMDeviceEnumerator();
+        IMMDevice device;
+        Marshal.ThrowExceptionForHR(enumerator.GetDefaultAudioEndpoint(0, 1, out device));   // render, multimedia
+        Guid iid = typeof(IAudioSessionManager2).GUID;
+        object instance;
+        Marshal.ThrowExceptionForHR(device.Activate(ref iid, 23, IntPtr.Zero, out instance));
+        IAudioSessionEnumerator sessions;
+        Marshal.ThrowExceptionForHR(((IAudioSessionManager2)instance).GetSessionEnumerator(out sessions));
+        int count, found = 0;
+        Marshal.ThrowExceptionForHR(sessions.GetCount(out count));
+        Guid context = Guid.Empty;
+        for (int i = 0; i < count; ++i)
+        {
+            IAudioSessionControl2 session;
+            if (sessions.GetSession(i, out session) != 0) continue;
+            uint pid;
+            session.GetProcessId(out pid);
+            if (!pids.Contains(pid)) continue;
+            var volume = (ISimpleAudioVolume)session;
+            if (!show) Marshal.ThrowExceptionForHR(volume.SetMute(mute, ref context));
+            bool now;
+            volume.GetMute(out now);
+            Console.WriteLine("pid {0}: {1}", pid, now ? "muted" : "not muted");
+            ++found;
+        }
+        if (found == 0) Console.WriteLine("the game has no sound session yet (" + pids.Count + " process(es) of " + processName + ")");
+        return found == 0 ? 3 : 0;
+    }
+
     static int Walk(Options o)
     {
         int count = o.PositionalInt(0);
@@ -548,6 +658,7 @@ static class OreWin
             "orewin wheel DELTA\n" +
             "orewin key VK [down|up] [--hold MS]\n" +
             "orewin still [OUT.png] [--timeout MS]\n" +
+            "orewin mute [on|off|show]\n" +
             "orewin walk COUNT DIR [--x 400 --y 500] [--start N] [--timeout MS]\n" +
             "orewin burst SECONDS DIR [--fps 30] [--click-x X --click-y Y | --key VK]\n" +
             "orewin run FILE.input DIR [--shot-every N] [--frames N]\n" +
@@ -570,6 +681,7 @@ static class OreWin
             gameHeight = int.Parse(size[1], CultureInfo.InvariantCulture);
             string command = args[0];
             if (command == "info") return Info(o);
+            if (command == "mute") return Mute(o);
             NeedGame();
             if (command == "shot")
             {

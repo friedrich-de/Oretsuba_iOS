@@ -18,6 +18,7 @@ Start the game in a window, leave the window uncovered, then:
 
 ```bat
 orewin info                       the game's window and the size of its client area
+orewin mute on                    mute the game in the Windows volume mixer (off takes it back, show tells)
 orewin shot title.png             one picture
 orewin click 730 384              a left click at a game position
 orewin still rest.png             wait until the picture stands still, then save it
