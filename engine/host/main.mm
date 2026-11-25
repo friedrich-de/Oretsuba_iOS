@@ -38,6 +38,7 @@
 //   tap X Y                  a finger's tap as the app handles it: the kit is asked first
 //                            ({"tap":0} the game got a click, {"tap":1,"popup":{...}} a word
 //                            was hit and the game is held, {"tap":2} nothing happens)
+//   text                     the line that stands in the text box, as a tap would tell it, or null
 //   hold 0|1                 the game stands still while the popup is open
 //   move X Y | wheel D | key VK | command N
 //   call METHOD [JSON]       a call to the kit; the answer is the kit's own
@@ -46,6 +47,7 @@
 //   state                    the frame, the script, the hold
 //   quit
 // What the kit tells without having been asked comes as {"event":"...","payload":...}.
+// With --kit and --control but without --data the host is the kit alone: call, data, quit.
 #include <sys/stat.h>
 
 #include <cstdio>
@@ -177,6 +179,54 @@ int main(int argc, char **argv) {
 			return 2;
 		}
 	}
+	OreKit *kit = nullptr;
+	if (!kit_folder.empty()) {
+		char problem[512] = "";
+		kit = ore_kit_open(kit_folder.c_str(), kit_resources.c_str(), problem, sizeof problem);
+		if (!kit) {
+			fprintf(stderr, "the mining kit does not open: %s\n", problem);
+			return 1;
+		}
+	}
+	// A call to the kit or a file of it, answered with one line.
+	auto kit_command = [&](const std::string &op, std::stringstream &ss) {
+		std::string method, params;
+		ss >> method;
+		std::getline(ss, params);
+		if (!kit) {
+			answer_line("{\"ok\":false,\"error\":\"The host runs without --kit.\",\"kind\":\"internal\"}");
+		} else if (op == "call") {
+			char *text = ore_kit_call(kit, method.c_str(), params.c_str());
+			answer_line(text ? text : "{\"ok\":false}");
+			ore_kit_free(text);
+		} else {
+			uint8_t *bytes = nullptr;
+			int64_t length = 0;
+			char type[128] = "";
+			std::string encoded;
+			int found = ore_kit_data(kit, method.c_str(), params.c_str(), &bytes, &length, type, sizeof type);
+#if ORE_MINING_KIT
+			if (found) encoded = ore::base64(std::string(reinterpret_cast<const char *>(bytes), size_t(length)));
+#endif
+			ore_kit_free(bytes);
+			answer_line(found ? std::string("{\"ok\":true,\"type\":\"") + type + "\",\"base64\":\"" + encoded + "\"}" : "{\"ok\":false}");
+		}
+	};
+	if (data.empty() && control && kit) {
+		// The kit alone, without a game: its calls and files.
+		ore_kit_set_events(kit, nullptr, kit_event);
+		std::string line;
+		while (std::getline(std::cin, line)) {
+			std::stringstream ss(line);
+			std::string op;
+			ss >> op;
+			if (op == "quit") break;
+			if (op == "call" || op == "data") kit_command(op, ss);
+			else if (!op.empty() && op[0] != '#') answer_line("{\"ok\":false,\"error\":\"Without --data the host knows call, data and quit.\",\"kind\":\"internal\"}");
+		}
+		ore_kit_close(kit);
+		return 0;
+	}
 	if (data.empty()) {
 		fprintf(stderr, "usage: orehost --data DIR [...]\n");
 		return 2;
@@ -219,18 +269,9 @@ int main(int argc, char **argv) {
 		while (std::getline(ss, t, ','))
 			if (!t.empty()) engine.vm.trace_natives[size_t(strtol(t.c_str(), nullptr, 16)) & 1023] = true;
 	}
-	OreKit *kit = nullptr;
-	if (!kit_folder.empty()) {
-		char problem[512] = "";
-		kit = ore_kit_open(kit_folder.c_str(), kit_resources.c_str(), problem, sizeof problem);
-		if (!kit) {
-			fprintf(stderr, "the mining kit does not open: %s\n", problem);
-			return 1;
-		}
 #if ORE_MINING_KIT
-		engine.set_kit(kit->kit.get());
+	if (kit) engine.set_kit(kit->kit.get());
 #endif
-	}
 	std::vector<float> audio(2 * 800);
 	std::multimap<int, Cmd> releases;
 	int f = 0;
@@ -329,32 +370,18 @@ int main(int argc, char **argv) {
 					engine.set_reading_hold(true);
 				}
 				done(r, ",\"tap\":" + std::to_string(what) + (what == 1 ? ",\"popup\":" + popup : std::string()));
+			} else if (c.op == "text") {
+				std::string standing;
+#if ORE_MINING_KIT
+				if (engine.kit_tap) engine.kit_tap->standing_text(standing);
+#endif
+				done(0, ",\"standing\":" + (standing.empty() ? std::string("null") : standing));
 			} else if (c.op == "hold") {
 				ss >> c.a;
 				engine.set_reading_hold(c.a != 0);
 				done(0);
 			} else if (c.op == "call" || c.op == "data") {
-				std::string method, params;
-				ss >> method;
-				std::getline(ss, params);
-				if (!kit) {
-					answer_line("{\"ok\":false,\"error\":\"The host runs without --kit.\",\"kind\":\"internal\"}");
-				} else if (c.op == "call") {
-					char *text = ore_kit_call(kit, method.c_str(), params.c_str());
-					answer_line(text ? text : "{\"ok\":false}");
-					ore_kit_free(text);
-				} else {
-					uint8_t *bytes = nullptr;
-					int64_t length = 0;
-					char type[128] = "";
-					std::string encoded;
-					int found = ore_kit_data(kit, method.c_str(), params.c_str(), &bytes, &length, type, sizeof type);
-#if ORE_MINING_KIT
-					if (found) encoded = ore::base64(std::string(reinterpret_cast<const char *>(bytes), size_t(length)));
-#endif
-					ore_kit_free(bytes);
-					answer_line(found ? std::string("{\"ok\":true,\"type\":\"") + type + "\",\"base64\":\"" + encoded + "\"}" : "{\"ok\":false}");
-				}
+				kit_command(c.op, ss);
 			} else if (c.op == "state") {
 				const ore::ScriptBlob *script = engine.vm.current_script();
 				done(0, std::string(",\"script\":\"") + (script ? script->name : "") + "\",\"hold\":" + (engine.reading_hold() ? "true" : "false"));

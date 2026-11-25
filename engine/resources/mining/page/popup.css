@@ -1,0 +1,102 @@
+/* The page lies over the game's picture and shows nothing but the popup and the marked word. */
+/* No color-scheme here: a page that declares one gets a canvas of its own colour, and the game would not show through. */
+:root {
+  --surface: #1c1c1f;
+  --border: #3a3a40;
+  --text: #ececf1;
+  --muted: #a0a0ab;
+  --danger: #ff8a80;
+  --mark: #ffd54f;
+  --radius: 10px;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  color: var(--text);
+  font: 14px/1.4 -apple-system, system-ui, 'Hiragino Sans', 'Noto Sans CJK JP', 'Noto Sans JP', sans-serif;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+body {
+  position: fixed;
+  inset: 0;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#marks {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.mark {
+  position: absolute;
+  box-sizing: border-box;
+  border-bottom: 2px solid var(--mark);
+  border-radius: 2px;
+  background: rgb(255 213 79 / 22%);
+}
+
+.word-popup {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 55%);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.word-popup[hidden],
+.holder[hidden],
+.note[hidden],
+.status[hidden] {
+  display: none;
+}
+
+.holder {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* The popup's own element: as wide as the panel, its definitions scrolling inside. */
+.holder > .dictionary-popup {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.note,
+.status {
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+.note {
+  color: var(--muted);
+}
+
+.status {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border);
+}
+
+.status.error {
+  color: var(--danger);
+}

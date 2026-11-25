@@ -74,36 +74,48 @@ int KitTap::tap(int x, int y, std::string &json) {
 	}
 	if (hit < 0) return 2;
 
+	json = describe(*w, capture(*w), hit);
+	return 1;
+}
+
+bool KitTap::standing_text(std::string &json) {
+	json.clear();
+	MessageWindow *w = standing();
+	if (!w) return false;
+	json = describe(*w, 0, -1);
+	return true;
+}
+
+std::string KitTap::describe(MessageWindow &window, int64_t line, int index) const {
+	Platform &platform = engine_.platform;
 	std::string text;
 	json::Value rects = json::Value::array();
-	for (const TextGlyph &g : glyphs) {
-		utf8::append(text, engine_.platform.decode_char(g.code, engine_.encoding));
+	for (const TextGlyph &g : window.glyphs()) {
+		utf8::append(text, platform.decode_char(g.code, engine_.encoding));
 		json::Value rect = json::Value::array();
-		rect.push(w->x() + g.x);
-		rect.push(w->y() + g.y);
+		rect.push(window.x() + g.x);
+		rect.push(window.y() + g.y);
 		rect.push(g.w);
 		rect.push(g.h);
 		rects.push(std::move(rect));
 	}
-	const MessageManager &mm = w->mm;
-	Platform &platform = engine_.platform;
+	const MessageManager &mm = window.mm;
 	json::Value out = json::Value::object();
-	out.set("line", capture(*w));
+	out.set("line", line);
 	out.set("text", text);
-	out.set("index", hit);
+	out.set("index", index);
 	out.set("rects", std::move(rects));
 	out.set("sentence", mining_trim(platform.to_utf8(mining_plain_text(mm.body, engine_.encoding), engine_.encoding)));
 	out.set("speaker", mining_trim(platform.to_utf8(mm.name_segment(1), engine_.encoding)));
 	json::Value &box = out.set("box", json::Value::array());
-	box.push(w->x());
-	box.push(w->y());
-	box.push(w->width());
-	box.push(w->height());
+	box.push(window.x());
+	box.push(window.y());
+	box.push(window.width());
+	box.push(window.height());
 	json::Value &screen = out.set("screen", json::Value::array());
 	screen.push(Engine::kWidth);
 	screen.push(Engine::kHeight);
-	json = json::write(out);
-	return 1;
+	return json::write(out);
 }
 
 int64_t KitTap::capture(MessageWindow &window) {

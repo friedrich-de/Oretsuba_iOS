@@ -31,6 +31,10 @@ public:
 	//    [x, y, w, h] of every character on the screen.
 	// 2: in the text box, but on no character: nothing happens.
 	int tap(int x, int y, std::string &json);
+	// The same JSON for the line that stands, without a tap ("index" is -1 and
+	// "line" 0: nothing is handed to the kit). False when no line stands. For
+	// tests and for a host that wants to know what can be tapped.
+	bool standing_text(std::string &json);
 
 	void line_shown(MessageWindow &window);  // native 0x2fa began a line
 	void window_gone(MessageWindow &window);
@@ -39,6 +43,7 @@ private:
 	// The window whose line stands complete in front of the reader.
 	MessageWindow *standing() const;
 	int64_t capture(MessageWindow &window);
+	std::string describe(MessageWindow &window, int64_t line, int index) const;
 
 	Engine &engine_;
 	MiningKit &kit_;
