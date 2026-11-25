@@ -3,12 +3,15 @@
 // Android build compiles it as C++.
 #include "api/ore_api.h"
 
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <string>
 
+#include "api/ore_kit_internal.h"
 #include "core/engine.h"
 #include "mining/anki_app.h"
+#include "mining/kit_tap.h"
 #include "mining/mining.h"
 #include "util/log.h"
 
@@ -127,6 +130,37 @@ void ore_answer_text_input(OreEngine *e, int ok, const char *utf8) {
 
 void ore_set_paused(OreEngine *e, int paused) {
 	e->engine->set_paused(paused != 0);
+}
+
+// Mining in the game (api/ore_kit.h): the functions that take the engine.
+void ore_set_kit(OreEngine *e, OreKit *kit) {
+#if ORE_MINING_KIT
+	e->engine->set_kit(kit ? kit->kit.get() : nullptr);
+#else
+	(void)e, (void)kit;
+#endif
+}
+
+int ore_text_tap(OreEngine *e, int x, int y, char **json) {
+	*json = nullptr;
+#if ORE_MINING_KIT
+	if (!e->engine->kit_tap) return 0;
+	std::string text;
+	int what = e->engine->kit_tap->tap(x, y, text);
+	if (what == 1) {
+		*json = static_cast<char *>(malloc(text.size() + 1));
+		if (!*json) return 2;
+		memcpy(*json, text.c_str(), text.size() + 1);
+	}
+	return what;
+#else
+	(void)e, (void)x, (void)y;
+	return 0;
+#endif
+}
+
+void ore_set_reading_hold(OreEngine *e, int hold) {
+	e->engine->set_reading_hold(hold != 0);
 }
 
 int ore_mining_check(const char *data_dir, char *text, int text_len) {

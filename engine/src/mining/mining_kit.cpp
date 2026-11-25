@@ -178,7 +178,7 @@ MiningKit::MiningKit(Options options, std::shared_ptr<const dict::Deinflector> r
 }
 
 MiningKit::~MiningKit() {
-	// The host's targets and methods go first, while the rest still stands.
+	// What a host added goes first, while the kit is whole: a target's last word still finds its listener.
 	std::map<std::string, std::shared_ptr<CardTarget>> targets;
 	std::map<std::string, KitMethod> methods;
 	{
@@ -186,6 +186,8 @@ MiningKit::~MiningKit() {
 		targets.swap(targets_);
 		methods.swap(methods_);
 	}
+	targets.clear();
+	methods.clear();
 }
 
 KitSettings MiningKit::settings() const {
@@ -486,16 +488,16 @@ json::Value MiningKit::dispatch(const std::string &method, const json::Value &pa
 		result.set("id", set_line(std::move(made)));
 		return result;
 	}
-	KitMethod own;
+	KitMethod added;
 	{
 		std::lock_guard<std::mutex> lock(gate_);
 		auto found = methods_.find(method);
-		if (found != methods_.end()) own = found->second;
+		if (found != methods_.end()) added = found->second;
 	}
-	if (own) {
+	if (added) {
 		json::Value result;
 		AnkiProblem problem;
-		if (!own(params, result, problem)) fail(problem);
+		if (!added(params, result, problem)) fail(problem);
 		return result;
 	}
 	throw Failure{"The app does not know what \"" + method + "\" asks for.", "internal"};

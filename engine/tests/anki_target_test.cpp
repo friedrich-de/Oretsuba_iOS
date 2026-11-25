@@ -7,7 +7,8 @@
 //
 //   c++ -std=c++17 -Isrc -Ithird_party tests/anki_target_test.cpp src/dict/*.cpp src/mining/anki_*.cpp
 //       src/mining/card_note.cpp src/mining/word_audio.cpp src/mining/mining_kit.cpp src/util/json.cpp
-//       src/util/log.cpp -lsqlite3 -lz -lpthread -o /tmp/anki_target_test && /tmp/anki_target_test
+//       src/util/log.cpp src/api/ore_kit.cpp host/linux/linux_kit_host.cpp -lsqlite3 -lz -lpthread
+//       -o /tmp/anki_target_test && /tmp/anki_target_test
 //
 // It reads the rules (resources/mining/transforms.json) from the repository it
 // is run in, or from the folder given as its first argument (the engine's).
@@ -29,6 +30,7 @@
 #include "util/json.h"
 
 #if ORE_MINING_KIT
+#include "api/ore_kit.h"
 #include "mining/mining_kit.h"
 #endif
 
@@ -608,6 +610,21 @@ void test_kit(const std::string &root) {
 	AppReturns::shared().opened_with("oretsuba://anki/added?card=0123456789abcdef");
 }
 
+// The kit as the apps open it (api/ore_kit.h): that is where it gets the Anki
+// apps of its host. A test host has none, so AnkiConnect stands alone.
+void test_opened_by_the_app(const std::string &root) {
+	char problem[256] = "";
+	OreKit *kit = ore_kit_open((scratch + "/app-kit").c_str(), (root + "/resources/mining").c_str(), problem, sizeof problem);
+	check(kit != nullptr, std::string("the kit opens as the app opens it: ") + problem);
+	if (!kit) return;
+	char *answer = ore_kit_call(kit, "anki.targets", nullptr);
+	json::Value read = parsed(answer ? answer : "");
+	ore_kit_free(answer);
+	check(read.boolean("ok") && read["result"].size() >= 1 && read["result"][0].str("name") == "connect",
+	      "and answers which places for cards this device has");
+	ore_kit_close(kit);
+}
+
 #endif  // ORE_MINING_KIT
 
 }  // namespace
@@ -624,6 +641,7 @@ int main(int argc, char **argv) {
 	test_ankimobile();
 #if ORE_MINING_KIT
 	test_kit(root);
+	test_opened_by_the_app(root);
 #else
 	printf("  (this build has no mining kit, its part is left out)\n");
 #endif

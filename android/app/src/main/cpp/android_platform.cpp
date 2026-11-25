@@ -6,6 +6,7 @@
 
 #include "cp932.h"
 #include "jni_bridge.h"
+#include "mining/kit_host.h"
 
 namespace ore {
 namespace {
@@ -88,14 +89,14 @@ HttpSend AndroidPlatform::http_sender() {
 	return android_http_sender();
 }
 
-AnkiAppHost android_anki_host() {
+#if ORE_MINING_KIT
+// For the mining kit (mining/kit_host.h): AnkiDroid on this device, asked
+// through the app's Kotlin (AnkiDroid.kt).
+AnkiAppHost host_anki_app() {
 	AnkiAppHost host;
 	host.ankidroid = jni_ankidroid;
 	return host;
 }
-
-AnkiAppHost AndroidPlatform::anki_app() {
-	return android_anki_host();
-}
+#endif
 
 }  // namespace ore

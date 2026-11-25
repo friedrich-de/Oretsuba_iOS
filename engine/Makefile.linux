@@ -6,7 +6,9 @@
 #   make -C engine -f Makefile.linux        build/host-linux/orehost
 #   make -C engine -f Makefile.linux clean
 #
-# Needs g++, make and the FreeType headers (Debian: libfreetype-dev).
+# Needs g++, make and the headers of FreeType, SQLite and zlib (Debian:
+# libfreetype-dev libsqlite3-dev zlib1g-dev); the last two are for the mining
+# kit (docs/MINING.md).
 
 BUILD   := ../build/host-linux
 CXX     := g++
@@ -19,7 +21,8 @@ CFLAGS  := -O2 -w -Ithird_party
 CPP_SRCS := $(wildcard src/*/*.cpp src/*/*/*.cpp src/*/*/*/*.cpp)
 C_SRCS   := $(wildcard src/*/*.c src/*/*/*.c)
 OBJS := $(CPP_SRCS:%.cpp=$(BUILD)/obj/%.o) $(C_SRCS:%.c=$(BUILD)/obj/%.o) \
-        $(BUILD)/obj/host/main.o $(BUILD)/obj/host/linux_platform.o $(BUILD)/obj/host/stb_write.o
+        $(BUILD)/obj/host/main.o $(BUILD)/obj/host/linux_platform.o $(BUILD)/obj/host/linux_kit_host.o \
+        $(BUILD)/obj/host/stb_write.o
 DEPS := $(OBJS:.o=.d)
 
 all: $(BUILD)/orehost
@@ -40,12 +43,16 @@ $(BUILD)/obj/host/linux_platform.o: host/linux/linux_platform.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(FT_CFLAGS) -MMD -MP -c $< -o $@
 
+$(BUILD)/obj/host/linux_kit_host.o: host/linux/linux_kit_host.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
+
 $(BUILD)/obj/host/stb_write.o: tests/stb_write_impl.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) -std=c++17 -O2 -w -Ithird_party -c $< -o $@
 
 $(BUILD)/orehost: $(OBJS)
-	$(CXX) $(OBJS) $(FT_LIBS) -lpthread -o $@
+	$(CXX) $(OBJS) $(FT_LIBS) -lsqlite3 -lz -lpthread -o $@
 
 clean:
 	rm -rf $(BUILD)/obj $(BUILD)/orehost

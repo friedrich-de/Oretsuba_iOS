@@ -41,6 +41,9 @@ struct KitLine {
 using VoiceEncoder = std::function<bool(const std::string &file, const std::string &ending, std::string &out, std::string &type,
                                         std::string &out_ending)>;
 
+// A method a host adds to the kit's own (MiningKit::set_method). False with the reason in `problem`.
+using KitMethod = std::function<bool(const json::Value &params, json::Value &result, AnkiProblem &problem)>;
+
 // The title the cards name as their source.
 inline constexpr char kKitSource[] = "\xE4\xBF\xBA\xE3\x81\x9F\xE3\x81\xA1\xE3\x81\xAB\xE7\xBF\xBC\xE3\x81\xAF\xE3\x81\xAA\xE3\x81\x84";  // 俺たちに翼はない
 
@@ -62,9 +65,6 @@ struct KitSettings {
 	// Takes over what `patch` names and leaves the rest.
 	void merge(const json::Value &patch);
 };
-
-// A method a host adds to the kit. False with the reason in `problem`.
-using KitMethod = std::function<bool(const json::Value &params, json::Value &result, AnkiProblem &problem)>;
 
 class MiningKit {
 public:
@@ -97,14 +97,16 @@ public:
 
 	// Another place cards can go, chosen by the setting anki.target.
 	void set_target(const std::string &name, std::shared_ptr<CardTarget> target);
-	// A method of the host's own: call() hands it what the kit does not know itself.
+	// A method of a host's own: call() hands it what the kit itself does not know.
 	void set_method(const std::string &name, KitMethod method);
-	const std::string &folder() const { return options_.folder; }
-	// Things the page is told without having asked (window.oreMining.event).
+	// Things the page and the settings are told without having asked
+	// (window.oreMining.event). The sink may be called from any thread.
 	void set_events(std::function<void(const std::string &name, const std::string &payload)> sink);
 	void emit(const std::string &name, const json::Value &payload);
 
 	dict::DictionaryLibrary &library() { return *library_; }
+	// Where the kit keeps its settings and its dictionaries.
+	const std::string &folder() const { return options_.folder; }
 
 private:
 	struct Failure {

@@ -41,7 +41,6 @@ public:
 	void begin_text_input(const std::string &utf8_initial) override;
 	int poll_text_input(std::string &utf8_result) override;
 	HttpSend http_sender() override;  // apple_http.mm
-	AnkiAppHost anki_app() override;  // apple_anki.mm
 
 private:
 	const void *font_for(const std::string &face, int size, int weight);

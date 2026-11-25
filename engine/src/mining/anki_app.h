@@ -51,6 +51,9 @@ bool anki_app_info_from_text(std::string_view json, AnkiAppInfo &out);
 // ---------------------------------------------------------------- links
 
 inline constexpr char kAnkiMobileClipboardType[] = "net.ankimobile.json";
+// The scheme of the links this app itself is opened with, as the Apple app
+// declares it (app/Resources/Info.plist): AnkiMobile's way back.
+inline constexpr char kAppLinkScheme[] = "oretsuba";
 
 // A text as one value of a link's query: everything but letters, digits and -._~ as %XX.
 std::string link_escape(std::string_view text);

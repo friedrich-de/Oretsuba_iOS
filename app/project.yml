@@ -31,6 +31,11 @@ targets:
           - "Info.plist"
       - path: ../engine/src
         compilerFlags: ["-w"]
+    dependencies:
+      # The mining kit (docs/MINING.md): dictionaries in SQLite, a line's voice as AAC.
+      - sdk: libsqlite3.tbd
+      - sdk: libz.tbd
+      - sdk: AudioToolbox.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.local.oretsuba.${ORE_BUNDLE_SUFFIX}
