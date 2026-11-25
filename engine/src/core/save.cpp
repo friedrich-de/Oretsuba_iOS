@@ -124,8 +124,11 @@ std::vector<uint8_t> Engine::state_blob(bool with_log) {
 	bool has_log = with_log && opt8(0xe5b);
 	w.u8(has_log);
 	if (has_log) {
-		std::vector<uint8_t> log = text ? text->save_backlog() : std::vector<uint8_t>();
-		w.blob(log);
+		// The backlog, then the state at the last choice (N_31), itself a blob like this one.
+		if (text)
+			text->save_backlog(w);
+		else
+			w.u32(0);
 		w.blob(has_mem_snapshot ? mem_snapshot : std::vector<uint8_t>());
 	}
 	return w.take();
@@ -147,10 +150,19 @@ int Engine::restore_state_blob(const std::vector<uint8_t> &blob) {
 	has_mem_snapshot = false;
 	mem_snapshot.clear();
 	bool has_log = r.u8();
-	if (has_log && !r.bad()) {
+	if (has_log && !r.bad() && text && r.remaining() >= 8) {
+		// This port first wrote the backlog as a length, "BLOG" and its own entries;
+		// the original writes the count and its entries (message.cpp).
+		size_t at = r.pos();
 		uint32_t n = r.u32();
-		std::vector<uint8_t> log = r.bytes(n);
-		if (text && opt8(0xe5b)) text->load_backlog(log);
+		bool earlier = r.u32() == 0x474f4c42;
+		r.seek(at + (earlier ? 4 : 0));
+		if (earlier) {
+			std::vector<uint8_t> log = r.bytes(n);
+			if (opt8(0xe5b)) text->load_backlog_earlier(log);
+		} else if (!text->load_backlog(r, opt8(0xe5b) != 0)) {
+			return 0;
+		}
 		uint32_t m = r.u32();
 		if (m && !r.bad()) {
 			mem_snapshot = r.bytes(m);
@@ -162,18 +174,48 @@ int Engine::restore_state_blob(const std::vector<uint8_t> &blob) {
 
 // ---------------------------------------------------------------- save files
 
+// The small picture in a save (the original's save routine at 0x41dc00). A
+// picture made for the scene, SYS\_<name>, is stored as it is. Without one the
+// save is left blank when the script asks for that, and otherwise shows the
+// screen as it stands, reduced 8:1.
 std::vector<uint8_t> Engine::thumbnail(int w, int h) {
 	std::vector<uint8_t> out(size_t(w) * h * 3, 0);
-	bool blank = thumb_flag_ptr[1] && vm.mem().rd32(thumb_flag_ptr[1]);
-	if (blank) return out;
-	ImageRef src;
+	auto store = [&](const Image &img) {
+		for (int y = 0; y < h && y < img.height(); ++y)
+			for (int x = 0; x < w && x < img.width(); ++x) {
+				uint32_t p = img.row32(y)[x];
+				uint8_t *d = &out[(size_t(y) * w + x) * 3];
+				d[0] = uint8_t(p), d[1] = uint8_t(p >> 8), d[2] = uint8_t(p >> 16);
+			}
+	};
 	if (thumb_name_ptr) {
-		std::string name = vm.mem().cstr(thumb_name_ptr);
-		if (!name.empty() && name.find('\\') == std::string::npos) src = load_image("SYS\\_" + name + ".ELG", false);
+		// the name's last part; a backslash can be the second byte of a Shift-JIS letter
+		std::string name = vm.mem().cstr(thumb_name_ptr), base;
+		for (size_t i = 0; i < name.size(); ++i) {
+			uint8_t c = uint8_t(name[i]);
+			if (((c >= 0x81 && c <= 0x9f) || (c >= 0xe0 && c <= 0xfc)) && i + 1 < name.size()) {
+				base += name[i];
+				base += name[++i];
+			} else if (c == '\\' || c == '/') {
+				base.clear();
+			} else {
+				base += name[i];
+			}
+		}
+		std::string path = "SYS\\_" + base + ".ELG";
+		if (!base.empty() && vfs.exists(path))
+			if (ImageRef made = load_image(path, false)) {
+				if (made->bpp() == 32) store(*made);
+				return out;
+			}
 	}
-	if (!src && thumb_source) {
+	if (thumb_flag_ptr[1] && vm.mem().rd32(thumb_flag_ptr[1])) return out;
+	ImageRef src;
+	if (thumb_source) {
 		if (Surface *s = surface_of(thumb_source)) {
-			s->update(now);
+			// The page as it was last shown, so with the button under the pointer
+			// lit; it is composed anew only when the script asks (N_37, flag 0).
+			if (thumb_flag_ptr[0] && vm.mem().rd32(thumb_flag_ptr[0])) s->update(now);
 			src = s->image_ref();
 		} else {
 			src = image_of(thumb_source);
@@ -181,13 +223,8 @@ std::vector<uint8_t> Engine::thumbnail(int w, int h) {
 	}
 	if (!src) src = std::make_shared<Image>(frame_);
 	Image small(w, h, 32);
-	stretch_blit(small, *src, 0, 0, w, h, src->rect(), 0, 2, 255, false);
-	for (int y = 0; y < h; ++y)
-		for (int x = 0; x < w; ++x) {
-			uint32_t p = small.row32(y)[x];
-			uint8_t *d = &out[(size_t(y) * w + x) * 3];
-			d[0] = uint8_t(p), d[1] = uint8_t(p >> 8), d[2] = uint8_t(p >> 16);
-		}
+	if (!reduce_tent(small, *src)) stretch_blit(small, *src, 0, 0, w, h, src->rect(), 0, 2, 255, false);
+	store(small);
 	return out;
 }
 
@@ -519,6 +556,8 @@ void register_save_natives(Engine &e) {
 			std::string p(reinterpret_cast<const char *>(&d[kPreviewAt]), strnlen(reinterpret_cast<const char *>(&d[kPreviewAt]), 0x90));
 			if (a.b(6) && e.text) p = e.text->reflow(p, 34, 4);
 			a.out_str(4, p);
+			// The load screen tests the first four bytes for "this save has a memo" (0x41e9e4).
+			if (p.empty()) memset(e.vm.mem().host(a.u(4), 4), 0, 4);
 		}
 		if (!a.null(5)) {
 			struct stat st;

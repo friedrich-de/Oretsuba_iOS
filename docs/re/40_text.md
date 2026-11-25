@@ -429,8 +429,12 @@ Return 0 drawn, -1 drawn after wrap, 1 page full (not drawn).
 
 Name-box print (vtbl+0x118, FUN_0045d270(str, mode)): measures the string
 and calls vtbl+0xb8(str, x, y) with, horizontally, mode 0 = centred in the
-padded box both ways, 1 = x 0 / current y, 2 = right aligned, 3 = x from
+padded box both ways, 1 = centred / current y, 2 = right aligned, 3 = x from
 cursor (−1); advinit uses mode 1. (Vertical table at 0x45d3c0 similar.)
+Centred is `x = (boxW + padL + padR − marginL − marginR − width) >> 1`, where
+`width` is the measured rectangle's, edge included, and the rectangle's
+offset is not taken off again. Read at run time for the name box (boxW 222,
+margins 23, pads 2, so 180 left): width 26 gives 77, 48 gives 66, 114 gives 33.
 
 Message window effective values: font = G[900] ("ＭＳ ゴシック" 22 px per
 gameinit, the default font N_a6; passed to N_2b2 as args[4]) → cell 22,
@@ -620,7 +624,17 @@ dest alpha kept. drawOver (used by text objects): ARGB "over":
   6/7/8 window bg mode/alpha/colour (+0xe85 def 1, +0xe86 def 140, +0xe88
   def 0). Applied by FUN_0041d770 (native N_c): effect = cfg, shadow
   offset forced (2,2), gradient = cfg, AA = cfg, re-init if bold/face
-  changed; window/name/selection bg via vtbl+0x84. (No literal
+  changed; window and selection bg via vtbl+0x84 / vtbl+0x88. The message
+  window's vtbl+0x84 (0x409970 after the +0x20 shift) first hands mode, colour
+  and alpha to its linked name window (+0x2c0), then takes them itself; N_2fe
+  copies no style when it links the name window. The composed frame
+  (`+0x240`, measured 2026-11-25 on all pixels of the message window): shade
+  alpha = `(A·alpha + 127) / 255` from the mask byte A, shade colour = the
+  setting; then the frame picture goes over it by pairs of pixels that begin
+  on an 8 byte boundary: both frame alphas 0 → shade kept; both 255 → both
+  frame pixels copied; else per pixel `A' = 255 − (((255−sa)(255−dA)) >> 8)`,
+  `c' = d + (((s−d)·w) >> 8)` with `w = 255` when `dA = 0`, else
+  `(sa·255)/A'` (that last case was not seen in the data). (No literal
   "cf_bold"/"cf_edge" strings exist in the EXE; these are the equivalents.)
 * Default look: 22 px MS Gothic, GRAY4 AA, white, soft black edge r=2,
   no gradient, window bg mode 1 colour 0 alpha 140.
@@ -806,8 +820,13 @@ table (FUN at ore_tuba.c ~11530) and config1 "reset".
 5. Ruby (`vtbl+0x114`, ruby font +0x2c) and `<"str">`, `@nnn` gaiji, `[`
    blocks, `%` interpolation, record type≠0 are implemented but unused by
    the Japanese scripts.
-6. tmAscent of MS Gothic 22 px and whether GDI used embedded bitmaps
-   (affects pixel-exact baseline/edge look).
+6. Answered on Windows (`orehost --font-report`, and the port next to the
+   original): tmAscent of MS Gothic is `(size*220 + 128) / 256` for 8 to 48 px
+   (19 at 22 px); its half-width cell is `(size + 1) / 2` and the full-width
+   cell twice that; GDI returns 17 grey levels for these faces, no stored
+   bitmaps, and the game turns level v into `v*16` saturated to 255
+   (0x44c460). With the same glyphs the port's letters and edge are the
+   original's within 1 of 255.
 8. Who sets G[905]/G[906]/G[908] on load / back-to-choice (probably native
    save restore), and the N_1f8/N_1fc "LAG" object format (logo only).
 9. TEXT_LOG.DAT write trigger (FUN_00423e30 callers) and exact compressor

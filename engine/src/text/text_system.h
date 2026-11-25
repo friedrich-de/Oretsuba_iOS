@@ -12,6 +12,8 @@ namespace ore {
 
 class Engine;
 class MessageManager;
+class ByteReader;
+class ByteWriter;
 
 class TextSystem {
 public:
@@ -21,8 +23,9 @@ public:
 	Engine &engine;
 
 	// Save support (save.cpp)
-	std::vector<uint8_t> save_backlog();
-	void load_backlog(const std::vector<uint8_t> &data);
+	void save_backlog(ByteWriter &w);
+	bool load_backlog(ByteReader &r, bool keep);  // keep false: read past it
+	void load_backlog_earlier(const std::vector<uint8_t> &data);  // as this port wrote it at first
 	void clear_message_state();  // FUN_00432330
 	// "【name】\n" + plain message text, cut to max bytes on a character boundary.
 	std::string preview_text(size_t max);

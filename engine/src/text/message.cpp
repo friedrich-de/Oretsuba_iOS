@@ -312,9 +312,35 @@ void MessageManager::attach_choices() {
 	en->choice_base = choice_base;
 }
 
-std::vector<uint8_t> MessageManager::save_log() const {
-	ByteWriter w;
-	w.u32(0x474f4c42);  // "BLOG"
+namespace {
+
+// A string of the backlog: its length counts the closing NUL, and none at all is length 0.
+void put_text(ByteWriter &w, const std::string &s) {
+	if (s.empty()) {
+		w.u32(0);
+		return;
+	}
+	w.u32(uint32_t(s.size() + 1));
+	w.data().insert(w.data().end(), s.begin(), s.end());
+	w.u8(0);
+}
+
+std::string get_text(ByteReader &r) {
+	uint32_t n = r.u32();
+	if (!n) return std::string();
+	std::string s = r.str(n);
+	size_t end = s.find('\0');
+	if (end != std::string::npos) s.resize(end);
+	return s;
+}
+
+}  // namespace
+
+// The original's serialiser (0x456d80, MessageManager vtable +0x10): the count,
+// then the entries from the oldest on. An entry with choices carries them as the
+// script's choice records (u8 size, u8 0, text, NUL), followed by their count,
+// the one that was taken, and the choice's type and base.
+void MessageManager::save_log(ByteWriter &w) const {
 	std::vector<const Entry *> list;
 	for (int k = 0; k < used; ++k) {
 		int idx = ((write - used + k) % capacity + capacity) % capacity;
@@ -322,23 +348,69 @@ std::vector<uint8_t> MessageManager::save_log() const {
 	}
 	w.u32(uint32_t(list.size()));
 	for (const Entry *en : list) {
-		w.str(en->name);
-		w.str(en->body);
+		put_text(w, en->name);
+		put_text(w, en->body);
 		w.u8(en->type);
 		w.u16(en->line);
-		w.u8(en->has_choices);
+		if (!en->has_choices || en->choices.empty()) {
+			w.u32(0);
+			continue;
+		}
+		ByteWriter c;
+		for (const std::string &text : en->choices) {
+			std::string t = text.substr(0, 252);
+			c.u8(uint8_t(t.size() + 3));
+			c.u8(0);
+			c.data().insert(c.data().end(), t.begin(), t.end());
+			c.u8(0);
+		}
+		w.blob(c.take());
+		w.u32(uint32_t(en->choices.size()));
 		w.u8(en->selected);
 		w.u8(en->choice_type);
 		w.u16(en->choice_base);
-		w.u32(uint32_t(en->choices.size()));
-		for (const std::string &c : en->choices) w.str(c);
 	}
-	return w.take();
 }
 
-void MessageManager::load_log(const std::vector<uint8_t> &data) {
+bool MessageManager::load_log(ByteReader &r, bool keep) {
+	uint32_t n = r.u32();
+	if (keep) set_capacity(capacity);
+	for (uint32_t i = 0; i < n && !r.bad(); ++i) {
+		auto en = std::make_unique<Entry>();
+		en->name = get_text(r);
+		en->body = get_text(r);
+		en->type = r.u8();
+		en->line = r.u16();
+		uint32_t size = r.u32();
+		if (size) {
+			std::vector<uint8_t> records = r.bytes(size);
+			uint32_t count = r.u32();
+			en->selected = r.u8();
+			en->choice_type = r.u8();
+			en->choice_base = r.u16();
+			size_t p = 0;
+			for (uint32_t k = 0; k < count && p + 3 <= records.size(); ++k) {
+				size_t sz = records[p];
+				if (sz < 3 || p + sz > records.size()) break;
+				const char *text = reinterpret_cast<const char *>(&records[p + 2]);
+				en->choices.emplace_back(text, strnlen(text, sz - 2));
+				p += sz;
+			}
+			en->has_choices = !en->choices.empty();
+		}
+		if (r.bad()) break;
+		if (!keep || capacity <= 0) continue;
+		ring[size_t(write)] = std::move(en);
+		write = (write + 1) % capacity;
+		used = std::min(used + 1, capacity);
+	}
+	if (keep) view = std::max(0, used - 1);
+	return !r.bad();
+}
+
+void MessageManager::load_log_earlier(const std::vector<uint8_t> &data) {
 	ByteReader r(data);
-	if (r.u32() != 0x474f4c42) return;
+	if (r.u32() != 0x474f4c42) return;  // "BLOG"
 	uint32_t n = r.u32();
 	set_capacity(capacity);
 	for (uint32_t i = 0; i < n && !r.bad(); ++i) {
