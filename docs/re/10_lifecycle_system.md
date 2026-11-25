@@ -528,11 +528,15 @@ in §6.5. MAIN still checks T[1].
         the 32-bpp surface pixel, i.e. B,G,R; row order = surface order, top-down [G])
 0x57EC  char[0x2c] title           (lstrcpyn of *(eng+0x124), ≤40 chars)
 0x5818  char[0x90] text preview    ("【name】\n" + message, ≤140 bytes, SJIS-safe cut)
-0x58A0  u32 storedSize
-0x58A4  u32 origSize               (0 = stored raw)
-0x58A8  u8  checksum               (8-bit sum of the stored bytes)
-0x58A9  stored bytes               (LZSS of the state blob if that is smaller, else raw)
+0x58A8  u32 storedSize
+0x58AC  u32 origSize               (0 = stored raw)
+0x58B0  u8  checksum               (8-bit sum of the stored bytes)
+0x58B1  stored bytes               (LZSS of the state blob if that is smaller, else raw)
 ```
+The three fields follow the preview's 0x90 bytes: checked against saves written by the
+original game. An empty preview is one zero byte followed by whatever the buffer held; the
+load screen shows its memo mark when the first byte is not zero (N_2d, 0x41e9e4, hands the
+script four zero bytes for an empty preview, and saveload.sob tests them as one value).
 LZSS (FUN_00495420 / FUN_00495710): Okumura-style, 4096-byte ring
 **zero-filled**, write pos starts 0xFEE, flag byte LSB first, bit 1 = literal
 byte, bit 0 = 2-byte match `pos = b0 | (b1 & 0xF0) << 4`, `len = (b1 & 0x0F) + 3`.
@@ -544,17 +548,38 @@ u8 scopeSel = 0                         (= scope-1 vars)
 for each G var with scope==1 and type<2, in table order:
     u8 type ; size bytes  (type 1 = string buffer contents)   — values from copy2
 u8 hasLog = withLog && app+0xe5b
-if hasLog:  backlog object serialisation (eng+0x370 vt+0x10)
+if hasLog:  backlog object serialisation (eng+0x370 vt+0x10, 0x456d80):
+              u32 count                  (the used entries; at most app+0xe5a + 1)
+              per entry, oldest first:
+                u32 nameLen ; name       (length counts the NUL; 0 = no name; "name\voice id")
+                u32 bodyLen ; body       (length counts the NUL; the text ends "$")
+                u8 type ; u16 line
+                u32 choiceBytes          (0 = no choices)
+                if choiceBytes: the choices as script records (u8 size = len+3, u8 0, text, NUL),
+                                u32 count ; u8 selected ; u8 choiceType ; u16 choiceBase
             u32 n ; n bytes  (nested snapshot eng+0x128, n=0 if none)
 ```
+The nested snapshot is a state blob of the same layout whose own `n` is 0. It is the state
+at the last choice (N_31, §6.6), not the line before: in a save from scene S01_04A it held
+S01_03B. Checked against three saves of the original game: the last entry ends exactly where
+`n` begins, and the blob ends exactly after the snapshot.
 Before serialising, FUN_00423070 refreshes copy2 with the live values of the
 N_28-registered vars (G[806], G[807], G[785], G[786], …). Everything else is
 "as of the start of the current scene".
 
-Thumbnail source (§7.3 N_29/N_37) **[V/G]**: if `eng+0x118` names an image, the
-file `SYS\_<name>` (pre-rendered 100×75 thumbnails `_asu16c.elg`… exist in
-SYS.LPK) is used; otherwise the source object (eng+0x114) is rendered and
-stretched to 100×75; if `*(eng+0x134)` the thumbnail is blank.
+Thumbnail (§7.3 N_29/N_37, save routine at 0x41dc00 after the +0x20 shift) **[V, measured
+2026-11-25]**: the last part of the name at `eng+0x118` (Shift-JIS aware) gives
+`SYS\_<name>` (pre-rendered 100×75 thumbnails `_asu16c.elg`… exist in SYS.LPK); if that
+file loads it is stored as it is. Without it: if `*(eng+0x134)` the thumbnail stays blank;
+else the picture of the source page (`[[eng+0x114]+0x30]`) is reduced to 100×75. That
+picture is the page as it was last shown, so it holds the text window, the button bar and
+the SAVE button in the state the pointer left it in; only when `*(eng+0x130)` is set (or
+the source's `vt+0x50` returns an object) is the page composed anew into an 800×600
+picture first. The reduction (tvpgl stretch, flags 2) at 8:1 is a tent over 15 source
+pixels centred on pixel `8j`, rows first, each pass rounded:
+`h[y][j] = (Σ_{u=−7..7} (8−|u|)·s[y][8j+u] + 32) >> 6`, then the same down the columns of
+`h`; indices below 0 are mirrored. This reproduces all 7,500 pixels of a save the original
+wrote. Whether flags 2 gives the same filter at other ratios is not known.
 Text preview: last backlog entry, only if `app+0xedd` (option) and log
 non-empty and `*(eng+0x120)` (G[909]) non-zero.
 
@@ -569,7 +594,7 @@ Date shown for a save = file last-write time, formatted
 `"%04d/%02d/%02d(%s) %02d:%02d"` with weekday from "日月火水木金土".
 
 ### 6.2 Load (N_2b → FUN_0041e3f0 → FUN_0041db10) **[V]**
-Check magic/version, seek 0x58A0, read header, verify checksum, LZSS-decode,
+Check magic/version, seek 0x58A8, read header, verify checksum, LZSS-decode,
 then: write scope-1 vars into **copy0 (live)** (type byte must match the
 table, else error); FUN_00432330 (clear message window/backlog state);
 free eng+0x128; if `hasLog` restore the backlog (honouring app+0xe5b) and the
@@ -915,16 +940,13 @@ N_6 hardware queries (constants), N_7(1) (NULL). Keep N_7(0) returning the GUID.
 * `app+0x1af0` (interrupt request) is never set in the EXE; is there any other
   path that sets ScriptBootFlg (T[1]) ≠0 besides FUN_004251d0? (MAIN's `T[1]`
   branch then only matters for the load path via `G[910]`.)
-* Thumbnail row order (top-down vs bottom-up DIB) and exact capture path when
-  `*(eng+0x130)` is set (FUN_0043bc20 renders the layer tree into an 800×600
-  surface first) — verify by decoding a real save.
+* What the object is that the thumbnail source's `vt+0x50` returns (with it, as with
+  `*(eng+0x130)`, the page is composed anew before it is reduced).
 * Exact meaning of many option bytes in app+0xe40..0xee3 (table §7.2): only
   consumers were located; the message/sound/input docs should name them.
 * N_35 animation parameters (which value goes to which keyframe).
 * Meaning of the mount record `param2` (−2 for PATCH/SCRIPT, −1 for game LPKs)
   — stored at mount+8, no reader found in the lookup path.
-* Backlog serialisation format (eng+0x370 vt+0x10/+0x14) — needed only for
-  byte-exact save compatibility.
 * `app+0xd07`/`0xd0a` semantics beyond window-style toggling.
 * Whether N_2a's error codes (from the catch block of FUN_0041dbe0) distinguish
   failure kinds (scripts only test zero/non-zero).

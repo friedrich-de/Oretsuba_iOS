@@ -20,12 +20,16 @@ MessageManager &TextSystem::msg() {
 	return impl->mm;
 }
 
-std::vector<uint8_t> TextSystem::save_backlog() {
-	return impl->mm.save_log();
+void TextSystem::save_backlog(ByteWriter &w) {
+	impl->mm.save_log(w);
 }
 
-void TextSystem::load_backlog(const std::vector<uint8_t> &data) {
-	impl->mm.load_log(data);
+bool TextSystem::load_backlog(ByteReader &r, bool keep) {
+	return impl->mm.load_log(r, keep);
+}
+
+void TextSystem::load_backlog_earlier(const std::vector<uint8_t> &data) {
+	impl->mm.load_log_earlier(data);
 }
 
 void TextSystem::clear_message_state() {
