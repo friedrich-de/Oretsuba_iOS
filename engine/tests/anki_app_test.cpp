@@ -11,8 +11,11 @@
 #include <unistd.h>
 
 #include <chrono>
+#include <condition_variable>
 #include <cstdio>
 #include <cstring>
+#include <map>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -475,6 +478,366 @@ void test_handover() {
 	check(with_query.returned(v).kind == AnkiMobileHandover::Result::Added, "and is recognised");
 }
 
+// ---------------------------------------------------------------- AnkiMobile, from asking to knowing
+
+// The "name=value" pairs of a link's query, unescaped.
+std::vector<std::pair<std::string, std::string>> query_pairs(const std::string &link) {
+	std::vector<std::pair<std::string, std::string>> out;
+	size_t mark = link.find('?');
+	if (mark == std::string::npos) return out;
+	std::string query = link.substr(mark + 1);
+	size_t at = 0;
+	while (at <= query.size()) {
+		size_t amp = query.find('&', at);
+		std::string pair = query.substr(at, amp == std::string::npos ? std::string::npos : amp - at);
+		size_t eq = pair.find('=');
+		out.emplace_back(link_unescape(pair.substr(0, eq)), eq == std::string::npos ? std::string() : link_unescape(pair.substr(eq + 1)));
+		if (amp == std::string::npos) break;
+		at = amp + 1;
+	}
+	return out;
+}
+
+const char kPretendLists[] = "{\"profiles\":[{\"name\":\"User 1\"}],\"decks\":[{\"name\":\"Default\"},{\"name\":\"Mining\"}],"
+                             "\"notetypes\":[{\"name\":\"Lapis\",\"fields\":[{\"name\":\"Expression\"},{\"name\":\"Picture\"}]}]}";
+
+// What AnkiMobile does when it is opened with one of its links, as far as its
+// manual says: it works while this app is in the back, then opens the way back.
+struct PretendAnkiMobile {
+	std::mutex mutex;
+	bool installed = true;      // an app takes anki:// links
+	bool comes_back = true;     // it opens the way back
+	bool fetches = true;        // it fetches the files a card links to
+	bool front_first = false;   // this app hears "in front" before it hears the way back
+	std::string lists = kPretendLists;
+	int clipboard_late = 0;     // looks at the clipboard that find nothing yet
+	std::string clipboard;
+	std::vector<std::string> links;
+	std::vector<std::pair<std::string, size_t>> fetched;  // field, bytes
+	std::vector<std::thread> threads;
+
+	AnkiAppHost host() {
+		AnkiAppHost h;
+		h.open_link = [this](const std::string &link, std::function<void(bool)> done) {
+			bool there;
+			{
+				std::lock_guard<std::mutex> lock(mutex);
+				links.push_back(link);
+				there = installed;
+			}
+			done(there);
+			if (!there) return;
+			std::lock_guard<std::mutex> lock(mutex);
+			threads.emplace_back([this, link] { work(link); });
+		};
+		h.take_answer = [this] {
+			std::lock_guard<std::mutex> lock(mutex);
+			if (clipboard_late > 0) {
+				--clipboard_late;
+				return std::string();
+			}
+			std::string text = clipboard;
+			clipboard.clear();
+			return text;
+		};
+		return h;
+	}
+
+	void work(const std::string &link) {
+		std::string back;
+		bool answer;
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			answer = comes_back;
+		}
+		link_query_value(link, "x-success", back);
+		if (link.compare(0, 37, "anki://x-callback-url/infoForAdding?x") == 0) {
+			std::lock_guard<std::mutex> lock(mutex);
+			if (answer) clipboard = lists;
+		} else if (link.compare(0, 30, "anki://x-callback-url/addnote?") == 0) {
+			for (const auto &pair : query_pairs(link)) {
+				// a field whose whole value is a web link with a media ending is fetched
+				if (pair.first.compare(0, 3, "fld") != 0 || pair.second.compare(0, 17, "http://localhost:") != 0) continue;
+				if (!anki_media_name(pair.second) || !fetches) continue;
+				Answer a = get(false, atoi(pair.second.c_str() + 17), path_of(pair.second));
+				std::lock_guard<std::mutex> lock(mutex);
+				fetched.emplace_back(pair.first.substr(3), a.status == 200 ? a.body.size() : 0);
+			}
+		}
+		if (front_first) AppReturns::shared().in_front();
+		if (answer && !back.empty()) AppReturns::shared().opened_with(back);
+		if (!front_first) AppReturns::shared().in_front();
+	}
+
+	void finish() {
+		std::vector<std::thread> all;
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			all.swap(threads);
+		}
+		for (std::thread &t : all) t.join();
+	}
+	~PretendAnkiMobile() { finish(); }
+};
+
+struct Told {
+	std::mutex mutex;
+	std::vector<std::pair<std::string, std::string>> events;
+	AnkiMobile::Tell tell() {
+		return [this](const std::string &event, const std::string &json) {
+			std::lock_guard<std::mutex> lock(mutex);
+			events.emplace_back(event, json);
+		};
+	}
+	// Waits until `count` events are there, at most a few seconds.
+	bool wait(size_t count) {
+		for (int i = 0; i < 400; ++i) {
+			{
+				std::lock_guard<std::mutex> lock(mutex);
+				if (events.size() >= count) return true;
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		}
+		return false;
+	}
+	size_t count() {
+		std::lock_guard<std::mutex> lock(mutex);
+		return events.size();
+	}
+	std::pair<std::string, std::string> at(size_t i) {
+		std::lock_guard<std::mutex> lock(mutex);
+		return i < events.size() ? events[i] : std::pair<std::string, std::string>();
+	}
+};
+
+bool has(const std::string &text, const char *part) { return text.find(part) != std::string::npos; }
+
+std::vector<AnkiMobileHandover::File> two_files() {
+	return {{"oretsuba_shot.jpg", std::vector<uint8_t>(70000, 0x5a), {"Picture"}}, {"TAK1004.ogg", std::vector<uint8_t>(20000, 0x33), {"SentenceAudio"}}};
+}
+
+void test_returns() {
+	std::vector<std::string> heard_a, heard_b;
+	int a = AppReturns::shared().listen([&](const std::string &link) { heard_a.push_back(link); });
+	int b = AppReturns::shared().listen([&](const std::string &link) { heard_b.push_back(link); });
+	AppReturns::shared().opened_with("oretsuba://anki/added?card=1");
+	AppReturns::shared().in_front();
+	AppReturns::shared().opened_with("");
+	check(heard_a == (std::vector<std::string>{"oretsuba://anki/added?card=1", ""}) && heard_b == heard_a,
+	      "every listener hears a link and the coming to the front, and an empty link is no link");
+	AppReturns::shared().forget(a);
+	AppReturns::shared().opened_with("x://y");
+	check(heard_a.size() == 2 && heard_b.size() == 3 && a != b, "a listener that was forgotten hears no more");
+	AppReturns::shared().forget(b);
+	AppReturns::shared().forget(b);
+	AppReturns::shared().in_front();
+	check(heard_b.size() == 3, "forgetting twice does no harm");
+}
+
+void test_ankimobile() {
+	AnkiMobile::Timing quick;
+	quick.confirm_ms = 150;
+	quick.answer_tries = 4;
+	quick.answer_wait_ms = 20;
+	std::string problem, card;
+	std::vector<std::string> left_out;
+
+	{
+		Told told;
+		AnkiMobile none(AnkiAppHost(), "oretsuba", told.tell(), quick);
+		check(!none.possible(), "a host that can open no link has no AnkiMobile");
+		check(!none.ask_lists(problem) && !problem.empty(), "its lists cannot be asked for, and it says so");
+		check(!none.add(lapis_note(), two_files(), card, left_out, problem) && !problem.empty(), "nor can a card be handed over");
+		AppReturns::shared().in_front();
+		std::this_thread::sleep_for(std::chrono::milliseconds(250));
+		check(told.count() == 0, "coming to the front with nothing on its way says nothing");
+	}
+
+	// ---- the lists
+	{
+		PretendAnkiMobile anki;
+		anki.clipboard_late = 2;
+		Told told;
+		AnkiMobile mobile(anki.host(), "oretsuba", told.tell(), quick);
+		check(mobile.possible() && mobile.ask_lists(problem), "the lists are asked for");
+		check(told.wait(1) && told.at(0).first == "anki.lists", "an answer comes");
+		std::string json = told.at(0).second;
+		check(has(json, "\"ok\":true") && has(json, "\"decks\":[\"Default\",\"Mining\"]") &&
+		          has(json, "\"noteTypes\":[{\"name\":\"Lapis\",\"fields\":[\"Expression\",\"Picture\"]}]") && has(json, "\"profiles\":[\"User 1\"]"),
+		      "it carries decks, note types and fields, even when the clipboard took a moment");
+		anki.finish();
+		check(anki.links.size() == 1 && anki.links[0] == "anki://x-callback-url/infoForAdding?x-success=oretsuba%3A%2F%2Fanki%2Flists",
+		      "AnkiMobile was opened with the link its manual gives");
+		check(anki.clipboard.empty(), "the answer was taken off the clipboard");
+		std::this_thread::sleep_for(std::chrono::milliseconds(300));
+		check(told.count() == 1, "one question, one answer");
+		AppReturns::shared().opened_with("oretsuba://anki/lists");
+		std::this_thread::sleep_for(std::chrono::milliseconds(200));
+		check(told.count() == 1, "the way back without a question is not an answer");
+	}
+	{
+		PretendAnkiMobile anki;
+		anki.installed = false;
+		Told told;
+		AnkiMobile mobile(anki.host(), "oretsuba", told.tell(), quick);
+		check(mobile.ask_lists(problem) && told.wait(1) && has(told.at(0).second, "\"ok\":false") && has(told.at(0).second, "did not open"),
+		      "without AnkiMobile on the device the question fails at once, and says why");
+	}
+	{
+		PretendAnkiMobile anki;
+		anki.comes_back = false;  // the player says no in AnkiMobile and returns by hand
+		Told told;
+		AnkiMobile mobile(anki.host(), "oretsuba", told.tell(), quick);
+		check(mobile.ask_lists(problem) && told.wait(1) && has(told.at(0).second, "\"ok\":false") && has(told.at(0).second, "left no answer"),
+		      "a question AnkiMobile never answers ends once this app is in front again");
+		std::this_thread::sleep_for(std::chrono::milliseconds(300));
+		check(told.count() == 1, "and ends once");
+	}
+	{
+		PretendAnkiMobile anki;
+		anki.lists = "";  // comes back with nothing on the clipboard
+		Told told;
+		AnkiMobile mobile(anki.host(), "oretsuba", told.tell(), quick);
+		check(mobile.ask_lists(problem) && told.wait(1) && has(told.at(0).second, "\"ok\":false") && has(told.at(0).second, "left no answer"),
+		      "a way back with an empty clipboard is no answer");
+		std::this_thread::sleep_for(std::chrono::milliseconds(300));
+		check(told.count() == 1, "and is told once, not again when the app is in front");
+	}
+	{
+		PretendAnkiMobile anki;
+		anki.lists = "{\"decks\":[],\"notetypes\":[]}";
+		Told told;
+		AnkiMobile mobile(anki.host(), "oretsuba", told.tell(), quick);
+		check(mobile.ask_lists(problem) && told.wait(1) && has(told.at(0).second, "\"ok\":false") && has(told.at(0).second, "no deck"),
+		      "an answer without a deck is passed on as a problem");
+	}
+
+	// ---- a card
+	{
+		PretendAnkiMobile anki;
+		Told told;
+		AnkiMobile mobile(anki.host(), "oretsuba", told.tell(), quick);
+		check(mobile.add(lapis_note(), two_files(), card, left_out, problem) && card.size() == 16 && left_out.empty(), "a card is handed over");
+		check(told.wait(1) && told.at(0).first == "card.added", "AnkiMobile's way back says it was added");
+		check(has(told.at(0).second, ("\"card\":\"" + card + "\"").c_str()) && has(told.at(0).second, "\"notFetched\":[]"),
+		      "the event names the card, and no file is missing");
+		anki.finish();
+		check(anki.fetched.size() == 2 && anki.fetched[0] == std::make_pair(std::string("Picture"), size_t(70000)) &&
+		          anki.fetched[1] == std::make_pair(std::string("SentenceAudio"), size_t(20000)),
+		      "AnkiMobile fetched picture and voice whole, from the links in their fields");
+		std::this_thread::sleep_for(std::chrono::milliseconds(300));
+		check(told.count() == 1, "a card that was added is not called unconfirmed afterwards");
+	}
+	{
+		PretendAnkiMobile anki;
+		anki.front_first = true;  // the system says "in front" before it delivers the way back
+		Told told;
+		AnkiMobile mobile(anki.host(), "oretsuba", told.tell(), quick);
+		check(mobile.add(lapis_note(), two_files(), card, left_out, problem) && told.wait(1) && told.at(0).first == "card.added",
+		      "the way back may come after the app is in front");
+		std::this_thread::sleep_for(std::chrono::milliseconds(300));
+		check(told.count() == 1, "and still counts once");
+	}
+	{
+		PretendAnkiMobile anki;
+		anki.fetches = false;
+		Told told;
+		AnkiMobile mobile(anki.host(), "oretsuba", told.tell(), quick);
+		check(mobile.add(lapis_note(), two_files(), card, left_out, problem) && told.wait(1) && told.at(0).first == "card.added" &&
+		          has(told.at(0).second, "\"notFetched\":[\"oretsuba_shot.jpg\",\"TAK1004.ogg\"]"),
+		      "files AnkiMobile did not fetch are named with the card");
+	}
+	{
+		PretendAnkiMobile anki;
+		anki.comes_back = false;  // AnkiMobile refuses the note and the player returns by hand
+		Told told;
+		AnkiMobile mobile(anki.host(), "oretsuba", told.tell(), quick);
+		check(mobile.add(lapis_note(), two_files(), card, left_out, problem) && told.wait(1) && told.at(0).first == "card.unconfirmed",
+		      "a card AnkiMobile never confirms is called unconfirmed once this app is in front again");
+		check(has(told.at(0).second, ("\"card\":\"" + card + "\"").c_str()) && has(told.at(0).second, "\"reason\":\"AnkiMobile did not say"),
+		      "with the card's name and a reason");
+		AppReturns::shared().opened_with("oretsuba://anki/added?card=" + card);
+		std::this_thread::sleep_for(std::chrono::milliseconds(250));
+		check(told.count() == 1, "a way back after that is too late");
+	}
+	{
+		PretendAnkiMobile anki;
+		anki.installed = false;
+		Told told;
+		AnkiMobile mobile(anki.host(), "oretsuba", told.tell(), quick);
+		check(mobile.add(lapis_note(), two_files(), card, left_out, problem) && told.wait(1) && told.at(0).first == "card.unconfirmed" &&
+		          has(told.at(0).second, "did not open"),
+		      "without AnkiMobile on the device the card is unconfirmed at once");
+	}
+	{
+		// two cards one after the other, the first never confirmed
+		PretendAnkiMobile anki;
+		anki.comes_back = false;
+		Told told;
+		AnkiMobile mobile(anki.host(), "oretsuba", told.tell(), quick);
+		std::string first, second;
+		check(mobile.add(lapis_note(), two_files(), first, left_out, problem), "a first card goes out");
+		anki.finish();
+		{
+			std::lock_guard<std::mutex> lock(anki.mutex);
+			anki.comes_back = true;
+		}
+		check(mobile.add(lapis_note(), two_files(), second, left_out, problem) && second != first, "a second card goes out before the first is settled");
+		check(told.wait(1) && told.at(0).first == "card.added" && has(told.at(0).second, second.c_str()), "the second is added");
+		std::this_thread::sleep_for(std::chrono::milliseconds(300));
+		check(told.count() == 1, "and the first, given up for it, says nothing more");
+	}
+	{
+		// the owner lets go while a card is on its way and timers run
+		PretendAnkiMobile anki;
+		anki.comes_back = false;
+		Told told;
+		{
+			AnkiMobile mobile(anki.host(), "oretsuba", told.tell(), quick);
+			check(mobile.add(lapis_note(), two_files(), card, left_out, problem), "a card goes out");
+			anki.finish();
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(300));
+		check(told.count() == 0, "an AnkiMobile that is gone tells nothing");
+		AppReturns::shared().opened_with("oretsuba://anki/added?card=" + card);
+		AppReturns::shared().in_front();
+		check(told.count() == 0, "and hears nothing");
+	}
+}
+
+// ---------------------------------------------------------------- AnkiDroid
+
+void test_ankidroid() {
+	AnkiLinkNote note = lapis_note();
+	note.allow_duplicate = true;
+	std::string request = ankidroid_add_request(note, {{"oretsuba_shot.jpg", false, {"Picture"}}, {"TAK1004.ogg", true, {"SentenceAudio", "ExpressionAudio"}}});
+	check(request == std::string("{\"deck\":\"Mining\",\"noteType\":\"Lapis\",\"fields\":{\"Expression\":\"") + U8_WORD +
+	                     "\",\"Sentence\":\"a <b>b</b> c\",\"Picture\":\"\",\"SentenceAudio\":\"\",\"ExpressionAudio\":\"\","
+	                     "\"Glossary\":\"<ol><li>to eat</li></ol>\"},\"tags\":[\"oretsuba\"],\"allowDuplicate\":true,"
+	                     "\"media\":[{\"name\":\"oretsuba_shot.jpg\",\"sound\":false,\"fields\":[\"Picture\"]},"
+	                     "{\"name\":\"TAK1004.ogg\",\"sound\":true,\"fields\":[\"SentenceAudio\",\"ExpressionAudio\"]}]}",
+	      "a card is written for AnkiDroid.kt as it reads it");
+	check(ankidroid_known_request("Lapis", "Expression", "a\"b") == "{\"noteType\":\"Lapis\",\"field\":\"Expression\",\"value\":\"a\\\"b\"}",
+	      "the question whether a word is there is written with its quotes escaped");
+
+	AnkiDroidAnswer a = ankidroid_answer("{\"installed\":true,\"allowed\":false,\"mediaFolder\":\"/data/user/0/app/cache/anki-media\"}");
+	check(a.ok && a.installed && !a.allowed && a.media_folder == "/data/user/0/app/cache/anki-media", "status is read");
+	a = ankidroid_answer("{\"decks\":[\"Default\",\"Mining\"],\"noteTypes\":[{\"name\":\"Lapis\",\"fields\":[\"Expression\",\"Picture\"]}]}");
+	check(a.ok && a.info.decks.size() == 2 && a.info.note_types.size() == 1 && a.info.note_types[0].fields.size() == 2, "the lists are read");
+	a = ankidroid_answer("{\"known\":true}");
+	check(a.ok && a.known, "a known word is read");
+	a = ankidroid_answer("{\"id\":\"1795645000123\",\"missing\":[\"TAK1004.ogg\"]}");
+	check(a.ok && a.id == "1795645000123" && a.missing == std::vector<std::string>{"TAK1004.ogg"}, "a new card's number and its missing file are read");
+	a = ankidroid_answer("{\"error\":\"This word is in AnkiDroid already.\",\"code\":\"duplicate\"}");
+	check(!a.ok && a.problem == "This word is in AnkiDroid already." && a.code == "duplicate", "a refusal is read with its reason and kind");
+	a = ankidroid_answer("{\"error\":\"\"}");
+	check(!a.ok && !a.problem.empty() && a.code == "failed", "a refusal without words still has words");
+	a = ankidroid_answer("");
+	check(!a.ok && a.code == "failed" && !a.problem.empty(), "no answer is a failure");
+	a = ankidroid_answer("[]");
+	check(!a.ok, "a list is no answer");
+}
+
 }  // namespace
 
 int main() {
@@ -485,6 +848,9 @@ int main() {
 	test_media_names();
 	test_server();
 	test_handover();
+	test_returns();
+	test_ankimobile();
+	test_ankidroid();
 	printf("%s: %d checks\n", ok ? "anki_app_test passed" : "anki_app_test FAILED", checks);
 	return ok ? 0 : 1;
 }

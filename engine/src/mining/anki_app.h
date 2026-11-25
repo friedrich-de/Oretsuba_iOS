@@ -15,6 +15,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -160,6 +161,8 @@ public:
 	// This app is in front again and no way back came. Unconfirmed when a card was on its way.
 	Result gave_up();
 	bool waiting() const;
+	// The name of the card on its way; empty when none is.
+	std::string card() const;
 
 private:
 	Result finish(Result::Kind kind);
@@ -169,5 +172,108 @@ private:
 	std::string card_;
 	std::vector<std::pair<std::string, std::string>> offered_;  // name, link
 };
+
+// ---------------------------------------------------------------- what the host does for an Anki app
+
+// What the app around the engine can do with the Anki app on this device.
+// A host has what its system has: any of these may be empty.
+struct AnkiAppHost {
+	// For AnkiMobile. Opens a link in another app and keeps this app running
+	// while it is away; `done` hears whether an app took the link.
+	std::function<void(const std::string &link, std::function<void(bool opened)> done)> open_link;
+	// For AnkiMobile. Its answer, taken off the clipboard; empty when none is there.
+	std::function<std::string()> take_answer;
+	// For AnkiDroid. One request, answered in JSON (AnkiDroid.kt says which).
+	std::function<std::string(const std::string &method, const std::string &json)> ankidroid;
+};
+
+// The links this app is opened with and its coming back to the front, on
+// their way from the host to whoever waits for them. The host calls
+// opened_with() and in_front() (ore_app_opened_with, ore_app_in_front).
+class AppReturns {
+public:
+	static AppReturns &shared();
+	// `link` is empty when the app is merely in front again.
+	using Listener = std::function<void(const std::string &link)>;
+	int listen(Listener listener);
+	void forget(int id);
+	void opened_with(const std::string &link);
+	void in_front();
+
+private:
+	void tell(const std::string &link);
+	std::mutex mutex_;
+	int next_ = 1;
+	std::vector<std::pair<int, std::shared_ptr<Listener>>> listeners_;
+};
+
+// ---------------------------------------------------------------- AnkiMobile, from asking to knowing
+
+// Everything this app does with AnkiMobile: asking for its decks and note
+// types, handing a card over, and learning how each ended. Both leave this
+// app, so both answer later, through `tell`:
+//
+//   anki.lists        {"ok":true,"lists":{profiles,decks,noteTypes}}  or  {"ok":false,"problem":".."}
+//   card.added        {"card":"..","notFetched":["file", ..]}
+//   card.unconfirmed  {"card":"..","reason":".."}
+//
+// `tell` is called from a thread of this object's or from the host's.
+class AnkiMobile {
+public:
+	using Tell = std::function<void(const std::string &event, const std::string &json)>;
+	struct Timing {
+		int confirm_ms = 2000;      // in front again this long without a way back: the card is not confirmed
+		int answer_tries = 4;       // how often the clipboard is looked at for the lists
+		int answer_wait_ms = 800;   // before each look: AnkiMobile's answer takes a moment to arrive
+	};
+
+	// `scheme` is this app's own link scheme, "oretsuba".
+	AnkiMobile(AnkiAppHost host, std::string scheme, Tell tell);
+	AnkiMobile(AnkiAppHost host, std::string scheme, Tell tell, Timing timing);
+	~AnkiMobile();
+	AnkiMobile(const AnkiMobile &) = delete;
+	AnkiMobile &operator=(const AnkiMobile &) = delete;
+
+	// Whether this host can open links and read the clipboard at all.
+	bool possible() const;
+	// Asks AnkiMobile for its decks and note types. False with the reason when it cannot even be asked.
+	bool ask_lists(std::string &problem);
+	// Hands a card over; `card` gets the name the later event carries, `left_out` the files AnkiMobile cannot take.
+	bool add(AnkiLinkNote note, std::vector<AnkiMobileHandover::File> files, std::string &card,
+	         std::vector<std::string> &left_out, std::string &problem);
+
+private:
+	struct State;
+	std::shared_ptr<State> state_;
+};
+
+// ---------------------------------------------------------------- AnkiDroid
+
+// A card as AnkiDroid.kt takes it ("add"). The files must wait in the folder
+// "status" names, under the names given here.
+struct AnkiDroidFile {
+	std::string name;
+	bool sound = false;
+	std::vector<std::string> fields;
+};
+std::string ankidroid_add_request(const AnkiLinkNote &note, const std::vector<AnkiDroidFile> &files);
+std::string ankidroid_known_request(std::string_view note_type, std::string_view field, std::string_view value);
+
+// What AnkiDroid.kt answers. `problem` and `code` are set when it answered with an error or with no JSON.
+struct AnkiDroidAnswer {
+	bool ok = false;
+	std::string problem, code;
+	// status
+	bool installed = false, allowed = false;
+	std::string media_folder;
+	// info
+	AnkiAppInfo info;
+	// known
+	bool known = false;
+	// add
+	std::string id;
+	std::vector<std::string> missing;
+};
+AnkiDroidAnswer ankidroid_answer(std::string_view json);
 
 }  // namespace ore

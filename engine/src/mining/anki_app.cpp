@@ -2,6 +2,7 @@
 #include "mining/anki_app.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <map>
 #include <mutex>
@@ -671,6 +672,295 @@ AnkiMobileHandover::Result AnkiMobileHandover::gave_up() {
 bool AnkiMobileHandover::waiting() const {
 	std::lock_guard<std::mutex> lock(mutex_);
 	return !card_.empty();
+}
+
+std::string AnkiMobileHandover::card() const {
+	std::lock_guard<std::mutex> lock(mutex_);
+	return card_;
+}
+
+// ---------------------------------------------------------------- from the host
+
+AppReturns &AppReturns::shared() {
+	static AppReturns instance;
+	return instance;
+}
+
+int AppReturns::listen(Listener listener) {
+	std::lock_guard<std::mutex> lock(mutex_);
+	int id = next_++;
+	listeners_.emplace_back(id, std::make_shared<Listener>(std::move(listener)));
+	return id;
+}
+
+void AppReturns::forget(int id) {
+	std::lock_guard<std::mutex> lock(mutex_);
+	listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(), [id](const auto &entry) { return entry.first == id; }),
+	                 listeners_.end());
+}
+
+void AppReturns::tell(const std::string &link) {
+	std::vector<std::shared_ptr<Listener>> all;
+	{
+		std::lock_guard<std::mutex> lock(mutex_);
+		for (const auto &entry : listeners_) all.push_back(entry.second);
+	}
+	for (const auto &listener : all) (*listener)(link);
+}
+
+void AppReturns::opened_with(const std::string &link) {
+	if (!link.empty()) tell(link);
+}
+
+void AppReturns::in_front() { tell(std::string()); }
+
+// ---------------------------------------------------------------- AnkiMobile, from asking to knowing
+
+namespace {
+
+constexpr char kNotThere[] = "AnkiMobile did not open. Is it on this device?";
+constexpr char kNoWord[] =
+    "AnkiMobile did not say that it added the card. Look there: it may have refused it, for example a word it has already.";
+constexpr char kNoLists[] = "AnkiMobile left no answer. Allow the request there and fetch again.";
+
+json::Value info_json(const AnkiAppInfo &info) {
+	json::Value value;
+	json::parse(anki_app_info_text(info), value);
+	return value;
+}
+
+void sleep_ms(int ms) {
+	if (ms > 0) std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+}
+
+}  // namespace
+
+struct AnkiMobile::State {
+	State(AnkiAppHost h, std::string s, Tell t, Timing g)
+	    : host(std::move(h)), scheme(std::move(s)), tell(std::move(t)), timing(g), handover(scheme + "://anki/added") {}
+
+	const AnkiAppHost host;
+	const std::string scheme;
+	const Tell tell;
+	const Timing timing;
+	AnkiMobileHandover handover;
+
+	std::mutex mutex;
+	bool lists_asked = false;  // the question for the lists is out
+	uint64_t lists_round = 0;  // which question: an older one's timers find a newer number and stop
+
+	// `tell` reaches into whoever owns this object, so nothing is told once the owner lets go.
+	std::recursive_mutex telling;
+	bool alive = true;
+	int listener = 0;
+
+	void say(const std::string &event, const json::Value &payload) {
+		std::lock_guard<std::recursive_mutex> lock(telling);
+		if (alive && tell) tell(event, json::write(payload));
+	}
+
+	void say_unconfirmed(const std::string &card, const char *reason) {
+		json::Value payload = json::Value::object();
+		payload.set("card", card);
+		payload.set("reason", reason);
+		say("card.unconfirmed", payload);
+	}
+
+	void say_no_lists(const char *problem) {
+		json::Value payload = json::Value::object();
+		payload.set("ok", false);
+		payload.set("problem", problem);
+		say("anki.lists", payload);
+	}
+
+	// A link this app was opened with, or "" for being in front again.
+	static void heard(const std::shared_ptr<State> &state, const std::string &link) {
+		if (link.empty()) {
+			// In front again. AnkiMobile's way back, when there is one, arrives
+			// about now; only when none has come after a while is the card given up.
+			std::string card = state->handover.card();
+			uint64_t round;
+			bool asked;
+			{
+				std::lock_guard<std::mutex> lock(state->mutex);
+				asked = state->lists_asked;
+				round = state->lists_round;
+			}
+			if (card.empty() && !asked) return;
+			std::thread([state, card, asked, round] {
+				sleep_ms(state->timing.confirm_ms);
+				if (!card.empty() && state->handover.card() == card) {
+					AnkiMobileHandover::Result result = state->handover.gave_up();
+					if (result.kind == AnkiMobileHandover::Result::Unconfirmed && result.card == card)
+						state->say_unconfirmed(card, kNoWord);
+				}
+				if (asked) {
+					bool still;
+					{
+						std::lock_guard<std::mutex> lock(state->mutex);
+						still = state->lists_asked && state->lists_round == round;
+						if (still) state->lists_asked = false;
+					}
+					if (still) state->say_no_lists(kNoLists);
+				}
+			}).detach();
+			return;
+		}
+		std::string head = link.substr(0, link.find('?'));
+		if (head == state->scheme + "://anki/added") {
+			AnkiMobileHandover::Result result = state->handover.returned(link);
+			if (result.kind != AnkiMobileHandover::Result::Added) return;
+			json::Value payload = json::Value::object();
+			payload.set("card", result.card);
+			json::Value missing = json::Value::array();
+			for (const std::string &name : result.not_fetched) missing.push(name);
+			payload.set("notFetched", std::move(missing));
+			state->say("card.added", payload);
+		} else if (head == state->scheme + "://anki/lists") {
+			{
+				std::lock_guard<std::mutex> lock(state->mutex);
+				if (!state->lists_asked) return;
+				state->lists_asked = false;
+			}
+			// The answer lies on the clipboard, and may take a moment to get there.
+			std::thread([state] {
+				std::string text;
+				for (int i = 0; i < state->timing.answer_tries && text.empty(); ++i) {
+					sleep_ms(state->timing.answer_wait_ms);
+					text = state->host.take_answer();
+				}
+				if (text.empty()) return state->say_no_lists(kNoLists);
+				AnkiAppInfo info;
+				std::string problem;
+				if (!ankimobile_parse_info(text, info, problem)) return state->say_no_lists(problem.c_str());
+				json::Value payload = json::Value::object();
+				payload.set("ok", true);
+				payload.set("lists", info_json(info));
+				state->say("anki.lists", payload);
+			}).detach();
+		}
+	}
+};
+
+AnkiMobile::AnkiMobile(AnkiAppHost host, std::string scheme, Tell tell)
+    : AnkiMobile(std::move(host), std::move(scheme), std::move(tell), Timing()) {}
+
+AnkiMobile::AnkiMobile(AnkiAppHost host, std::string scheme, Tell tell, Timing timing)
+    : state_(std::make_shared<State>(std::move(host), std::move(scheme), std::move(tell), timing)) {
+	std::weak_ptr<State> weak = state_;
+	state_->listener = AppReturns::shared().listen([weak](const std::string &link) {
+		if (std::shared_ptr<State> state = weak.lock()) State::heard(state, link);
+	});
+}
+
+AnkiMobile::~AnkiMobile() {
+	AppReturns::shared().forget(state_->listener);
+	std::lock_guard<std::recursive_mutex> lock(state_->telling);
+	state_->alive = false;
+}
+
+bool AnkiMobile::possible() const { return state_->host.open_link && state_->host.take_answer; }
+
+bool AnkiMobile::ask_lists(std::string &problem) {
+	if (!possible()) {
+		problem = "This device cannot reach AnkiMobile.";
+		return false;
+	}
+	std::shared_ptr<State> state = state_;
+	uint64_t round;
+	{
+		std::lock_guard<std::mutex> lock(state->mutex);
+		state->lists_asked = true;
+		round = ++state->lists_round;
+	}
+	state->host.open_link(ankimobile_info_link(state->scheme + "://anki/lists"), [state, round](bool opened) {
+		if (opened) return;
+		{
+			std::lock_guard<std::mutex> lock(state->mutex);
+			if (!state->lists_asked || state->lists_round != round) return;
+			state->lists_asked = false;
+		}
+		state->say_no_lists(kNotThere);
+	});
+	problem.clear();
+	return true;
+}
+
+bool AnkiMobile::add(AnkiLinkNote note, std::vector<AnkiMobileHandover::File> files, std::string &card,
+                     std::vector<std::string> &left_out, std::string &problem) {
+	if (!state_->host.open_link) {
+		problem = "This device cannot reach AnkiMobile.";
+		return false;
+	}
+	AnkiMobileHandover::Prepared prepared;
+	if (!state_->handover.prepare(std::move(note), std::move(files), prepared, problem)) return false;
+	card = prepared.card;
+	left_out = std::move(prepared.left_out);
+	std::shared_ptr<State> state = state_;
+	std::string name = card;
+	state->host.open_link(prepared.link, [state, name](bool opened) {
+		if (opened || state->handover.card() != name) return;
+		AnkiMobileHandover::Result result = state->handover.gave_up();
+		if (result.kind == AnkiMobileHandover::Result::Unconfirmed && result.card == name) state->say_unconfirmed(name, kNotThere);
+	});
+	problem.clear();
+	return true;
+}
+
+// ---------------------------------------------------------------- AnkiDroid
+
+std::string ankidroid_add_request(const AnkiLinkNote &note, const std::vector<AnkiDroidFile> &files) {
+	json::Value root = json::Value::object();
+	root.set("deck", note.deck);
+	root.set("noteType", note.note_type);
+	json::Value fields = json::Value::object();
+	for (const auto &field : note.fields) fields.set(field.first, field.second);
+	root.set("fields", std::move(fields));
+	root.set("tags", names_json(note.tags));
+	root.set("allowDuplicate", note.allow_duplicate);
+	json::Value media = json::Value::array();
+	for (const AnkiDroidFile &file : files) {
+		json::Value entry = json::Value::object();
+		entry.set("name", file.name);
+		entry.set("sound", file.sound);
+		entry.set("fields", names_json(file.fields));
+		media.push(std::move(entry));
+	}
+	root.set("media", std::move(media));
+	return json::write(root);
+}
+
+std::string ankidroid_known_request(std::string_view note_type, std::string_view field, std::string_view value) {
+	json::Value root = json::Value::object();
+	root.set("noteType", note_type);
+	root.set("field", field);
+	root.set("value", value);
+	return json::write(root);
+}
+
+AnkiDroidAnswer ankidroid_answer(std::string_view text) {
+	AnkiDroidAnswer answer;
+	json::Value root;
+	if (!json::parse(text, root) || !root.is_object()) {
+		answer.problem = "AnkiDroid's answer could not be read.";
+		answer.code = "failed";
+		return answer;
+	}
+	if (root.has("error")) {
+		answer.problem = root.str("error");
+		if (answer.problem.empty()) answer.problem = "AnkiDroid refused.";
+		answer.code = root.str("code", "failed");
+		return answer;
+	}
+	answer.ok = true;
+	answer.installed = root.boolean("installed");
+	answer.allowed = root.boolean("allowed");
+	answer.media_folder = root.str("mediaFolder");
+	anki_app_info_from_text(text, answer.info);
+	answer.known = root.boolean("known");
+	answer.id = root.str("id");
+	add_names(root["missing"], answer.missing);
+	return answer;
 }
 
 }  // namespace ore
