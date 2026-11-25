@@ -24,6 +24,7 @@ import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.window.OnBackInvokedDispatcher
@@ -272,15 +273,28 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
             if (isFinishing || isDestroyed) return@post
             val field = EditText(this)
             field.inputType = InputType.TYPE_CLASS_TEXT
+            // In landscape a keyboard would otherwise take the whole screen and cover the
+            // dialog and its buttons. It stays a keyboard, and its Done key is the dialog's OK.
+            field.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_FLAG_NO_FULLSCREEN or
+                EditorInfo.IME_ACTION_DONE
             field.setText(value)
             field.setSelection(field.text.length)
-            AlertDialog.Builder(this).setTitle(R.string.comment).setView(field).setCancelable(false)
+            val dialog = AlertDialog.Builder(this).setTitle(R.string.comment).setView(field).setCancelable(false)
                 .setNegativeButton(R.string.cancel) { _, _ -> engine { Native.answerTextInput(session, false, null) } }
                 .setPositiveButton(R.string.ok) { _, _ ->
                     val typed = field.text.toString().toByteArray()
                     engine { Native.answerTextInput(session, true, typed) }
                 }
-                .show()
+                .create()
+            field.setOnEditorActionListener { _, action, _ ->
+                if (action == EditorInfo.IME_ACTION_DONE) {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+                    true
+                } else {
+                    false
+                }
+            }
+            dialog.show()
         }
     }
 
