@@ -216,9 +216,15 @@ void register_ui_natives(Engine &e) {
 	// (x, y, w, h, warpX, warpY, b6, b7); p4 == -1 → no warp target. The two
 	// flags are not used by anything we know of.
 	def(0x2b4, "hit_region", [ui, made](Args &a) {
+		// FUN_00420760 passes (x, y, w, h, -1, -1, 0, 0) on when the fifth
+		// argument is -1, and the seventh becomes the region's "active" byte
+		// (+0x40). The full-screen region of advinit is made that way: it is
+		// switched off, never takes a click, and the message window's own
+		// controller advances the text.
 		auto c = std::make_unique<HitRegion>(ui());
-		c->init(a.i(0), a.i(1), a.i(2), a.i(3), true);
-		if (a.i(4) == -1) c->set_warp(-1, -1);
+		bool plain = a.i(4) == -1;
+		c->init(a.i(0), a.i(1), a.i(2), a.i(3), !plain && a.b(6));
+		if (plain) c->set_warp(-1, -1);
 		else c->set_warp(a.i(4), a.i(5));
 		return made(std::move(c), true);
 	});
