@@ -58,11 +58,12 @@ Apps that install from sources can take the newest build straight from this addr
 under Sources) and the app appears there with its version and date:
 
 ```text
-https://github.com/friedrich-de/Oretsuba_iOS/releases/latest/download/source.json
+https://github.com/friedrich-de/Oretsuba_iOS-Android-Mining/releases/latest/download/source.json
 ```
 
 Every build of `main` writes that file anew, so it always points to the newest package. The package is unsigned; the
-app that installs it signs it with your own certificate.
+app that installs it signs it with your own certificate. The repository was called `Oretsuba_iOS` before: a source
+added under that name keeps working, as GitHub passes the old address on.
 
 ### iPhone / iPad (sideloading)
 
