@@ -319,6 +319,90 @@ the stream was read. Copying the game folder with a cable, and the folder picker
 keyboard or a game controller on a device. A tablet. The versions between Android 8 and 14. The story beyond the
 first choice of the prologue.
 
+## Mining in the game on Android, 2026-11-26
+
+[ANDROID.md](ANDROID.md#in-the-game) describes it. Run with the `SET_UP` folder of the game's disc on the two
+emulators of the section above: Android 15 with Android System WebView 124, shaped like a phone (2400x1080), and
+Android 8.0 with WebView 69. Every input was sent through `adb`. The AnkiConnect, the audio source and one small
+dictionary were the made-up ones of `tools/mining_page/neighbours.mjs` on the same PC; the large dictionaries were
+JMdict, JMnedict and Jitendex as their makers publish them.
+
+**The build.** CMake fetched SQLite 3.54.1 from sqlite.org for both processor types; the file was hashed by hand as
+well and has the SHA3-256 that `CMakeLists.txt` names. The app installed over the build without mining, with the game
+files and the saves kept. On GitHub the package builds, the lint check passes, and the check of the cards for the
+real AnkiDroid, which now runs with the kit switched on, passes as before.
+
+**The settings, Android 15.**
+
+- The launcher's card says "Off: a tap on the text reads on." and, once everything is set, "On: 2 dictionaries,
+  cards go to the deck Mining."
+- **Dictionaries.** JMdict by its address (15.6 MB behind two redirects, 528,425 words): downloaded after 2.9
+  seconds, in the list after 4.7. "Add JMnedict" (11.4 MB, 668,035 words): 5.0 seconds. "Add Jitendex" (38.9 MB,
+  437,367 words): 7.3 seconds. A button goes when its dictionary is in and comes back when it is removed. A file
+  chosen in the system's file picker is imported, and the copy the app made of it is gone afterwards. Up, Down, the
+  switch of a row and Remove with its question do what they say. Stop ends a download within a quarter of a second,
+  also one from a server that took the connection and never answered, and leaves no half file.
+- **What is refused is said in the card it belongs to**, under its buttons: a name no server has, an answer of
+  404, an address that is no web address, and a chosen file that is no zip.
+- **Anki.** Connect finds the Lapis note type and its deck and fills the lists of decks and note types. The fields
+  dialog shows the 22 fields of Lapis with what each gets; for a plain note type every field starts at "Nothing",
+  there are 13 things to choose from, and the card says what is missing until the word has a field. Tags stay.
+- **The key**, next to an AnkiConnect that refuses every request without it: without the key the card says "The
+  AnkiConnect did not take the key", with it "Connected". After a forced stop the screen connects by itself and a
+  card made in the game arrives: the kept key is read back and sent. The app's files hold the key sealed only; its
+  clear text is nowhere in them. After "Forget the key" the AnkiConnect refuses again.
+- **Word audio.** "It answers, with 2 sounds for 食べる."; the address stays over a restart; a wrong one says so and
+  is not kept.
+- Each of the four text fields stays above the keyboard while it is typed in, upright and sideways.
+- **Plain `http://` stays in the own network.** `http://example.com` is turned down without a request, with "An
+  address in the internet has to begin with https://. Plain http:// is for a server in your own network.", for a
+  dictionary's address, the AnkiConnect and the word audio, each in its own card; what was kept before stays. The
+  same addresses on the PC's own address still work, and so do the https downloads with their redirects.
+
+**In the game, Android 15.**
+
+- A tap on a word shows the popup above the line: the reading over the word, the meanings with their tags, ×, + and
+  the loudspeaker, 520 by 304 CSS pixels and readable down to its smallest letters. From the tap to the drawn popup
+  it took 66 to 98 milliseconds, at the first look-up after a start 90 to 134. A click with a mouse does the same.
+- While it is open the game waits: the same line after 10 seconds, and neither taps inside the popup nor Enter or
+  Space reach the game. The popup scrolls.
+- **A card** of a narration line arrives 0.5 to 1.2 seconds after + with the word, its reading, the reading over
+  the word, the meanings, the sentence with the word in bold, the word's sound, the game's title and the picture: a
+  JPEG of 800x600 of about 100 KB that shows the scene with the text box and neither the popup nor the mark. A card
+  of a voiced line also carries the voice as AAC in an `.m4a` file. Four such files were laid next to the game's
+  own Ogg files, sample by sample: each holds the whole voice, 46 milliseconds later than the original.
+- The same word again shows the mark for a card that exists, and no second card is made. With the AnkiConnect
+  switched off, + says that Anki could not be reached, and where.
+- ×, a tap beside the popup, Back and Escape close it. The closing tap does not read on; after it, a tap on the
+  picture reads on and a tap in the text box beside the words does nothing. The LOG button in the text box opens
+  the history, where nothing is looked up.
+- Home and back with the popup open: the popup, the word and the line are as they were. A forced stop with the
+  popup open: the game starts again at its auto save and is not held.
+- With looking up switched off a tap on the text reads on and no web view is made. Switched on with every
+  dictionary off, the launcher says "On, but without a dictionary no word is found."
+- More than 200 look-ups, 40 of them in one run of the game at the largest text size: no crash, no JNI error, no
+  "not responding", and no error line of the app's own. The app's memory went from 135 to 144 MB over those 40 and
+  stayed between 150 and 154 MB over 40 more in a run that had 90 behind it.
+
+**The mining sender next to it, Android 15.** With a `mining.txt` whose server is `http://example.com` the
+launcher says that the address has to begin with https://, and the game sends nothing there. With the file of a VN
+Mining Server 0.2.0 on the same PC, five lines read in the game arrived as five lines, in order, each with its
+picture and the voiced one with its voice. The game's SAVE menu, with the popup's web view in the same window, fades
+in and out in about 0.27 seconds and does not show again afterwards.
+
+**Android 8.0** (WebView 69): the launcher and the settings say that the dictionary needs a newer Android System
+WebView. The game plays as before, a tap on the text reads on also with the switch on, and no web view is made. The
+settings' fields stay above the keyboard there too.
+
+**Seen and left**, because the popup's page and the kit are the same on every system: for a word in the second row
+of a line the popup covers the first row, and a tap on a line's indent or on punctuation opens a small panel that
+says no word starts there, which holds the game until it is closed.
+
+**Not checked:** a real phone, where the web view, the system's AAC encoder and the Keystore are the maker's own.
+The sounds by ear. An Anki on a computer with the AnkiConnect add-on itself. Frequency, pitch accent and a selection
+on a card made in the app, and a dictionary's pictures in the popup. A controller's B. Versions of the web view
+between 69 and 124: the limit of 88 comes from what the page uses, not from a test.
+
 ## The original project's checks on devices, 2026-10-18
 
 The original project checked its versions 0.1.0 and 0.1.1 on real devices. It played with a Chinese translation

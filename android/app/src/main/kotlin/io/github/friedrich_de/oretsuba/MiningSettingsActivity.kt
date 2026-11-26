@@ -16,6 +16,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
@@ -27,6 +28,8 @@ import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
 import java.io.File
+import java.net.MalformedURLException
+import java.net.URL
 import java.text.NumberFormat
 import java.util.UUID
 import org.json.JSONArray
@@ -838,7 +841,16 @@ class MiningSettingsActivity : Activity() {
         holder.setPadding(pad, 0, pad, 0)
         holder.addView(field, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                                                         ViewGroup.LayoutParams.WRAP_CONTENT))
-        val download = { dictionaryCall("dict.download", JSONObject().put("url", field.text.toString().trim())) }
+        val download = {
+            val typed = field.text.toString().trim()
+            if (plainIntoTheInternet(typed)) {
+                // Said as it is: the kit would wrap it in "the address did not answer", and it was never asked.
+                dictionaryProblem = Http.PLAIN_REFUSED
+                show()
+            } else {
+                dictionaryCall("dict.download", JSONObject().put("url", typed))
+            }
+        }
         val dialog = AlertDialog.Builder(this).setTitle(R.string.kit_download_title).setMessage(R.string.kit_download_note)
             .setView(holder)
             .setNegativeButton(R.string.cancel, null)
@@ -848,6 +860,8 @@ class MiningSettingsActivity : Activity() {
         // keyboard lies over the dialog's buttons.
         field.setOnEditorActionListener { _, action, _ ->
             if (action == EditorInfo.IME_ACTION_DONE) {
+                // The keyboard goes with the dialog, also when a field of the screen behind it has the cursor.
+                getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(field.windowToken, 0)
                 dialog.dismiss()
                 download()
                 true
@@ -889,6 +903,14 @@ class MiningSettingsActivity : Activity() {
     private fun checkAudio() {
         val typed = audioField.text.toString().trim()
         if (typed.isEmpty() && !audioSet) return
+        // The kit only says of an audio source that it could not be reached. Why a plain http address in
+        // the internet is not even asked is said here, in the words the other requests get.
+        if (typed.isNotEmpty() && plainIntoTheInternet(typed)) {
+            audioProblem = null
+            audio = Check(BAD, Http.PLAIN_REFUSED)
+            show()
+            return
+        }
         audio = Check(WORKING)
         audioProblem = null
         show()
@@ -913,6 +935,14 @@ class MiningSettingsActivity : Activity() {
             }
             show()
         }
+    }
+
+    /** Whether a typed address would send a request into the internet without https (Http.mayGo). */
+    private fun plainIntoTheInternet(address: String): Boolean = try {
+        !Http.mayGo(URL(address))
+    } catch (e: MalformedURLException) {
+        // No address the system knows: the kit says what is wrong with it.
+        false
     }
 
     companion object {
