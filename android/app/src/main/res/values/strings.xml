@@ -84,7 +84,7 @@
     <string name="kit_droid_again">Fetch decks and note types again</string>
     <string name="kit_droid_missing">AnkiDroid is not on this device. Install it, open it once and go through its first screens, then come back.</string>
     <string name="kit_droid_not_allowed">AnkiDroid\'s cards are closed to other apps until you allow it. Android asks whether Oretsuba may access AnkiDroid\'s notes, cards, note types and decks and create new ones.</string>
-    <string name="kit_droid_refused">That was not allowed, so no card can go to AnkiDroid. Android no longer asks: allow it in the system\'s settings for Oretsuba, under Permissions.</string>
+    <string name="kit_droid_refused">That was not allowed, so no card can go to AnkiDroid. Android no longer asks: allow it in the system\'s settings for Oretsuba, under Permissions, Additional permissions.</string>
     <string name="kit_droid_lapis">AnkiDroid answers. The Lapis note type is there.</string>
     <string name="kit_droid_plain">AnkiDroid answers. There is no Lapis note type: choose a note type and what goes into its fields.</string>
     <string name="kit_droid_no_note_type">AnkiDroid has no note type %1$s. Choose one of its note types.</string>

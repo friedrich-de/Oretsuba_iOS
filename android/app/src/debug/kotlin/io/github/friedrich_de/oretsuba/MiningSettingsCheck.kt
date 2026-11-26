@@ -102,6 +102,8 @@ class MiningSettingsCheck : Instrumentation() {
     private fun picture(name: String) {
         val folder = shots ?: return
         try {
+            // A list that just closed is still fading away.
+            SystemClock.sleep(600)
             val image: Bitmap = uiAutomation.takeScreenshot() ?: return
             shot++
             File(folder, "%02d-%s.png".format(shot, name)).outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
