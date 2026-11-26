@@ -365,6 +365,10 @@ mode 0: `M=2R+1`, `p=min(M,t*M/D)`; p ≤ R: radius p on src1; else
 radius M−p on src2; radius 0 → plain copy.
 `FUN_0046a420`: horizontal box blur, width 2r+1, all 4 channels, edges clamped
 (edge pixel repeated), `out = (sum*k + 0x8000) >> 16`, `k = 65536/(2r+1)`.
+The right edge is clamped one column early: column w−1 is never read, column
+w−2 stands in for it and for everything beyond **[measured: with this rule
+all 31 frames of `hblur(500,0,32)` equal the original's; the routine itself
+was not read]**.
 mode 1: `M=255`, a=p; `r = R*a/127` (a<128) or `R*(255−a)/127`. r==0 → cross
 fade with a; else copy src1 and blend blur(src2, r) over it with
 `d + ((b−d)*w[a] >> 8)` (`FUN_0046a670`).
