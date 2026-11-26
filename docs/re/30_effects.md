@@ -196,6 +196,13 @@ Per frame:
    the window.
 5. `if (tr->done()) → S->finish(S+0x9d)`. The last frame (progress = 100%) is
    rendered before the finish.
+   So the VM run that follows in the same frame already sees `N_fd` = 0, and with
+   the flag set the pages are already swapped. A port that runs the VM before it
+   draws must end the transition right after drawing its last frame, not in
+   the next frame's drawing: else a mode 0 transition whose script does the
+   page action itself (the menus' `L+2a150`) shows the old page for one frame
+   more, and chained transitions get one still frame between their stages
+   **[measured: 1109 line 45, last picture at k 20, next N_fb at k 21]**.
 
 Progress convention: **progress 0 shows src1 (old), 100% shows src2 (new).**
 
@@ -358,6 +365,10 @@ mode 0: `M=2R+1`, `p=min(M,t*M/D)`; p ≤ R: radius p on src1; else
 radius M−p on src2; radius 0 → plain copy.
 `FUN_0046a420`: horizontal box blur, width 2r+1, all 4 channels, edges clamped
 (edge pixel repeated), `out = (sum*k + 0x8000) >> 16`, `k = 65536/(2r+1)`.
+The right edge is clamped one column early: column w−1 is never read, column
+w−2 stands in for it and for everything beyond **[measured: with this rule
+all 31 frames of `hblur(500,0,32)` equal the original's; the routine itself
+was not read]**.
 mode 1: `M=255`, a=p; `r = R*a/127` (a<128) or `R*(255−a)/127`. r==0 → cross
 fade with a; else copy src1 and blend blur(src2, r) over it with
 `d + ((b−d)*w[a] >> 8)` (`FUN_0046a670`).

@@ -186,6 +186,7 @@ public:
 private:
 	void register_natives();
 	void render_frame();
+	void end_finished_transitions();
 	bool run_vm();
 	int write_save_file(int bank, int slot);
 	bool autosave_in_scene();

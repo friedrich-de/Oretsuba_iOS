@@ -224,6 +224,7 @@ build/host/mining_test
 build/host/dict_test engine
 build/host/kit_test engine
 build/host/movie_flow /path/to/SET_UP
+build/host/menu_fade /path/to/SET_UP
 python3 tools/test_save.py /path/to/SET_UP
 python3 tools/test_quick_save.py /path/to/SET_UP
 python3 tools/test_history_toggle.py /path/to/SET_UP
