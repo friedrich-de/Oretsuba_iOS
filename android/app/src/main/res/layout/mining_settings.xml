@@ -119,6 +119,12 @@
                     style="@style/Note"
                     android:visibility="gone" />
 
+                <TextView
+                    android:id="@+id/anki_problem"
+                    style="@style/Note"
+                    android:textColor="@color/warning"
+                    android:visibility="gone" />
+
                 <Button
                     android:id="@+id/anki_forget_key"
                     style="@style/PlainButton"
@@ -213,6 +219,14 @@
                     android:textColor="@color/error"
                     android:visibility="gone" />
 
+                <!-- The dictionaries the kit offers, each with a button of its own. -->
+                <LinearLayout
+                    android:id="@+id/suggested"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone" />
+
                 <Button
                     android:id="@+id/import_file"
                     style="@style/PlainButton"
@@ -225,6 +239,12 @@
 
                 <TextView
                     android:id="@+id/import_error"
+                    style="@style/Note"
+                    android:textColor="@color/warning"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/dictionary_problem"
                     style="@style/Note"
                     android:textColor="@color/warning"
                     android:visibility="gone" />
@@ -273,6 +293,12 @@
                 <TextView
                     android:id="@+id/audio_check"
                     style="@style/Note"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/audio_problem"
+                    style="@style/Note"
+                    android:textColor="@color/warning"
                     android:visibility="gone" />
 
                 <Button

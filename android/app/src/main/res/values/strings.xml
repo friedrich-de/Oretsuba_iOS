@@ -96,6 +96,8 @@
     <string name="kit_move_up">Up</string>
     <string name="kit_move_down">Down</string>
     <string name="kit_remove_question">Remove the dictionary %1$s?</string>
+    <string name="kit_add">Add %1$s</string>
+    <string name="kit_add_note">%1$s, its newest release</string>
     <string name="kit_import_file">Import a file…</string>
     <string name="kit_import_address">Download from an address…</string>
     <string name="kit_download_title">Download a dictionary</string>
@@ -103,10 +105,12 @@
     <string name="kit_download_hint" translatable="false">https://…</string>
     <string name="kit_download">Download</string>
     <string name="kit_downloading">Downloading…</string>
+    <string name="kit_downloading_named">Downloading %1$s…</string>
     <string name="kit_importing">Importing…</string>
     <string name="kit_importing_named">Importing %1$s…</string>
     <string name="kit_copying">Reading %1$s…</string>
-    <string name="kit_unreadable">%1$s could not be read.</string>
+    <string name="kit_unreadable">%1$s could not be read: %2$s</string>
+    <string name="kit_unreadable_nothing">the place it lies in gave nothing.</string>
     <string name="kit_stop">Stop</string>
     <string name="kit_dictionaries_note">Dictionaries in Yomitan\'s format (zip files) are kept on this device. A word\'s meanings are shown in this order. Dictionaries of frequencies and of pitch accents count too.</string>
 

@@ -45,6 +45,9 @@ class MiningSettingsActivity : Activity() {
     private data class Installed(val id: String, val title: String, val terms: Int, val frequencies: Int,
                                  val pitches: Int, val enabled: Boolean)
 
+    /** A dictionary the kit offers to download with one tap. */
+    private data class Suggested(val name: String, val text: String, val url: String, val installed: Boolean)
+
     /** How asking a server went. */
     private class Check(val state: Int, val text: String = "")
 
@@ -67,13 +70,23 @@ class MiningSettingsActivity : Activity() {
     private var importProgress = 0.0
     private var importTitle = ""
     private var importError = ""
+    /** What is downloaded, by a name the player knows, when it is a suggested dictionary. */
+    private var importName = ""
+    private var suggested: List<Suggested> = emptyList()
     private var textSize = 100
     private var hideTags = false
     private var compact = false
 
     /** Why no card can be made as things are; empty when one can. */
     private var cardProblem = ""
+    /**
+     * Why the last thing asked did not happen. Each is shown where it was
+     * asked: at the top of a long screen it would be out of sight.
+     */
     private var problem: String? = null
+    private var ankiProblem: String? = null
+    private var dictionaryProblem: String? = null
+    private var audioProblem: String? = null
     /** Why this device cannot show the dictionary over the game; null when it can. */
     private var popupProblem: String? = null
     private var anki = Check(IDLE)
@@ -82,6 +95,7 @@ class MiningSettingsActivity : Activity() {
     private var copying: String? = null
     private var watching = false
     private var shownDictionaries: List<Installed>? = null
+    private var shownSuggested: List<Suggested>? = null
     private var fieldSpinners: List<Pair<String, Spinner>> = emptyList()
 
     private lateinit var problemText: TextView
@@ -91,6 +105,7 @@ class MiningSettingsActivity : Activity() {
     private lateinit var connectButton: Button
     private lateinit var ankiWorking: ProgressBar
     private lateinit var ankiCheck: TextView
+    private lateinit var ankiProblemText: TextView
     private lateinit var forgetKey: Button
     private lateinit var deckLabel: TextView
     private lateinit var deckSpinner: Spinner
@@ -106,10 +121,13 @@ class MiningSettingsActivity : Activity() {
     private lateinit var importFile: Button
     private lateinit var importAddress: Button
     private lateinit var importErrorText: TextView
+    private lateinit var suggestedRows: LinearLayout
+    private lateinit var dictionaryProblemText: TextView
     private lateinit var audioField: EditText
     private lateinit var audioButton: Button
     private lateinit var audioWorking: ProgressBar
     private lateinit var audioCheck: TextView
+    private lateinit var audioProblemText: TextView
     private lateinit var forgetAudio: Button
     private lateinit var textSizeSpinner: Spinner
     private lateinit var hideTagsSwitch: Switch
@@ -125,6 +143,7 @@ class MiningSettingsActivity : Activity() {
         connectButton = findViewById(R.id.anki_connect_button)
         ankiWorking = findViewById(R.id.anki_working)
         ankiCheck = findViewById(R.id.anki_check)
+        ankiProblemText = findViewById(R.id.anki_problem)
         forgetKey = findViewById(R.id.anki_forget_key)
         deckLabel = findViewById(R.id.deck_label)
         deckSpinner = findViewById(R.id.deck)
@@ -140,10 +159,13 @@ class MiningSettingsActivity : Activity() {
         importFile = findViewById(R.id.import_file)
         importAddress = findViewById(R.id.import_address)
         importErrorText = findViewById(R.id.import_error)
+        suggestedRows = findViewById(R.id.suggested)
+        dictionaryProblemText = findViewById(R.id.dictionary_problem)
         audioField = findViewById(R.id.audio_address)
         audioButton = findViewById(R.id.audio_check_button)
         audioWorking = findViewById(R.id.audio_working)
         audioCheck = findViewById(R.id.audio_check)
+        audioProblemText = findViewById(R.id.audio_problem)
         forgetAudio = findViewById(R.id.audio_forget)
         textSizeSpinner = findViewById(R.id.text_size)
         hideTagsSwitch = findViewById(R.id.hide_tags)
@@ -307,14 +329,22 @@ class MiningSettingsActivity : Activity() {
         importProgress = state.optDouble("progress", 0.0)
         importTitle = state.optString("title")
         importError = state.optString("error")
+        importName = state.optString("name")
+        val offered = answer.optJSONArray("suggested") ?: JSONArray()
+        suggested = (0 until offered.length()).mapNotNull { offered.optJSONObject(it) }.map {
+            Suggested(it.optString("name"), it.optString("text"), it.optString("url"), it.optBoolean("installed"))
+        }
     }
 
     private val importRunning: Boolean get() = importState == "downloading" || importState == "importing"
 
-    /** A call that answers with the settings as they are now. [after] runs once they are shown. */
-    private fun change(method: String, params: JSONObject, after: (() -> Unit)? = null) {
+    /**
+     * A call that answers with the settings as they are now. [after] runs once
+     * they are shown. With [forAnki] a refusal is shown with the Anki settings.
+     */
+    private fun change(method: String, params: JSONObject, forAnki: Boolean = false, after: (() -> Unit)? = null) {
         kit({ (MiningKit.call(method, params) as? JSONObject) to askCards() }) { answer, failure ->
-            problem = failure
+            if (forAnki) ankiProblem = failure else problem = failure
             answer?.first?.let { take(it) }
             answer?.second?.let { cardProblem = it }
             show()
@@ -346,9 +376,12 @@ class MiningSettingsActivity : Activity() {
         ankiWorking.visibility = if (anki.state == WORKING) View.VISIBLE else View.GONE
         showCheck(ankiCheck, anki)
         forgetKey.visibility = if (keySet) View.VISIBLE else View.GONE
-        choice(deckSpinner, deckLabel, decks, deck) { change("anki.choose", JSONObject().put("deck", it)) }
+        showLine(ankiProblemText, ankiProblem)
+        choice(deckSpinner, deckLabel, decks, deck) {
+            change("anki.choose", JSONObject().put("deck", it), forAnki = true)
+        }
         choice(noteTypeSpinner, noteTypeLabel, noteTypes, noteType) {
-            change("anki.choose", JSONObject().put("noteType", it))
+            change("anki.choose", JSONObject().put("noteType", it), forAnki = true)
         }
         fieldsButton.visibility = if (fields.isEmpty()) View.GONE else View.VISIBLE
         for ((field, spinner) in fieldSpinners) markRole(field, spinner, fields.firstOrNull { it.first == field }?.second)
@@ -364,6 +397,7 @@ class MiningSettingsActivity : Activity() {
         audioButton.isEnabled = audio.state != WORKING
         audioWorking.visibility = if (audio.state == WORKING) View.VISIBLE else View.GONE
         showCheck(audioCheck, audio)
+        showLine(audioProblemText, audioProblem)
         forgetAudio.visibility = if (audioSet) View.VISIBLE else View.GONE
 
         val sizes = if (textSize in TEXT_SIZES) TEXT_SIZES else (TEXT_SIZES + textSize).sorted()
@@ -371,6 +405,12 @@ class MiningSettingsActivity : Activity() {
              textSize.toString()) {
             change("settings.set", JSONObject().put("popup", JSONObject().put("textSize", it.toInt())))
         }
+    }
+
+    /** A line that is only there when it has something to say. */
+    private fun showLine(view: TextView, text: String?) {
+        view.text = text
+        view.visibility = if (text.isNullOrEmpty()) View.GONE else View.VISIBLE
     }
 
     private fun showCheck(view: TextView, check: Check) {
@@ -440,10 +480,15 @@ class MiningSettingsActivity : Activity() {
             decks = emptyList()
             noteTypes = emptyList()
             anki = Check(IDLE)
-            if (adopt) change("settings.set", JSONObject().put("anki", JSONObject().put("address", ""))) else show()
+            if (adopt) {
+                change("settings.set", JSONObject().put("anki", JSONObject().put("address", "")), forAnki = true)
+            } else {
+                show()
+            }
             return
         }
         anki = Check(WORKING)
+        ankiProblem = null
         show()
         val context = applicationContext
         kit({
@@ -462,7 +507,7 @@ class MiningSettingsActivity : Activity() {
             }
             val (answer, kept, cards) = result
             if (adopt && key.isNotEmpty()) keyField.setText("")
-            problem = if (kept) null else getString(R.string.kit_not_kept)
+            ankiProblem = if (kept) null else getString(R.string.kit_not_kept)
             decks = strings(answer.optJSONArray("decks"))
             noteTypes = strings(answer.optJSONArray("noteTypes"))
             answer.optJSONObject("settings")?.let { take(it, typed = adopt) }
@@ -479,7 +524,7 @@ class MiningSettingsActivity : Activity() {
     /** Forgets the AnkiConnect's key or the audio source's address, in the kit and on the device. */
     private fun forget(secret: String) {
         kit({ MiningKit.setSecret(secret, "") }) { _, failure ->
-            problem = failure
+            if (secret == Secrets.ANKI_KEY) ankiProblem = failure else audioProblem = failure
             if (failure == null && secret == Secrets.ANKI_KEY) {
                 keyField.setText("")
                 keySet = false
@@ -497,7 +542,7 @@ class MiningSettingsActivity : Activity() {
     private fun setTags() {
         val wanted = tagsField.text.toString().split(Regex("\\s+")).filter { it.isNotEmpty() }
         if (wanted.joinToString(" ") == keptTags) return
-        change("settings.set", JSONObject().put("anki", JSONObject().put("tags", JSONArray(wanted)))) {
+        change("settings.set", JSONObject().put("anki", JSONObject().put("tags", JSONArray(wanted))), forAnki = true) {
             if (!tagsField.hasFocus()) tagsField.setText(keptTags)
         }
     }
@@ -548,7 +593,7 @@ class MiningSettingsActivity : Activity() {
         val current = role ?: "none"
         val values = if (current in known) known else known + current
         fill(spinner, values, values.map { value -> roles.firstOrNull { it.role == value }?.label ?: value }, current) {
-            change("anki.setRole", JSONObject().put("field", field).put("role", it))
+            change("anki.setRole", JSONObject().put("field", field).put("role", it), forAnki = true)
         }
     }
 
@@ -589,6 +634,23 @@ class MiningSettingsActivity : Activity() {
         }
         val reading = copying
         val busy = importRunning || reading != null
+        // The dictionaries most people use, each one tap away.
+        val offered = suggested.filter { !it.installed }
+        if (offered != shownSuggested) {
+            shownSuggested = offered
+            suggestedRows.removeAllViews()
+            for (dictionary in offered) {
+                val add = Button(this, null, 0, R.style.PlainButton)
+                add.text = getString(R.string.kit_add, dictionary.name)
+                add.setOnClickListener { dictionaryCall("dict.download", JSONObject().put("url", dictionary.url)) }
+                suggestedRows.addView(add, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                                                                     ViewGroup.LayoutParams.WRAP_CONTENT))
+                val about = TextView(this, null, 0, R.style.Note)
+                about.text = getString(R.string.kit_add_note, dictionary.text)
+                suggestedRows.addView(about)
+            }
+        }
+        suggestedRows.visibility = if (busy || offered.isEmpty()) View.GONE else View.VISIBLE
         importStateText.visibility = if (busy) View.VISIBLE else View.GONE
         importProgressBar.visibility = if (busy) View.VISIBLE else View.GONE
         importStop.visibility = if (importRunning) View.VISIBLE else View.GONE
@@ -596,6 +658,7 @@ class MiningSettingsActivity : Activity() {
         importAddress.visibility = if (busy) View.GONE else View.VISIBLE
         importStateText.text = when {
             reading != null -> getString(R.string.kit_copying, reading)
+            importState == "downloading" && importName.isNotEmpty() -> getString(R.string.kit_downloading_named, importName)
             importState == "downloading" -> getString(R.string.kit_downloading)
             importTitle.isEmpty() -> getString(R.string.kit_importing)
             else -> getString(R.string.kit_importing_named, importTitle)
@@ -605,6 +668,7 @@ class MiningSettingsActivity : Activity() {
         val failed = importState == "failed" && importError.isNotEmpty() && !busy
         importErrorText.text = importError
         importErrorText.visibility = if (failed) View.VISIBLE else View.GONE
+        showLine(dictionaryProblemText, dictionaryProblem)
     }
 
     /** What a dictionary holds, in a few words. */
@@ -621,7 +685,7 @@ class MiningSettingsActivity : Activity() {
     /** A call that answers with the dictionaries and how far an import is. */
     private fun dictionaryCall(method: String, params: JSONObject? = null) {
         kit({ (MiningKit.call(method, params) as? JSONObject) to askCards() }) { answer, failure ->
-            problem = failure
+            dictionaryProblem = failure
             answer?.first?.let { takeDictionaries(it) }
             answer?.second?.let { cardProblem = it }
             if (failure != null) shownDictionaries = null
@@ -639,10 +703,17 @@ class MiningSettingsActivity : Activity() {
         val disabled = JSONArray(moved.filter { !it.enabled }.map { it.id })
         kit({ MiningKit.call("dict.arrange", JSONObject().put("order", order).put("disabled", disabled)) as? JSONObject }) {
                 answer, failure ->
-            problem = failure
+            dictionaryProblem = failure
             answer?.let { takeDictionaries(it) }
             show()
-            if (failure != null) dictionaryCall("dict.list")
+            // The list as it is, with what was refused still said beside it.
+            if (failure != null) {
+                kit({ MiningKit.call("dict.list") as? JSONObject }) { list, _ ->
+                    list?.let { takeDictionaries(it) }
+                    shownDictionaries = null
+                    show()
+                }
+            }
         }
     }
 
@@ -650,18 +721,21 @@ class MiningSettingsActivity : Activity() {
     private fun importPicked(file: Uri) {
         val name = nameOf(file)
         copying = name
+        dictionaryProblem = null
         show()
         val copy = File(cacheDir, COPY_PREFIX + UUID.randomUUID() + ".zip")
-        val unreadable = getString(R.string.kit_unreadable, name)
         kit({
-            val read = try {
-                contentResolver.openInputStream(file)?.use { from -> copy.outputStream().use { from.copyTo(it) } } != null
+            // Why the file could not be read, in the system's words; null when it was.
+            val refused = try {
+                val from = contentResolver.openInputStream(file)
+                from?.use { copy.outputStream().use { to -> from.copyTo(to) } }
+                if (from == null) getString(R.string.kit_unreadable_nothing) else null
             } catch (e: Exception) {
-                false
+                e.localizedMessage ?: e.javaClass.simpleName
             }
-            if (!read) {
+            if (refused != null) {
                 copy.delete()
-                throw KitError(unreadable, "internal")
+                throw KitError(getString(R.string.kit_unreadable, name, refused), "internal")
             }
             try {
                 MiningKit.call("dict.import", JSONObject().put("path", copy.path).put("name", name).put("remove", true))
@@ -672,7 +746,7 @@ class MiningSettingsActivity : Activity() {
             }
         }) { answer, failure ->
             copying = null
-            problem = failure
+            dictionaryProblem = failure
             answer?.let { takeDictionaries(it) }
             show()
             if (importRunning) watchImport()
@@ -741,6 +815,7 @@ class MiningSettingsActivity : Activity() {
         val typed = audioField.text.toString().trim()
         if (typed.isEmpty() && !audioSet) return
         audio = Check(WORKING)
+        audioProblem = null
         show()
         kit({
             val answer = MiningKit.call("audio.check", if (typed.isEmpty()) null else JSONObject().put("address", typed))
@@ -757,7 +832,7 @@ class MiningSettingsActivity : Activity() {
                     audioField.setText("")
                     audioSet = true
                 }
-                problem = if (kept) null else getString(R.string.kit_not_kept)
+                audioProblem = if (kept) null else getString(R.string.kit_not_kept)
                 audio = Check(GOOD, resources.getQuantityString(R.plurals.kit_audio_answers, count, count))
                 if (cards != null) cardProblem = cards
             }
