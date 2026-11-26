@@ -34,6 +34,10 @@ SPDX-License-Identifier: GPL-3.0-or-later
 Copyright (C) 2024-2026 Yomitan Authors; written as data by the Hoshidicts
 Japanese language pack. See mining/SOURCES.md inside the app.
 
+SQLite (in the Android app, for the dictionaries; Apple's systems bring their own)
+https://sqlite.org
+Its authors have dedicated SQLite to the public domain: https://sqlite.org/copyright.html
+
 pl_mpeg
 https://github.com/phoboslab/pl_mpeg
 SPDX-License-Identifier: MIT

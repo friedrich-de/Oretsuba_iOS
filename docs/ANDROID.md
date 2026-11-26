@@ -39,14 +39,38 @@ found the files, and "Check again" looks once more.
 
 ## Mining
 
-[MINING.md](MINING.md) describes mining. On Android, `mining.txt` gets into the game folder in one of two ways:
+[MINING.md](MINING.md) describes the two ways of mining. Both are in the Android app.
+
+### In the game
+
+In the launcher, under "Mining in the game", press **Set up…**. The screen asks for what
+[MINING.md](MINING.md#setting-it-up) describes: the address of your AnkiConnect, the dictionaries, the word audio,
+and the switch **Look words up in the game**. From then on a tap on a word of the text shows the dictionary, and
+the text box no longer reads on: tap the picture above it.
+
+* **Dictionaries** come in with **Import a file…**, which opens the system's file picker (have the zip file on the
+  device first), or with **Download from an address…**. The app keeps its own copy inside the app, not in the
+  folder above.
+* **The dictionary is shown by Android System WebView**, the part of Android that shows web pages inside apps and
+  that the Play Store keeps up to date. It has to be version 88 or newer. Where it is older, the launcher says so
+  and the game plays as it does without mining; update "Android System WebView" in the Play Store.
+* **Back** closes the dictionary. While it is open the game waits.
+* The AnkiConnect's key and the address of the audio source are kept on the device only, sealed with a key that
+  the device's Keystore holds.
+* Addresses follow the rule of MINING.md, and the app holds to it: `https://` for anything in the internet, plain
+  `http://` only for a server in your own network (an IP address, a name without dots, or one ending in `.local`).
+
+### Through a mining server
+
+`mining.txt` gets into the game folder in one of two ways:
 
 * Download `mining.txt` from your mining server's page on the device, press **Import mining.txt…** in the launcher
   and choose the file. **Remove mining.txt** turns mining off again.
 * Or copy the file with a cable into the folder above, next to the `SET_UP` folder or into it.
 
 The launcher then says where the lines go and whether the server takes the key. The rule for addresses is the one of
-MINING.md: `https://` for a server in the internet, plain `http://` only for a server in your own network.
+MINING.md: `https://` for a server in the internet, plain `http://` only for a server in your own network. The app
+does not send to an address that breaks it, and the launcher says so.
 
 ## Controls
 
@@ -56,6 +80,7 @@ are hidden: swipe in from the edge of the screen to see them.
 | Action | Touch | Mouse / keyboard |
 |---|---|---|
 | Advance / confirm | Tap | Left button, Enter |
+| Look a word up, with [mining in the game](#in-the-game) on | Tap the word | Click the word |
 | Menu / hide the text window | Tap with two fingers, or Back (the button or the gesture) | Right button |
 | History (text log) | Swipe down | Wheel up |
 | Scroll the other way | Swipe up | Wheel down |
@@ -101,9 +126,14 @@ adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
 The package holds the engine for `arm64-v8a` (phones and tablets) and `x86_64` (emulators, Chromebooks). The app uses
-no library besides Android itself. `ORE_BUILD_NUMBER` in the environment sets the build number (`versionCode`), which
-Android wants to grow from one update to the next, and the last part of the version (`versionName`, 0.1.N). The build
-on GitHub passes the number of its run, the same for the iPhone package; a build that was given none is 0.1.0.
+no library besides Android itself and SQLite, which the dictionaries of mining are kept in. Android has no SQLite for
+native code, so the build fetches SQLite's source from sqlite.org the first time, in the one file its makers publish
+(version 3.54.1), checks it against its hash and compiles it in. For a build without the network, put `sqlite3.c` and
+`sqlite3.h` of that version into `engine/third_party/sqlite`.
+
+`ORE_BUILD_NUMBER` in the environment sets the build number (`versionCode`), which Android wants to grow from one
+update to the next, and the last part of the version (`versionName`, 0.1.N). The build on GitHub passes the number of
+its run, the same for the iPhone package; a build that was given none is 0.1.0.
 
 ### The signing key
 
@@ -167,6 +197,8 @@ interface the Apple app uses, is compiled as plain C++ here and takes `AndroidPl
   the window. The picture, 800x600, is copied into the window's buffer of that size and the system scales it; it is
   copied only when the engine drew a new one.
 * `jni_bridge.*`: calls from the engine into Kotlin, from any thread. Texts cross as UTF-8 bytes.
+* `android_kit_host.cpp`: what the mining kit asks of a system ([MINING.md](MINING.md#the-mining-kit)): its HTTP
+  requests and the voice of a line as AAC, both done in Kotlin, and the way to AnkiDroid.
 
 `android/app/src/main/kotlin/`:
 
@@ -177,6 +209,13 @@ interface the Apple app uses, is compiled as plain C++ here and takes `AndroidPl
   keys the game knows from Windows.
 * `Glyphs`: one letter as a coverage bitmap, drawn by `android.graphics.Paint`.
 * `Http`: the mining sender's requests, through `HttpURLConnection`.
+* `MiningKit`: the mining kit for the app, one for its whole life, and `Secrets`, which seals the two secrets with a
+  key of the device's Keystore. `KitHttp` does the kit's requests (a dictionary is downloaded into a file),
+  `VoiceEncoder` turns a line's voice into AAC in an `.m4a` file with `MediaCodec`.
+* `MiningSettingsActivity`: the mining settings. It holds nothing itself: it asks the kit and shows what it answers.
+* `MiningPopup`: the dictionary over the game, a web view that shows the kit's page from the package
+  (`assets/mining`, which the build copies from `engine/resources/mining`). `GameActivity` asks the engine what a tap
+  on the picture hit before the tap becomes a click of the game.
 * `Native`: the list of the native functions.
 
 `tools/android/make_icons.py` makes the launcher icon's two layers from the project's icon, `icon-1024.png`.

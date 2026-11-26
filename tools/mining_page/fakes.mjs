@@ -29,8 +29,11 @@ async function bodyOf(request) {
   return Buffer.concat(parts);
 }
 
-/** An AnkiConnect with a Lapis note type and two decks. What it was asked and what it holds can be read. */
-export async function fakeAnki(port = 0) {
+/**
+ * An AnkiConnect with a Lapis note type and two decks. What it was asked and what it holds can be read.
+ * With a key it answers as the add-on does when its apiKey is set: nothing without that key.
+ */
+export async function fakeAnki(port = 0, key = '') {
   const anki = { actions: [], notes: [], media: new Map(), decks: ['Default', 'Mining'], models: { Basic: ['Front', 'Back'], Lapis: LAPIS_FIELDS } };
   let nextId = 1700000000000;
   const firstField = (note) => String(note.fields?.[anki.models[note.modelName]?.[0]] ?? '').trim();
@@ -54,7 +57,8 @@ export async function fakeAnki(port = 0) {
     anki.actions.push(action);
     let result = null;
     let error = null;
-    if (action === 'version') result = 6;
+    if (key !== '' && message.key !== key && action !== 'requestPermission') error = 'valid api key must be provided';
+    else if (action === 'version') result = 6;
     else if (action === 'deckNames') result = anki.decks;
     else if (action === 'modelNames') result = Object.keys(anki.models);
     else if (action === 'modelFieldNames') {

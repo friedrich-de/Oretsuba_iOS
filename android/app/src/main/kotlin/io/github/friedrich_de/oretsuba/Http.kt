@@ -14,6 +14,25 @@ import java.nio.ByteOrder
 internal object Http {
     private const val ANSWER_LIMIT = 4096
 
+    /** What a request hears that would go into the internet without https. */
+    const val PLAIN_REFUSED =
+        "An address in the internet has to begin with https://. Plain http:// is for a server in your own network."
+
+    private val IPV4 = Regex("\\d{1,3}(\\.\\d{1,3}){3}")
+
+    /**
+     * Whether a request may go to [address] as it is. These requests carry
+     * keys, so plain http is only for a server in the player's own network:
+     * one given by its IP address, by a name without dots or by one ending
+     * in .local. That is the line iOS draws for an app by itself; Android
+     * lets an app draw it.
+     */
+    fun mayGo(address: URL): Boolean {
+        if (!address.protocol.equals("http", ignoreCase = true)) return true
+        val host = address.host.lowercase().trimEnd('.')
+        return ':' in host || IPV4.matches(host) || '.' !in host || host.endsWith(".local")
+    }
+
     /**
      * The status as a little-endian 32-bit number, then the start of the
      * answer's body; or 0 and the reason no answer came. [headers] holds
@@ -22,7 +41,9 @@ internal object Http {
     fun send(method: String, url: String, headers: Array<ByteArray>, body: ByteArray?, timeoutMs: Int): ByteArray {
         var connection: HttpURLConnection? = null
         return try {
-            connection = URL(url).openConnection() as? HttpURLConnection
+            val address = URL(url)
+            if (!mayGo(address)) return pack(0, PLAIN_REFUSED.toByteArray())
+            connection = address.openConnection() as? HttpURLConnection
                 ?: return pack(0, "The address is not one of a web server.".toByteArray())
             val timeout = maxOf(1000, timeoutMs)
             connection.requestMethod = method
