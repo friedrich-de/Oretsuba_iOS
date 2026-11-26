@@ -32,10 +32,12 @@ class LauncherActivity : Activity() {
     private var miningState: Int? = null
     private var miningText = ""
     private var miningAsked = 0
+    private var kitAsked = 0
 
     private lateinit var filesStatus: TextView
     private lateinit var filesDetail: TextView
     private lateinit var miningStatus: TextView
+    private lateinit var kitSummary: TextView
     private lateinit var startButton: Button
     private lateinit var optionsCard: View
     private lateinit var keepPlace: Switch
@@ -55,6 +57,7 @@ class LauncherActivity : Activity() {
         filesStatus = findViewById(R.id.files_status)
         filesDetail = findViewById(R.id.files_detail)
         miningStatus = findViewById(R.id.mining_status)
+        kitSummary = findViewById(R.id.kit_summary)
         startButton = findViewById(R.id.start)
         optionsCard = findViewById(R.id.options_card)
         keepPlace = findViewById(R.id.keep_place)
@@ -84,6 +87,9 @@ class LauncherActivity : Activity() {
             startActivityForResult(pick, REQUEST_MINING)
         }
         miningRemoveButton.setOnClickListener { removeMining() }
+        findViewById<Button>(R.id.kit_set_up).setOnClickListener {
+            startActivity(Intent(this, MiningSettingsActivity::class.java))
+        }
         findViewById<Button>(R.id.check_again).setOnClickListener {
             errorMessage = null
             refresh()
@@ -134,6 +140,28 @@ class LauncherActivity : Activity() {
         gameFolder = paths.findGameFolder()
         show()
         checkMining()
+        checkKit()
+    }
+
+    /** Mining in the game (docs/MINING.md): how things stand, in a line. */
+    private fun checkKit() {
+        val asked = ++kitAsked
+        val cannot = if (!MiningKit.open(this)) MiningKit.problem
+                     else MiningPopup.problem()?.let { getString(R.string.kit_old_web_view, it) }
+        if (cannot != null) {
+            kitSummary.text = cannot
+            kitSummary.setTextColor(getColor(R.color.warning))
+            return
+        }
+        val context = applicationContext
+        MiningKit.work.execute {
+            val (line, on) = MiningSettingsActivity.summary(context)
+            main.post {
+                if (asked != kitAsked || isDestroyed) return@post
+                kitSummary.text = line.ifEmpty { getString(R.string.kit_note) }
+                kitSummary.setTextColor(getColor(if (on) R.color.good else R.color.secondary_text))
+            }
+        }
     }
 
     /** Asks the mining server named in mining.txt whether it takes the key; the answer can take some seconds. */

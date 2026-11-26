@@ -99,6 +99,25 @@
                     style="@style/Note" />
             </LinearLayout>
 
+            <!-- Mining in the game (docs/MINING.md): a dictionary over the text, and cards for Anki. -->
+            <LinearLayout style="@style/Card">
+
+                <TextView
+                    style="@style/CardTitle"
+                    android:text="@string/kit_title" />
+
+                <TextView
+                    android:id="@+id/kit_summary"
+                    style="@style/Body"
+                    android:text="@string/kit_note" />
+
+                <Button
+                    android:id="@+id/kit_set_up"
+                    style="@style/PlainButton"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/kit_set_up" />
+            </LinearLayout>
+
             <LinearLayout style="@style/Card">
 
                 <TextView

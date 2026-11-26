@@ -11,6 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.RenderProcessGoneDetail
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -165,6 +166,14 @@ internal class MiningPopup(private val activity: Activity, private val onClose: 
         // The page stays where it is: a link in a definition leads nowhere.
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
             request.url.host != HOST
+
+        /** A page that did not come cannot show a word: the popup closes, and the game goes on. */
+        override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+            if (!request.isForMainFrame) return
+            Log.w("Oretsuba", "mining: the popup's page did not load: ${error.description}")
+            ready = false
+            close()
+        }
 
         /** Without its page the popup would hold the game for good: it closes and the page is loaded again. */
         override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {

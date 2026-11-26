@@ -2,7 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Mining only (docs/MINING.md): lines go to the server named in mining.txt. -->
+    <!-- Mining only (docs/MINING.md): lines go to the server named in mining.txt, cards to the
+         AnkiConnect the player names, and dictionaries and a word's sound are fetched. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Cards straight into AnkiDroid on the same device (docs/MINING.md). The permission is
@@ -47,6 +48,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Mining in the game (docs/MINING.md): its settings, opened from the launcher. -->
+        <activity
+            android:name=".MiningSettingsActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <!-- The picture is 4:3: a phone holds it sideways. Where Android 16 lets a large
              screen turn anyway, the picture is fitted with black bars. -->

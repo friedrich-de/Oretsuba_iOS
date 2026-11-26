@@ -33,8 +33,9 @@ internal object MiningKit {
     @Volatile
     private var handle = 0L
 
+    /** The app itself, which outlives every screen. */
     @Volatile
-    private var app: Context? = null
+    private var appContext: Context? = null
 
     /** Why the kit could not be opened; empty when it is open or was not tried yet. */
     @Volatile
@@ -47,7 +48,7 @@ internal object MiningKit {
     val work: ExecutorService = Executors.newCachedThreadPool { task -> Thread(task, "mining-kit") }
 
     /** The app itself, once the kit was opened. */
-    val context: Context? get() = app
+    val context: Context? get() = appContext
 
     /** What native code takes for the kit (Native.setKit); 0 when it is not open. */
     val kit: Long get() = handle
@@ -60,7 +61,7 @@ internal object MiningKit {
     fun open(context: Context): Boolean {
         if (handle != 0L) return true
         val application = context.applicationContext
-        app = application
+        appContext = application
         val resources = try {
             resources(application)
         } catch (e: Exception) {
@@ -134,7 +135,7 @@ internal object MiningKit {
     fun setSecret(name: String, value: String): Boolean {
         val kitName = if (name == Secrets.ANKI_KEY) "ankiKey" else "audioAddress"
         call("secrets.set", JSONObject().put(kitName, value))
-        val context = app ?: return false
+        val context = appContext ?: return false
         return Secrets.set(context, name, value)
     }
 

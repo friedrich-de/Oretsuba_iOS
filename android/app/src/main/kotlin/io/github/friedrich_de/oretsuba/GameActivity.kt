@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.RectF
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -52,6 +53,10 @@ import kotlin.math.roundToInt
  *   game controller       A = left click, B = right click, right trigger = skip,
  *                         d-pad up / down = wheel
  *
+ * With mining in the game turned on (docs/MINING.md), a tap or a click on a
+ * word of the text shows the dictionary popup instead; until the popup is
+ * closed the game stands still and nothing here reaches it.
+ *
  * The engine runs on a thread of its own, once per display frame; everything
  * that touches it is handed to that thread.
  */
@@ -59,13 +64,19 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
     private val main = Handler(Looper.getMainLooper())
     private val engineThread = EngineThread()
     private lateinit var picture: PictureView
+    private lateinit var frame: FrameLayout
     private var session = 0L
+    /** The dictionary over the game; null when this device cannot show it. Read by the engine's thread too. */
+    @Volatile
+    private var popup: MiningPopup? = null
 
     // Owned by the engine's thread.
     private var booted = false
     private var visible = false
     private var framePosted = false
     private var stopped = false
+    /** The game stands still for the popup, from the tap that opens it until it has closed. */
+    private var reading = false
 
     // The game is played by touch, mouse, keys or a controller; a screen reader has nothing to press here.
     @SuppressLint("ClickableViewAccessibility")
@@ -95,7 +106,7 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
         picture.holder.setFixedSize(GAME_WIDTH, GAME_HEIGHT)
         picture.holder.setFormat(PixelFormat.RGBX_8888)
         picture.holder.addCallback(this)
-        val frame = FrameLayout(this)
+        frame = FrameLayout(this)
         frame.setBackgroundColor(Color.BLACK)
         frame.addView(picture, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
                                                         FrameLayout.LayoutParams.MATCH_PARENT, Gravity.CENTER))
@@ -104,6 +115,7 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
         frame.setOnTouchListener { _, event -> onTouch(event) }
         frame.setOnHoverListener { _, event -> onHover(event) }
         frame.setOnGenericMotionListener { _, event -> onGenericMotion(event) }
+        installMining()
         setContentView(frame)
         frame.requestFocus()
         hideSystemBars()
@@ -121,7 +133,13 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
         engineThread.handler.post {
             val failure = Native.boot(session, folder.toByteArray(), saves.toByteArray(),
                                       if (keepsPlace) GamePaths.AUTOSAVE_LINES else 0, keepsPlace)
-            if (failure == null) booted = true else leave(String(failure, Charsets.UTF_8))
+            if (failure == null) {
+                booted = true
+                // The engine learns of the kit: from now on it knows which character a tap hits.
+                if (popup != null) Native.setKit(session, MiningKit.kit)
+            } else {
+                leave(String(failure, Charsets.UTF_8))
+            }
         }
     }
 
@@ -158,6 +176,8 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
         super.onDestroy()
         if (session == 0L) return
         main.removeCallbacksAndMessages(null)
+        popup?.destroy()
+        popup = null
         picture.holder.removeCallback(this)
         Native.setSurface(session, null)
         val closing = session
@@ -302,6 +322,73 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
         }
     }
 
+    // ---------------------------------------------------------------- mining in the game
+
+    /**
+     * Opens the mining kit and lays the dictionary's page over the picture,
+     * when words are looked up and the device can show the page. The setting
+     * is the launcher's, so it cannot change while the game is on the screen.
+     */
+    private fun installMining() {
+        if (!MiningKit.open(this) || !MiningKit.direct || MiningPopup.problem() != null) return
+        val made = MiningPopup(this) { popupClosed() }
+        frame.addView(made.view, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
+                                                          FrameLayout.LayoutParams.MATCH_PARENT))
+        // The picture moved under the popup: its marks no longer lie on the words.
+        picture.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            if (left != oldLeft || top != oldTop || right != oldRight || bottom != oldBottom) closePopup()
+        }
+        popup = made
+    }
+
+    /**
+     * On the engine's thread: asks the engine what a tap at a place of the
+     * game's screen is. True when it is not the game's: it hit a word, which
+     * the popup now shows, or the text box beside the words, where nothing
+     * happens.
+     */
+    private fun lookUp(at: Pair<Int, Int>): Boolean {
+        if (popup == null) return false
+        if (reading) return true
+        val what = IntArray(1)
+        val tap = Native.textTap(session, at.first, at.second, what)
+        if (what[0] != 1 || tap == null) return what[0] != 0
+        // From here on the game stands still, before another frame runs.
+        reading = true
+        Native.setReadingHold(session, true)
+        val json = String(tap, Charsets.UTF_8)
+        main.post {
+            val shown = popup
+            if (shown == null || isFinishing) {
+                popupClosed()
+                return@post
+            }
+            main.removeCallbacks(hold)
+            holdingCtrl = false
+            shown.show(json, RectF(picture.left.toFloat(), picture.top.toFloat(),
+                                   picture.right.toFloat(), picture.bottom.toFloat()))
+        }
+        return true
+    }
+
+    /** Closes the dictionary when it is open. True when it was. */
+    private fun closePopup(): Boolean {
+        val open = popup?.takeIf { it.isOpen } ?: return false
+        open.close()
+        return true
+    }
+
+    /** The dictionary was closed, by the page or by the app: the game goes on. */
+    private fun popupClosed() {
+        // Keys and the controller are the game's again, not the page's.
+        frame.requestFocus()
+        if (session != 0L) hideSystemBars()
+        engineThread.handler.post {
+            reading = false
+            if (booted && !stopped) Native.setReadingHold(session, false)
+        }
+    }
+
     // ---------------------------------------------------------------- touch
 
     private var downX = 0f
@@ -376,13 +463,17 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
         }
     }
 
-    /** A tap is a press now and a release three frames later, so the game sees both. */
+    /**
+     * A tap is a press now and a release three frames later, so the game sees
+     * both. A tap on the text is not the game's when words are looked up.
+     */
     private fun click(button: Int, at: Pair<Int, Int>?) {
         engine {
+            if (button == LEFT && at != null && lookUp(at)) return@engine
             if (at != null) Native.mouseMove(session, at.first, at.second)
             Native.mouseButton(session, button, true)
+            engineThread.handler.postDelayed({ if (booted && !stopped) Native.mouseButton(session, button, false) }, 50)
         }
-        engineThread.handler.postDelayed({ if (booted && !stopped) Native.mouseButton(session, button, false) }, 50)
     }
 
     /**
@@ -391,6 +482,8 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
      * ends a film early on the PC, which a phone does not have.
      */
     private fun cancel(at: Pair<Int, Int>?) {
+        // What closes the game's own menus closes the dictionary first.
+        if (closePopup()) return
         engine {
             if (Native.moviePlaying(session)) {
                 Native.key(session, VK_ESCAPE, true)
@@ -412,6 +505,8 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
     // ---------------------------------------------------------------- mouse and trackpad: real presses
 
     private var mouseButton = -1
+    /** Owned by the engine's thread: the game was told of the press, so it is told of the release. */
+    private var mouseDown = false
 
     private fun onMouse(event: MotionEvent): Boolean {
         val (x, y) = gamePoint(event.x, event.y)
@@ -424,8 +519,13 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
                 }
                 mouseButton = button
                 engine {
-                    Native.mouseMove(session, x, y)
-                    Native.mouseButton(session, button, true)
+                    // A click on a word of the text is the popup's, and the game hears nothing of it,
+                    // not the release either.
+                    mouseDown = !(button == LEFT && lookUp(x to y))
+                    if (mouseDown) {
+                        Native.mouseMove(session, x, y)
+                        Native.mouseButton(session, button, true)
+                    }
                 }
             }
             MotionEvent.ACTION_MOVE -> engine { Native.mouseMove(session, x, y) }
@@ -434,8 +534,11 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
                 mouseButton = -1
                 if (button >= 0) {
                     engine {
-                        Native.mouseMove(session, x, y)
-                        Native.mouseButton(session, button, false)
+                        if (mouseDown) {
+                            mouseDown = false
+                            Native.mouseMove(session, x, y)
+                            Native.mouseButton(session, button, false)
+                        }
                     }
                 }
             }
@@ -483,6 +586,17 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
             KeyEvent.ACTION_DOWN -> true
             KeyEvent.ACTION_UP -> false
             else -> return super.dispatchKeyEvent(event)
+        }
+        if (popup?.isOpen == true) {
+            // Escape and a controller's B close the dictionary, as they close the game's own
+            // menus. No other key is the game's while it is open: the page may have them.
+            return when (event.keyCode) {
+                KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_BUTTON_B -> {
+                    if (down && event.repeatCount == 0) closePopup()
+                    true
+                }
+                else -> super.dispatchKeyEvent(event)
+            }
         }
         val pad = event.isFromSource(InputDevice.SOURCE_GAMEPAD) || event.isFromSource(InputDevice.SOURCE_JOYSTICK)
         when (event.keyCode) {

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One installed dictionary in the mining settings. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingBottom="6dp">
+
+    <Switch
+        android:id="@+id/enabled"
+        style="@style/SettingSwitch" />
+
+    <TextView
+        android:id="@+id/holds"
+        style="@style/Note" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/up"
+            style="@style/PlainButton"
+            android:text="@string/kit_move_up" />
+
+        <Button
+            android:id="@+id/down"
+            style="@style/PlainButton"
+            android:layout_marginStart="0dp"
+            android:text="@string/kit_move_down" />
+
+        <Button
+            android:id="@+id/remove"
+            style="@style/PlainButton"
+            android:layout_marginStart="0dp"
+            android:text="@string/remove"
+            android:textColor="@color/error" />
+    </LinearLayout>
+</LinearLayout>
