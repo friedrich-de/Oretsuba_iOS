@@ -52,6 +52,7 @@ jobs:
           build/host/anki_target_test engine
           build/host/dict_test engine
           build/host/kit_test engine
+          node --test engine/tests/page/*.test.mjs
           build/host/image_blend
           xcrun swiftc -module-cache-path build/swift-module-cache \
             app/Sources/App/FolderImport.swift app/Tests/FolderImportTests.swift \

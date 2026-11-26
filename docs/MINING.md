@@ -3,9 +3,10 @@
 This port has two ways of making Anki cards from what you read. They do not depend on each other and can both be
 on.
 
-* **In the game.** A tap on a word of the text shows a dictionary over the game, and a button in it makes the
-  card, with the sentence, its voice, a picture of the scene and the word's sound. You set it up in the launcher:
-  where your cards go, the dictionaries, and where the sound of a word comes from.
+* **In the game** (iPhone, iPad, Vision Pro and Mac; not yet in the Android app). A tap on a word of the text
+  shows a dictionary over the game, and a button in it makes the card, with the sentence, its voice, a picture
+  of the scene and the word's sound. You set it up in the launcher: where your cards go, the dictionaries, and
+  where the sound of a word comes from.
 * **Through a mining server.** The game sends every line you read to a
   [VN Mining Server](https://github.com/friedrich-de/VN-Mining-Server), whose page shows the lines as they come,
   looks words up and makes the cards, on the same phone or on any other device. It is on once a file named
