@@ -56,6 +56,7 @@ jobs:
           build/host/anki_target_test engine
           build/host/dict_test engine
           build/host/kit_test engine
+          build/host/app_sound_test
           node --test engine/tests/page/*.test.mjs
           build/host/image_blend
           build/host/wait_cursor

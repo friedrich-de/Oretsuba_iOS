@@ -19,7 +19,8 @@
 //                                  is on this page in CSS pixels (without it: fitted and centred).
 //   window.oreMining.hide()        the popup goes away without a word to the host
 //   window.oreMining.event(name, payload)   something the kit tells without having been asked
-// The page calls the host (host.js): the kit's methods, and popup.ready, popup.found, popup.close.
+// The page calls the host (host.js): the kit's methods, and popup.ready, popup.found, popup.close,
+// and popup.sound when the host plays the word's sound itself.
 import { hostOf, KitError } from './host.js';
 import { placeInSentence, wordOf } from './word.js';
 
@@ -67,6 +68,18 @@ let inLine = new WeakMap();
 const chosenSounds = new Map();
 let playing = null;
 let soundRound = 0;
+/**
+ * Whether the host plays a word's sound through the game's own sound (its answer to popup.ready said
+ * so). The page then only reads the sound file and hands the host its samples (popup.sound): a sound
+ * played by the web view itself took the iPhone's sound from the game, which stayed silent after it.
+ */
+let hostPlays = false;
+/** Whether the host was given a sound that may still be playing. */
+let hostSounding = false;
+/** The rate sounds are handed to the host at: the game's own, so that the host need not convert it. */
+const SOUND_RATE = 44100;
+/** No word takes longer; a longer sound file is cut there rather than carried whole. */
+const SOUND_SECONDS = 30;
 /** The word last handed to an Anki app, which answers later (card.added, card.unconfirmed). */
 let handedOver = null;
 /** The selection when the + button was pressed: a press on a button may take it away before its click is heard. */
@@ -198,6 +211,39 @@ function stopSound() {
     URL.revokeObjectURL(playing.url);
     playing = null;
   }
+  if (hostSounding) {
+    hostSounding = false;
+    void host.call('popup.sound', {}).catch(() => undefined);
+  }
+}
+
+/** Bytes as base64, in parts small enough to be spread into a call. */
+function base64Of(bytes) {
+  let text = '';
+  for (let at = 0; at < bytes.length; at += 0x8000) text += String.fromCharCode(...bytes.subarray(at, at + 0x8000));
+  return btoa(text);
+}
+
+/**
+ * A sound file as the host plays it: {rate, channels, frames, pcm}, pcm being 16-bit samples, one or two
+ * a frame, interleaved, in base64. An offline audio context only reads the file and plays nothing, so the
+ * web view never reaches for the device's sound.
+ */
+async function soundOf(bytes) {
+  let buffer;
+  try {
+    buffer = await new OfflineAudioContext(1, 1, SOUND_RATE).decodeAudioData(bytes);
+  } catch {
+    throw new Error('The sound from the audio source could not be read.');
+  }
+  const channels = Math.min(buffer.numberOfChannels, 2);
+  const frames = Math.min(buffer.length, buffer.sampleRate * SOUND_SECONDS);
+  const samples = new Int16Array(frames * channels);
+  for (let channel = 0; channel < channels; channel += 1) {
+    const data = buffer.getChannelData(channel);
+    for (let i = 0; i < frames; i += 1) samples[i * channels + channel] = Math.round(Math.max(-1, Math.min(1, data[i])) * 32767);
+  }
+  return { rate: buffer.sampleRate, channels, frames, pcm: base64Of(new Uint8Array(samples.buffer)) };
 }
 
 /** Plays how a word sounds, from the audio source: the sound chosen, if one was. */
@@ -212,6 +258,14 @@ async function playSound(result, chosen) {
     if (!answer.ok) throw new Error('The audio source has none.');
     const blob = await answer.blob();
     if (mine !== soundRound) return;
+    if (hostPlays) {
+      const sound = await soundOf(await blob.arrayBuffer());
+      if (mine !== soundRound) return;
+      // Marked first, so that a stop the page sends after it is not forgotten.
+      hostSounding = true;
+      await host.call('popup.sound', sound);
+      return;
+    }
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
     playing = { audio, url };
@@ -436,4 +490,9 @@ window.addEventListener('resize', () => {
   place(mark(shown.index, count));
 });
 
-void host.call('popup.ready').catch(() => undefined);
+host
+  .call('popup.ready')
+  .then((answer) => {
+    hostPlays = answer?.sound === true;
+  })
+  .catch(() => undefined);

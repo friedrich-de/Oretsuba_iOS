@@ -51,6 +51,12 @@ int ore_movie_playing(OreEngine *engine);
 /* Audio: interleaved stereo float at ore_audio_rate(). Called from the audio thread. */
 int ore_audio_rate(void);
 void ore_audio_mix(OreEngine *engine, float *out, int frames);
+/* A sound of the app's own, heard over the game's through the same output:
+   the word the dictionary popup plays (docs/MINING.md). `samples` are 16-bit,
+   `channels` (1 or 2) of them a frame, interleaved, at `rate` Hz. It replaces
+   the one before at full volume; 0 frames only stop it. Returns 1 when it
+   plays. Any thread. */
+int ore_play_app_sound(OreEngine *engine, const int16_t *samples, int frames, int channels, int rate);
 
 /* Modal dialogs and text entry requested by the game (called on the thread
    running ore_frame). kind: 0 = OK, 1 = Yes/No. The app answers later with

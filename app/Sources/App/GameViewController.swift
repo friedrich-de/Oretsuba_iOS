@@ -144,6 +144,9 @@ final class GameViewController: UIViewController, UIGestureRecognizerDelegate {
         ore_set_kit(engine, kit.kit)
         let popup = MiningPopup(kit: kit)
         popup.onClose = { [weak self] in self?.popupClosed() }
+        popup.onSound = { [weak self] samples, channels, rate in
+            self?.bridge?.playAppSound(samples, channels: channels, rate: rate) ?? false
+        }
         popup.webView.frame = view.bounds
         popup.webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(popup.webView)
@@ -171,6 +174,8 @@ final class GameViewController: UIViewController, UIGestureRecognizerDelegate {
     private func popupClosed() {
         // Keys go to the game again, not to the page.
         popup?.webView.endEditing(true)
+        // Whatever happened while it was open, the game is heard again.
+        bridge?.resumeAudio()
         guard let engine else { return }
         ore_set_reading_hold(engine, 0)
     }

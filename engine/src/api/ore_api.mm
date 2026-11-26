@@ -9,6 +9,7 @@
 #include <string>
 
 #include "api/ore_kit_internal.h"
+#include "audio/app_sound.h"
 #include "core/engine.h"
 #include "mining/anki_app.h"
 #include "mining/kit_tap.h"
@@ -34,6 +35,8 @@ ore::HttpSend host_http_sender() { return ore::apple_http_sender(); }
 struct OreEngine {
 	std::unique_ptr<HostPlatform> platform;
 	std::unique_ptr<ore::Engine> engine;
+	// Declared after the engine, so it ends first: it plays on the engine's mixer.
+	std::unique_ptr<ore::AppSound> app_sound;
 	std::string error;
 };
 
@@ -55,6 +58,7 @@ OreEngine *ore_create(const OreConfig *config, char *err, int err_len) {
 		}
 		return nullptr;
 	}
+	e->app_sound = std::make_unique<ore::AppSound>(e->engine->mixer);
 	return e.release();
 }
 
@@ -113,6 +117,14 @@ int ore_audio_rate(void) {
 
 void ore_audio_mix(OreEngine *e, float *out, int frames) {
 	e->engine->mixer.mix(out, frames);
+}
+
+int ore_play_app_sound(OreEngine *e, const int16_t *samples, int frames, int channels, int rate) {
+	if (frames <= 0) {
+		e->app_sound->stop();
+		return 0;
+	}
+	return e->app_sound->play(samples, size_t(frames), channels, rate) ? 1 : 0;
 }
 
 void ore_set_ui_callbacks(OreEngine *e, void *ctx, OreDialogCallback dialog, OreTextInputCallback text_input) {

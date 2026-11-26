@@ -287,7 +287,10 @@ gives it three things:
   takes the answer as the reply; and without either it sends `POST kit/call/<method>` to where it was loaded
   from. Methods that begin with `popup.` are the host's own: `popup.ready` (the page can show words),
   `popup.found {length}` (how many characters the found word takes) and `popup.close` (hide the page and end the
-  reading hold).
+  reading hold). A host that answers `popup.ready` with `{"sound": true}` plays the word's sound itself: the page
+  then reads the sound file with an `OfflineAudioContext`, which plays nothing, and calls `popup.sound {rate,
+  channels, frames, pcm}` with 16-bit samples (one or two a frame, interleaved, in base64) at 44,100 Hz, and
+  `popup.sound {}` to stop it. Other hosts get `null` there, and the page plays the sound with an `Audio` element.
 * The kit's files, fetched beside the page as `kit/data/<method>?p=<the parameters as JSON>`.
 * The tap: `window.oreMining.show(what)` with the JSON of `ore_text_tap` (`{line, text, index, rects, sentence,
   speaker, box, screen}`, places in the game's 800x600 pixels) and `picture: [x, y, width, height]` added, the
@@ -297,7 +300,11 @@ gives it three things:
 In the app that is `MiningPopup.swift`: the page comes from the scheme `ore-mining://page/`, whose handler serves
 the bundle's `mining/page` folder and `kit/data/`. `GameViewController` asks `ore_text_tap` before a tap or a
 primary click becomes a click of the game, holds the game while the popup is open and ends the hold when the
-page calls `popup.close`.
+page calls `popup.close`. The app plays the word's sound itself: `popup.sound` goes to `ore_play_app_sound`,
+which plays it on the game's own mixer (`audio/app_sound.h`), heard over the game through the one output. A sound
+the web view played took the iPhone's audio session from the game, and the game stayed silent after it.
+`EngineBridge` also starts the game's output again after an interruption (a call, Siri, an alarm), a change of
+the output (headphones) or a restart of the system's sound.
 
 In the Android app it is `MiningPopup.kt` and `GameActivity`, which do the same with Android's web view: the
 page comes from an address no server has (`https://mining.oretsuba.invalid/`), and every request to it is
@@ -311,6 +318,7 @@ answered from the package's `mining/page` folder or by the kit. A script served 
 make -C engine tests
 build/host/dict_test engine      # dictionaries, the import, Yomitan's inflection tests
 build/host/kit_test engine       # the kit against a made-up AnkiConnect and audio source
+build/host/app_sound_test        # the word's sound on the game's mixer, beside the game's own sound
 node --test engine/tests/page/*.test.mjs   # the page's own arithmetic
 
 # the popup's page in a browser (Playwright's Chromium), over a made-up line or, with SET_UP, over the game
