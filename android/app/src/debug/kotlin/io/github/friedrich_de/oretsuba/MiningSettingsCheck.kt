@@ -373,10 +373,25 @@ class MiningSettingsCheck : Instrumentation() {
         pressButton(activity, R.id.anki_fields)
         check(waitFor { find(withText(fields[0])) != null }, "the fields dialog opens")
         for ((index, role) in wanted.withIndex()) {
-            // Asked for anew each time: what the system told of the dialog before a choice no longer holds after it.
-            val list = dialogLists().getOrNull(index)
-            val picked = list != null && press(list) && pick(labels[role].orEmpty())
-            check(picked && waitFor { fieldRoles()[fields[index]] == role }, "${fields[index]} gets ${labels[role]}")
+            // Asked for anew each time: what the system told of the dialog before a choice no longer holds after it,
+            // and while the list chosen from last is still closing, the dialog's own lists may not be told at all.
+            // So: wait for the list, and should the press land in that moment, press it once more.
+            var done = false
+            for (attempt in 0 until 3) {
+                var list: AccessibilityNodeInfo? = null
+                waitFor(5) {
+                    list = dialogLists().getOrNull(index)
+                    list != null
+                }
+                val opened = list?.let { press(it) } == true
+                if (opened && pick(labels[role].orEmpty()) && waitFor(5) { fieldRoles()[fields[index]] == role }) {
+                    done = true
+                    break
+                }
+                if (attempt < 2) note("${fields[index]}: the list was not there or did not open; once more")
+                SystemClock.sleep(500)
+            }
+            check(done, "${fields[index]} gets ${labels[role]}")
         }
         picture("fields")
         check(pressWhenThere(10, withId("button1")), "the dialog is closed with Done")
