@@ -18,7 +18,8 @@ and on Android.
 
 > **Mining.** This fork makes Anki cards from what you read, in two ways. In the game (on Apple devices so far):
 > a tap on a word of the text shows a dictionary over the game, and a button makes the card, with the sentence,
-> its voice, a picture and the word's sound, through an AnkiConnect you name in the launcher. Or through a
+> its voice, a picture and the word's sound, through an AnkiConnect you name in the launcher or, on iPhone and
+> iPad, straight into the AnkiMobile app ([docs/ANKI_APPS.md](docs/ANKI_APPS.md)). Or through a
 > [VN Mining Server](https://github.com/friedrich-de/VN-Mining-Server), to which the game sends every line you
 > read once a `mining.txt` lies in the game folder. Both are off until you set them up:
 > see [docs/MINING.md](docs/MINING.md).

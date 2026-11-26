@@ -18,6 +18,7 @@ void say(char *err, int err_len, const std::string &text) {
 
 #if ORE_MINING_KIT
 
+#include "mining/anki_app_target.h"
 #include "mining/kit_host.h"
 
 namespace {
@@ -46,6 +47,8 @@ OreKit *ore_kit_open(const char *folder, const char *resources, char *err, int e
 		say(err, err_len, problem);
 		return nullptr;
 	}
+	// The Anki app on the same device as another place for cards, where there is one.
+	ore::add_anki_apps(*kit, ore::host_anki_app(), ore::kAppLinkScheme);
 	OreKit *out = new OreKit;
 	out->kit = std::move(kit);
 	return out;

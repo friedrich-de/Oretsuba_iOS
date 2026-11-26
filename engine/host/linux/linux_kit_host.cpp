@@ -335,6 +335,11 @@ VoiceEncoder host_voice_encoder() {
 	return nullptr;
 }
 
+// No Anki app beside a test host.
+AnkiAppHost host_anki_app() {
+	return AnkiAppHost();
+}
+
 }  // namespace ore
 
 #endif  // ORE_MINING_KIT

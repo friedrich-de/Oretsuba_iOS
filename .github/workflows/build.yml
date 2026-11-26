@@ -48,6 +48,8 @@ jobs:
         run: |
           make -C engine -j4 all tests
           build/host/mining_test
+          build/host/anki_app_test
+          build/host/anki_target_test engine
           build/host/dict_test engine
           build/host/kit_test engine
           node --test engine/tests/page/*.test.mjs

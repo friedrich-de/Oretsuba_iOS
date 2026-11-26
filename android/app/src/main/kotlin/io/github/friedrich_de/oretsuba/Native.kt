@@ -83,6 +83,11 @@ object Native {
     fun renderGlyph(codepoint: Int, serif: Boolean, bold: Boolean, size: Int): ByteArray? =
         Glyphs.render(codepoint, serif, bold, size)
 
+    /** One request to AnkiDroid on this device (AnkiDroid.kt); request and answer are JSON. */
+    @JvmStatic
+    fun ankiDroid(method: ByteArray, json: ByteArray): ByteArray =
+        AnkiDroid.request(String(method, Charsets.UTF_8), String(json, Charsets.UTF_8)).toByteArray(Charsets.UTF_8)
+
     @JvmStatic
     fun httpSend(method: ByteArray, url: ByteArray, headers: Array<ByteArray>, body: ByteArray?,
                  timeoutMs: Int): ByteArray =
