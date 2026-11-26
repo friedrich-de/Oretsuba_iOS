@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Debug builds only: checks the cards for AnkiDroid against the real AnkiDroid on a
+         device or an emulator (AnkiDroidCheck.kt says how to run it). -->
+    <instrumentation
+        android:name=".AnkiDroidCheck"
+        android:label="AnkiDroid check"
+        android:targetPackage="${applicationId}" />
+</manifest>

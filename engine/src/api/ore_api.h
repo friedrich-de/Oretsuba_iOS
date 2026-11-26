@@ -71,9 +71,20 @@ void ore_set_paused(OreEngine *engine, int paused);
    for the server for some seconds: call it away from the main thread. */
 int ore_mining_check(const char *data_dir, char *text, int text_len);
 
+/* Cards for the Anki app on the same device (docs/MINING.md). AnkiMobile
+   answers by opening this app with a link of the app's own scheme: pass every
+   link the app is opened with here (UTF-8). Any thread. */
+void ore_app_opened_with(const char *link);
+
 #if DEBUG
 /* Device smoke test; the host must supply an isolated temporary save directory. */
 int ore_debug_start_movie(OreEngine *engine, int index);
+/* Device smoke test of the cards for AnkiMobile, against the stand-in of
+   tools/apple/ankimobile-standin (run.sh there says how it is run): asks for the
+   lists and hands three cards over, and writes what happened, a line at a
+   time, to the file `report`; the last line begins with "done". `folder` is a
+   scratch folder. Returns at once. */
+void ore_debug_ankimobile_check(const char *folder, const char *report);
 #endif
 
 #ifdef __cplusplus

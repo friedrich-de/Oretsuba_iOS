@@ -6,6 +6,8 @@ import UniformTypeIdentifiers
 struct LauncherView: View {
     @EnvironmentObject private var model: AppModel
     @State private var showingImporter = false
+    @State private var showingMining = false
+    @StateObject private var mining = MiningSettingsModel()
     @AppStorage(GamePaths.keepsPlaceKey) private var keepsPlace = false
 
     var body: some View {
@@ -26,6 +28,7 @@ struct LauncherView: View {
                     .buttonStyle(.borderedProminent)
                     optionsCard
                 }
+                miningCard
                 importCard
                 if let error = model.errorMessage {
                     Text(error).foregroundStyle(.red)
@@ -38,6 +41,9 @@ struct LauncherView: View {
             .frame(maxWidth: .infinity)
         }
         .onAppear { model.refresh() }
+        .task { await mining.load() }
+        // The settings are long: they get the whole screen, not a sheet's part of it.
+        .fullScreenCover(isPresented: $showingMining) { MiningSettingsView(model: mining) }
         .fileImporter(isPresented: $showingImporter,
                       allowedContentTypes: [.folder]) { result in
             guard case .success(let url) = result else { return }
@@ -68,7 +74,7 @@ struct LauncherView: View {
                         Label(model.miningText, systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(Color.orange)
                     } else {
-                        Label("Mining is off (optional: put mining.txt next to SCRIPT.LPK)",
+                        Label("Sending lines to a mining server is off (optional: put mining.txt next to SCRIPT.LPK)",
                               systemImage: "antenna.radiowaves.left.and.right")
                             .foregroundStyle(.secondary)
                     }
@@ -84,6 +90,26 @@ struct LauncherView: View {
                 Toggle("Auto save and continue", isOn: $keepsPlace)
                 Text("Saves without a sound every \(GamePaths.autosaveLines) lines and when you leave the app, into a slot of its own that the game's menus do not show. The game then starts at that line, past the title menu. Your saves and quick saves stay as they are.")
                     .font(.footnote).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// Mining in the game (docs/MINING.md): a dictionary over the text, and cards for Anki.
+    private var miningCard: some View {
+        GroupBox("Mining in the game") {
+            VStack(alignment: .leading, spacing: 8) {
+                if mining.kit == nil {
+                    Label(MiningKit.problem, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                } else {
+                    Text("Look words up and make Anki cards without leaving the game: a tap on a word of the text shows a dictionary.")
+                        .foregroundStyle(.secondary)
+                    if !mining.summary.isEmpty {
+                        Label(mining.summary, systemImage: "character.book.closed")
+                            .foregroundStyle(mining.direct ? Color.green : Color.secondary)
+                    }
+                    Button("Set up…") { showingMining = true }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

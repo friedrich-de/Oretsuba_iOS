@@ -76,12 +76,23 @@
 	</array>
 	<key>UIPreferredDefaultInterfaceOrientation</key>
 	<string>UIInterfaceOrientationLandscapeRight</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>oretsuba</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Sends the lines you read to the mining server named in mining.txt, when that server is in your own network.</string>
+	<string>Sends the lines you read to the mining server named in mining.txt, and makes Anki cards through the AnkiConnect you set, when these are in your own network.</string>
 </dict>
 </plist>

@@ -11,7 +11,9 @@ CXX     := clang++
 CC      := clang
 CXXFLAGS:= -std=c++17 -O2 -g -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -Isrc -Ithird_party
 CFLAGS  := -O2 -g -w -Ithird_party
-FRAMEWORKS := -framework CoreText -framework CoreGraphics -framework CoreFoundation -framework Foundation
+# SQLite, zlib and AudioToolbox are for the mining kit (docs/MINING.md).
+FRAMEWORKS := -framework CoreText -framework CoreGraphics -framework CoreFoundation -framework Foundation \
+              -framework AudioToolbox -lsqlite3 -lz
 
 CPP_SRCS := $(shell find src -name '*.cpp')
 MM_SRCS  := $(shell find src -name '*.mm')
@@ -45,7 +47,7 @@ $(BUILD)/obj/host/stb_write.o: tests/stb_write_impl.cpp
 $(BUILD)/orehost: host/main.mm $(BUILD)/libore.a $(BUILD)/obj/host/stb_write.o
 	$(CXX) $(CXXFLAGS) -fobjc-arc host/main.mm $(BUILD)/obj/host/stb_write.o $(BUILD)/libore.a $(FRAMEWORKS) -o $@
 
-tests: $(BUILD)/elg_all $(BUILD)/vm_smoke $(BUILD)/movie_test $(BUILD)/movie_flow $(BUILD)/save_roundtrip $(BUILD)/quick_save $(BUILD)/command_input $(BUILD)/image_blend $(BUILD)/native_coverage $(BUILD)/mining_test $(BUILD)/menu_fade
+tests: $(BUILD)/elg_all $(BUILD)/vm_smoke $(BUILD)/movie_test $(BUILD)/movie_flow $(BUILD)/save_roundtrip $(BUILD)/quick_save $(BUILD)/command_input $(BUILD)/image_blend $(BUILD)/native_coverage $(BUILD)/mining_test $(BUILD)/menu_fade $(BUILD)/dict_test $(BUILD)/kit_test $(BUILD)/anki_app_test $(BUILD)/anki_target_test
 
 $(BUILD)/elg_all: tests/elg_all.cpp $(BUILD)/libore.a $(BUILD)/obj/host/stb_write.o
 	$(CXX) $(CXXFLAGS) $^ $(FRAMEWORKS) -o $@
@@ -78,6 +80,20 @@ $(BUILD)/mining_test: tests/mining_test.cpp $(BUILD)/libore.a
 	$(CXX) $(CXXFLAGS) $^ $(FRAMEWORKS) -o $@
 
 $(BUILD)/menu_fade: tests/menu_fade.cpp $(BUILD)/libore.a
+	$(CXX) $(CXXFLAGS) $^ $(FRAMEWORKS) -o $@
+
+# The mining kit (docs/MINING.md); both take the engine folder: build/host/kit_test engine
+$(BUILD)/dict_test: tests/dict_test.cpp $(BUILD)/libore.a
+	$(CXX) $(CXXFLAGS) -Itests $^ $(FRAMEWORKS) -o $@
+
+$(BUILD)/kit_test: tests/kit_test.cpp $(BUILD)/libore.a
+	$(CXX) $(CXXFLAGS) -Itests $^ $(FRAMEWORKS) -o $@
+
+# The Anki app on the same device (docs/MINING.md); the second takes the engine folder too.
+$(BUILD)/anki_app_test: tests/anki_app_test.cpp $(BUILD)/libore.a
+	$(CXX) $(CXXFLAGS) $^ $(FRAMEWORKS) -o $@
+
+$(BUILD)/anki_target_test: tests/anki_target_test.cpp $(BUILD)/libore.a
 	$(CXX) $(CXXFLAGS) $^ $(FRAMEWORKS) -o $@
 
 clean:

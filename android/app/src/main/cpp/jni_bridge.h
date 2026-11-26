@@ -32,5 +32,8 @@ bool jni_failed(JNIEnv *env, const char *what);
 bool jni_render_glyph(uint32_t codepoint, bool serif, bool bold, int size, GlyphBitmap &out);
 // Native.httpSend: one request through HttpURLConnection (the HttpSend of mining/mining.h).
 int jni_http_send(const HttpRequest &request, std::string &answer);
+// Native.ankiDroid: one request to AnkiDroid on this device, answered in JSON
+// (AnkiDroid.kt, the AnkiAppHost::ankidroid of mining/anki_app.h).
+std::string jni_ankidroid(const std::string &method, const std::string &json);
 
 }  // namespace ore

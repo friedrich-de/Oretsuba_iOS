@@ -16,9 +16,13 @@ and on Android.
 
 **This repository contains nothing of the game.** You have to buy the game yourself and use your own game files.
 
-> **Mining.** This fork can send every line you read, with its voice and a screenshot, to a
-> [VN Mining Server](https://github.com/friedrich-de/VN-Mining-Server), where you look words up and make
-> Anki cards from any device. It is off until a `mining.txt` lies in the game folder: see [docs/MINING.md](docs/MINING.md).
+> **Mining.** This fork makes Anki cards from what you read, in two ways. In the game (on Apple devices so far):
+> a tap on a word of the text shows a dictionary over the game, and a button makes the card, with the sentence,
+> its voice, a picture and the word's sound, through an AnkiConnect you name in the launcher or, on iPhone and
+> iPad, straight into the AnkiMobile app ([docs/ANKI_APPS.md](docs/ANKI_APPS.md)). Or through a
+> [VN Mining Server](https://github.com/friedrich-de/VN-Mining-Server), to which the game sends every line you
+> read once a `mining.txt` lies in the game folder. Both are off until you set them up:
+> see [docs/MINING.md](docs/MINING.md).
 
 ## Supported devices
 
@@ -133,6 +137,10 @@ History again closes the text log. The text advances when you look at it and pin
 
 Game controllers work too: A confirms, B opens the menu, the right trigger skips, up and down on the D-pad scroll.
 
+With [mining in the game](docs/MINING.md#mining-in-the-game) turned on, a tap or click on a word of the text shows
+the dictionary and the text box no longer advances the text: tap the picture above it, or use Enter, the wheel or a
+controller.
+
 ## Auto save and continue
 
 The launcher has a switch "Auto save and continue", off by default. With it on, the port saves without a sound every
@@ -191,6 +199,13 @@ cd android && ./gradlew :app:assembleRelease   # app/build/outputs/apk/release/a
 * Libraries: stb_vorbis, stb_image, stb_image_write (public domain / MIT), pl_mpeg (MIT), minimp3 (CC0). The LPK and
   ELG formats were read with the help of GARbro (MIT). Licences and attributions are in
   [ThirdPartyNotices.txt](app/Resources/ThirdPartyNotices.txt), which is also inside the apps.
+* Mining in the game uses two works under the GPL-3.0-or-later, which the Apple app carries as files of their own: the
+  dictionary popup of [Hachidori](https://github.com/bee-san/hachidori)
+  ([dictionary-popup](https://github.com/bee-san/dictionary-popup), in
+  `engine/resources/mining/page/vendor/dictionary-popup` with its licence and sources), and
+  [Yomitan](https://github.com/yomidevs/yomitan)'s rules for Japanese inflections as the Hoshidicts language pack
+  writes them (`engine/resources/mining/transforms.json`, see `SOURCES.md` beside it). Dictionaries are not part of
+  the app; you import your own.
 
 ## Checks and packages
 
@@ -202,6 +217,8 @@ build/host/command_input /path/to/SET_UP
 build/host/native_coverage /path/to/SET_UP
 build/host/image_blend
 build/host/mining_test
+build/host/dict_test engine
+build/host/kit_test engine
 build/host/movie_flow /path/to/SET_UP
 build/host/menu_fade /path/to/SET_UP
 python3 tools/test_save.py /path/to/SET_UP

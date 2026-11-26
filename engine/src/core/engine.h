@@ -26,6 +26,8 @@ class TextSystem;
 class UiSystem;
 class Font;
 class MiningTap;
+class MiningKit;
+class KitTap;
 class MessageWindow;
 
 struct EngineConfig {
@@ -161,6 +163,16 @@ public:
 	void game_command(int command);
 	// Sends the lines the player reads to a mining server; null without a mining.txt (docs/MINING.md).
 	std::unique_ptr<MiningTap> mining;
+	// Mining in the game (mining/kit_tap.h): a tap on the text looks a word up.
+	// The kit must outlive the engine; null takes it away.
+	void set_kit(MiningKit *kit);
+	std::unique_ptr<KitTap> kit_tap;
+	void kit_line_shown(MessageWindow &window);  // native 0x2fa began a line
+	void kit_window_gone(MessageWindow &window);
+	// While the popup is open the game stands still: its script and its
+	// animations wait and no input reaches it; what sounds goes on sounding.
+	void set_reading_hold(bool hold);
+	bool reading_hold() const { return reading_hold_; }
 
 	// Keeping the reader's place (autosave.cpp, docs/AUTOSAVE.md). Bank 12 is one
 	// no menu of the game shows: banks 0 to 9 are its pages, 10 and 11 its own rings.
@@ -194,6 +206,7 @@ private:
 	uint32_t opt_block_ = 0;
 	int64_t last_logic_ = -1;
 	bool paused_ = false;
+	bool reading_hold_ = false;
 	bool booted_ = false;
 };
 
