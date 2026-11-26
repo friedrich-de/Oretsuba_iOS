@@ -337,7 +337,10 @@ class MiningSettingsCheck : Instrumentation() {
         }
 
         // ---- AnkiDroid answers
-        check(waitFor(30) { entries(activity, R.id.deck).contains("Default") }, "AnkiDroid's decks are in the list: ${entries(activity, R.id.deck)}")
+        // The screen's own words first: an AnkiConnect that answered at the address kept from before may have a deck Default too.
+        val answers = listOf(context.getString(R.string.kit_droid_plain), context.getString(R.string.kit_droid_lapis))
+        check(waitFor(30) { text(activity, R.id.anki_check) in answers && entries(activity, R.id.deck).contains("Default") },
+              "AnkiDroid's decks are in the list: ${entries(activity, R.id.deck)}")
         val types = entries(activity, R.id.note_type)
         check(types.contains("Basic"), "and its note types: $types")
         val said = text(activity, R.id.anki_check)
@@ -473,10 +476,12 @@ class MiningSettingsCheck : Instrumentation() {
         check(choose(activity, R.id.anki_target_choice, "AnkiConnect") && waitFor { settings().optString("target") == "connect" },
               "AnkiConnect is chosen again")
         check(waitFor { shown(activity, R.id.anki_connect) && !shown(activity, R.id.anki_droid) }, "its address and key are back")
-        check(entries(activity, R.id.deck) == listOf("Default") && !onMain { activity.findViewById<Spinner>(R.id.deck).isEnabled },
-              "AnkiDroid's decks are out of the list, the chosen one stays named")
+        // Without an AnkiConnect the list holds the chosen deck alone; one that answers at a kept address fills it with its own.
+        check(!entries(activity, R.id.deck).contains(deck) && chosen(activity, R.id.deck) == "Default",
+              "AnkiDroid's decks are out of the list, the chosen one stays named: ${entries(activity, R.id.deck)}")
         picture("anki-connect-again")
-        check(choose(activity, R.id.anki_target_choice, "AnkiDroid") && waitFor(30) { entries(activity, R.id.deck).contains(deck) },
+        check(choose(activity, R.id.anki_target_choice, "AnkiDroid") &&
+                  waitFor(30) { text(activity, R.id.anki_check) in answers && entries(activity, R.id.deck).contains(deck) },
               "AnkiDroid again: its lists are there at once, and Android does not ask a second time")
         picture("ankidroid-again")
 

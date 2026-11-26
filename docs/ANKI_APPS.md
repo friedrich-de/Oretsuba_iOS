@@ -56,8 +56,8 @@ are marked, and a second card of the same word is refused. Pictures and sounds g
 and may share a field with text.
 
 * **If the answer to Android's question was no,** the settings say so and their button asks again. After a
-  second no Android stops asking; the button then opens the system's settings for Oretsuba, where the permission
-  can be given under Permissions, Additional permissions.
+  second no Android stops asking; the button then opens the system's settings for Oretsuba, where it is under
+  Permissions, Additional permissions, "Read and write to the AnkiDroid database": Allow.
 * **A deck or a note type added in AnkiDroid** is in the lists when you come back to the settings; **Fetch decks
   and note types again** asks at once.
 * **A deck or a note type that was chosen for an AnkiConnect** stays chosen when AnkiDroid has one of the same

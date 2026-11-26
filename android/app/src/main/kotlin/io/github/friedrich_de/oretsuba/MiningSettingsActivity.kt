@@ -610,6 +610,8 @@ class MiningSettingsActivity : Activity() {
 
     /** Cards go to another place from now on, which is asked for its decks and note types at once. */
     private fun chooseTarget(name: String) {
+        // The lists of the place before go at once, not when the kit has answered.
+        target = name
         decks = emptyList()
         noteTypes = emptyList()
         anki = Check(IDLE)
@@ -617,6 +619,7 @@ class MiningSettingsActivity : Activity() {
         droidRefused = false
         // An answer that is still on its way belongs to the place before.
         droidAsk++
+        show()
         change("settings.set", JSONObject().put("anki", JSONObject().put("target", name)), forAnki = true) {
             if (target == DROID && AnkiDroid.installed(this) && !AnkiDroid.allowed(this)) {
                 // Choosing AnkiDroid is the moment Android asks whether this app may reach it.
