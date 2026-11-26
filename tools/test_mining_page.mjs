@@ -33,8 +33,14 @@ function check(condition, what) {
   assert.ok(condition, what);
 }
 
-async function openStage(browser, harness, viewport) {
+async function openStage(browser, harness, viewport, { unreadableSounds = false } = {}) {
   const context = await browser.newContext({ viewport, hasTouch: false });
+  // A web view that cannot read sound files.
+  if (unreadableSounds) {
+    await context.addInitScript(() => {
+      BaseAudioContext.prototype.decodeAudioData = () => Promise.reject(new DOMException('no', 'EncodingError'));
+    });
+  }
   // Counts the sounds the page plays itself, in every frame.
   await context.addInitScript(() => {
     window.mediaPlays = 0;
@@ -266,6 +272,17 @@ async function hostSound(browser, harness, audio) {
 
   check(problems.length === 0, `the page reports no errors (${problems.join(' | ')})`);
   await context.close();
+
+  // A sound file the web view cannot read is played by the page after all.
+  const unreadable = await openStage(browser, harness, { width: 844, height: 390 }, { unreadableSounds: true });
+  await tapGame(unreadable.page, ...cell(10));
+  await unreadable.popup.locator('.dictionary-popup').getByText('食べる').first().waitFor();
+  const handedBefore = harness.events.filter((event) => event.name === 'popup.sound' && event.payload.bytes > 0).length;
+  await unreadable.popup.locator('.gsm-hoshidicts-audio-button').first().click();
+  await until('the page to play it', () => unreadable.page.frame({ name: 'popup' })?.evaluate(() => window.mediaPlays > 0));
+  check(harness.events.filter((event) => event.name === 'popup.sound' && event.payload.bytes > 0).length === handedBefore,
+    'a sound the web view cannot read is played by the page itself');
+  await unreadable.context.close();
 }
 
 const scratch = mkdtempSync(join(tmpdir(), 'ore-mining-page-'));

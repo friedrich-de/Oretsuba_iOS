@@ -227,14 +227,14 @@ function base64Of(bytes) {
 /**
  * A sound file as the host plays it: {rate, channels, frames, pcm}, pcm being 16-bit samples, one or two
  * a frame, interleaved, in base64. An offline audio context only reads the file and plays nothing, so the
- * web view never reaches for the device's sound.
+ * web view never reaches for the device's sound. Null when the web view cannot read the file.
  */
 async function soundOf(bytes) {
   let buffer;
   try {
     buffer = await new OfflineAudioContext(1, 1, SOUND_RATE).decodeAudioData(bytes);
   } catch {
-    throw new Error('The sound from the audio source could not be read.');
+    return null;
   }
   const channels = Math.min(buffer.numberOfChannels, 2);
   const frames = Math.min(buffer.length, buffer.sampleRate * SOUND_SECONDS);
@@ -261,10 +261,14 @@ async function playSound(result, chosen) {
     if (hostPlays) {
       const sound = await soundOf(await blob.arrayBuffer());
       if (mine !== soundRound) return;
-      // Marked first, so that a stop the page sends after it is not forgotten.
-      hostSounding = true;
-      await host.call('popup.sound', sound);
-      return;
+      if (sound !== null) {
+        // Marked first, so that a stop the page sends after it is not forgotten.
+        hostSounding = true;
+        await host.call('popup.sound', sound);
+        return;
+      }
+      // A file the web view cannot read this way is still played by the page: the word is heard,
+      // and the host gives the game its sound back when the popup closes.
     }
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);

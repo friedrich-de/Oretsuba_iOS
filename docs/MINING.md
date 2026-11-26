@@ -290,7 +290,8 @@ gives it three things:
   reading hold). A host that answers `popup.ready` with `{"sound": true}` plays the word's sound itself: the page
   then reads the sound file with an `OfflineAudioContext`, which plays nothing, and calls `popup.sound {rate,
   channels, frames, pcm}` with 16-bit samples (one or two a frame, interleaved, in base64) at 44,100 Hz, and
-  `popup.sound {}` to stop it. Other hosts get `null` there, and the page plays the sound with an `Audio` element.
+  `popup.sound {}` to stop it. Other hosts get `null` there, and the page plays the sound with an `Audio` element,
+as it also does with a file the web view cannot read that way.
 * The kit's files, fetched beside the page as `kit/data/<method>?p=<the parameters as JSON>`.
 * The tap: `window.oreMining.show(what)` with the JSON of `ore_text_tap` (`{line, text, index, rects, sentence,
   speaker, box, screen}`, places in the game's 800x600 pixels) and `picture: [x, y, width, height]` added, the
