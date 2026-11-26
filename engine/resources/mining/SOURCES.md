@@ -9,6 +9,17 @@ gives its place to `ore_kit_open`.
   `furigana.js` and `glossary-html.js` follow what [VN Mining Server](https://github.com/friedrich-de/VN-Mining-Server)'s
   page does, so that both make the same cards). `page/vendor/dictionary-popup/` is Hachidori's dictionary popup,
   GPL-3.0-or-later; its own `SOURCES.md` says where it comes from and what was changed.
+- `LICENSE`: the text of the GNU General Public License, version 3.
+
+# Licence
+
+Everything in this folder is under the GNU General Public License, version 3 or later (GPL-3.0-or-later); `LICENSE`
+is its text. The page's own files say so at their head. `transforms.json` is data and cannot carry such a head: this
+note stands for it. `page/vendor/dictionary-popup/` has its own copy of the licence and names its authors; its icons
+are under the MIT licence (`page/vendor/dictionary-popup/hachidori/LICENSE.fluent-icons`).
+
+This statement is about this folder (and `engine/tests/japanese` and `engine/tests/page`, see below), not about the
+rest of the repository.
 
 # Where the Japanese rules come from
 
@@ -22,7 +33,8 @@ gives its place to `ore_kit_open`.
 - The transforms marked `"source": "own"` (such as `-ください` and `-ながら`) were written for Hoshidicts,
   GPL-3.0-or-later.
 
-The tests in `engine/tests/japanese/` come from the same pack: `yomitan.tsv` is Yomitan's Japanese conjugation test
+The page's own tests in `engine/tests/page/` are under the same licence as the page. The tests in
+`engine/tests/japanese/` come from the same pack as the rules: `yomitan.tsv` is Yomitan's Japanese conjugation test
 corpus (GPL-3.0-or-later, Copyright (C) 2023-2026 Yomitan Authors and 2020-2022 Yomichan Authors) and `cases.tsv` was
 written for Hoshidicts (GPL-3.0-or-later).
 

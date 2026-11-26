@@ -213,6 +213,10 @@ for the popup in `engine/resources/mining/page`, and a thin layer of each system
 between them. The Swift side (`app/Sources/App/Mining*.swift`) holds no dictionary and no Anki logic, so another
 system needs only that layer.
 
+The folder `engine/resources/mining` (the page and the inflection rules) is under the GNU General Public License,
+version 3 or later, as the works it is built on are; its `SOURCES.md` and `LICENSE` say more. An app packs the folder
+whole, so that the licence's text goes with the page.
+
 * `dict/`: dictionaries. `yomitan_import` reads a Yomitan zip into an SQLite file, `dictionary_db` reads it,
   `deinflector` undoes inflections with Yomitan's rules (`engine/resources/mining/transforms.json`), `lookup`
   finds the words that start a text, and `library` keeps the installed dictionaries, their order and one
