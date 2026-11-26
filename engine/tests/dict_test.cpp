@@ -510,6 +510,96 @@ void test_import() {
 	check(DictionaryReader::open(scratch + "/other.db") == nullptr, "a file that is no dictionary file is not opened");
 }
 
+// ---------------------------------------------------------------- zips as odd packers write them
+
+// Two things real dictionaries do that a careful packer does not: names in Shift-JIS with the UTF-8 name beside
+// them in an extra field (a JA-JA dictionary's label pictures, packed on a Japanese Windows), and checksums the
+// files do not have (a pitch accent dictionary's banks).
+void test_odd_zips() {
+	using testing_zip::File;
+	auto file = [](const std::string &name, const std::string &data) {
+		File one;
+		one.name = name, one.data = data;
+		return one;
+	};
+	// 漢 and 可能 in Shift-JIS; the second byte of 能 is a backslash.
+	const std::string kan = "gaiji/\x8a\xbf-default.svg", kanou = "gaiji/\x89\xc2\x94\x5c-default.svg";
+	const std::string bun = "gaiji/\x95\xb6.svg", ha = "gaiji/\x94\x68.svg";
+	const std::string svg = "<svg xmlns=\"http://www.w3.org/2000/svg\"/>";
+	std::string pitch_bank = R"([["昨日","pitch",{"reading":"きのう","pitches":[{"position":2}]}],)"
+	                         R"(["丈夫","pitch",{"reading":"じょうぶ","pitches":[{"position":0}]}]])";
+
+	std::vector<File> files;
+	files.push_back(file("index.json", R"({"title":"Odd","revision":"1","format":3})"));
+	files.push_back(file("term_bank_1.json", "[" + term("丈夫", "じょうぶ", "", "", 0, R"(["sturdy"])") + "]"));
+	files.push_back(file("term_meta_bank_1.json", pitch_bank));  // deflated
+	files.back().wrong_checksum = true;
+	files.push_back(file("img/stored.png", "PNG stored"));  // stored
+	files.back().wrong_checksum = true;
+	files.push_back(file("gaiji/漢-default.svg", svg + "<!--1-->"));
+	files.back().own_name = kan;
+	files.push_back(file("gaiji/可能-default.svg", svg + "<!--2-->"));
+	files.back().own_name = kanou;
+	files.push_back(file("gaiji/文.svg", svg + "<!--3-->"));
+	files.back().own_name = bun, files.back().unicode_field = false;
+	files.push_back(file("gaiji/派.svg", svg + "<!--4-->"));
+	files.back().own_name = ha, files.back().renamed = true;
+	std::string path = scratch + "/odd.zip";
+	testing_zip::write_files(path, files);
+
+	auto zip = ZipReader::open(path);
+	check(zip != nullptr && zip->entries().size() == files.size(), "a zip with extra fields opens");
+	if (!zip || zip->entries().size() != files.size()) return;
+	const auto &entries = zip->entries();
+	check(entries[4].name == "gaiji/漢-default.svg" && entries[5].name == "gaiji/可能-default.svg",
+	      "a name in the packer's own encoding is read from the Unicode field beside it");
+	check(entries[6].name == bun, "without the field the name stays as the zip writes it");
+	check(entries[7].name == ha, "a field made for another name is left aside");
+	std::string data, problem;
+	check(zip->read(entries[2], 1 << 20, data, problem) && data == pitch_bank && problem.empty(),
+	      "a packed file that unpacks whole is read though its checksum is wrong");
+	check(zip->read(entries[3], 1 << 20, data, problem) && data == "PNG stored", "and so is a stored one");
+	check(zip->wrong_checksums() == 2 && zip->read(entries[0], 1 << 20, data, problem) && zip->wrong_checksums() == 2,
+	      "the wrong checksums are counted");
+
+	std::string database = scratch + "/odd.db";
+	DictionaryInfo info;
+	try {
+		info = import_yomitan(path, database, "odd", nullptr, kGo);
+	} catch (const std::exception &error) {
+		check(false, std::string("a dictionary with wrong checksums is imported: ") + error.what());
+		return;
+	}
+	check(info.terms == 1 && info.pitches == 2 && info.media == 5, "a dictionary with wrong checksums is imported whole");
+	auto reader = DictionaryReader::open(database);
+	std::string picture;
+	check(reader && reader->media("gaiji/漢-default.svg", picture) && picture == svg + "<!--1-->" &&
+	          reader->media("gaiji/可能-default.svg", picture) && picture == svg + "<!--2-->",
+	      "its pictures are found by the names its meanings ask for");
+	check(reader && !reader->media(kan, picture) && reader->media("img/stored.png", picture) && picture == "PNG stored",
+	      "and not by the packer's bytes");
+
+	// What no wrong checksum excuses: a file that does not unpack to its end, or to another size than stated.
+	std::string bytes = read_file(path);
+	size_t at = bytes.find("term_meta_bank_1.json");
+	check(at != std::string::npos, "the test finds the bank in its zip");
+	if (at == std::string::npos) return;
+	std::string cut = bytes;
+	for (size_t i = 0; i < 12; ++i) cut[at + 21 + 8 + i] = char(0xff);  // in the packed bytes, past their first block header
+	{
+		std::ofstream f(scratch + "/cut.zip", std::ios::binary);
+		f.write(cut.data(), std::streamsize(cut.size()));
+	}
+	std::string said;
+	try {
+		import_yomitan(scratch + "/cut.zip", scratch + "/cut.db", "cut", nullptr, kGo);
+	} catch (const DictError &error) {
+		said = error.what();
+	}
+	check_eq(said, "term_meta_bank_1.json in that dictionary is damaged.", "a file that does not unpack is damaged, as before");
+	check(!exists(scratch + "/cut.db"), "and leaves no file");
+}
+
 // ---------------------------------------------------------------- looking up
 
 std::shared_ptr<const Deinflector> rules;
@@ -804,6 +894,7 @@ int main(int argc, char **argv) {
 	rules = Deinflector::load(read_file(root + "/resources/mining/transforms.json"), problem);
 	if (rules) {
 		test_import();
+		test_odd_zips();
 		test_lookup();
 		test_library();
 	}
