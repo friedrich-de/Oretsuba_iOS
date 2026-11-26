@@ -1,11 +1,12 @@
-# Builds the unsigned iPhone and iPad package from the code of the commit and
-# runs the checks that need no game files. A build of main is published as
-# the release "Latest build", so the package there always comes from the code
-# in this repository. The release also carries source.json, the source file
-# that sideloading apps read to offer that package.
+# Builds the packages from the code of the commit and runs the checks that
+# need no game files: the unsigned iPhone and iPad package and the Android
+# package. A build of main is published as the release "Latest build", so the
+# packages there always come from the code in this repository. The release
+# also carries source.json, the source file that sideloading apps on iOS read
+# to offer the iPhone package.
 #
-# The job runs on GitHub's standard macOS runner, which costs nothing for a
-# public repository.
+# The jobs run on GitHub's standard macOS and Linux runners, which cost
+# nothing for a public repository.
 name: Build
 
 on:
@@ -14,13 +15,17 @@ on:
     paths:
       - "app/**"
       - "engine/**"
+      - "android/**"
       - "tools/apple/**"
+      - "tools/android/**"
       - ".github/workflows/build.yml"
   pull_request:
     paths:
       - "app/**"
       - "engine/**"
+      - "android/**"
       - "tools/apple/**"
+      - "tools/android/**"
       - ".github/workflows/build.yml"
   workflow_dispatch:
 
@@ -33,8 +38,6 @@ jobs:
     name: iPhone and iPad package
     runs-on: macos-26
     timeout-minutes: 45
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -64,6 +67,7 @@ jobs:
           python3 tools/apple/source_json.py --ipa build/packages/Oretsuba-iOS-unsigned.ipa \
             --repository "$GITHUB_REPOSITORY" --commit "$GITHUB_SHA" --out build/packages/source.json
           cat build/packages/source.json
+          xcodebuild -version | tr '\n' ' ' > build/packages/built-with.txt
 
       - name: Keep the package with the run
         uses: actions/upload-artifact@v4
@@ -73,34 +77,129 @@ jobs:
             build/packages/Oretsuba-iOS-unsigned.ipa
             build/packages/Oretsuba-iOS-unsigned.ipa.sha256
             build/packages/source.json
+            build/packages/built-with.txt
           if-no-files-found: error
 
-      - name: Publish as the latest build
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+  android:
+    name: Android package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      signed: ${{ steps.key.outputs.signed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Checks without game files
+        run: |
+          mkdir -p build
+          python3 tools/android/make_cp932.py build/cp932_table.inc
+          cmp build/cp932_table.inc android/app/src/main/cpp/cp932_table.inc
+          g++ -std=c++17 -Wall -Wextra -Iandroid/app/src/main/cpp android/tests/cp932_test.cpp \
+            android/app/src/main/cpp/cp932.cpp -o build/cp932_test
+          build/cp932_test
+
+      # Android installs an update only over a package signed with the same key, so
+      # published builds are signed with one key, kept in the repository's secrets
+      # (docs/ANDROID.md). Where the secrets are not to be had (a pull request from
+      # a fork), the build is signed with a key made on the spot and not published.
+      - name: Signing key
+        id: key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+            echo "ORE_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No signing key (secret ANDROID_KEYSTORE_BASE64): this package is signed with a key made on the spot and is not published."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build the package
+        working-directory: android
+        env:
+          ORE_BUILD_NUMBER: ${{ github.run_number }}
+          ORE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ORE_KEY_ALIAS: oretsuba
+          ORE_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: ./gradlew --no-daemon :app:lintRelease :app:assembleRelease
+
+      - name: Name the package
+        run: |
+          mkdir -p build/packages
+          cp android/app/build/outputs/apk/release/app-release.apk build/packages/Oretsuba-Android.apk
+          (cd build/packages && sha256sum Oretsuba-Android.apk > Oretsuba-Android.apk.sha256)
+          tools="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)"
+          "$tools/aapt2" dump badging build/packages/Oretsuba-Android.apk | head -n 4
+          "$tools/apksigner" verify --print-certs build/packages/Oretsuba-Android.apk | grep -i "SHA-256" \
+            | tee build/packages/signed-with.txt
+          rm -f "$RUNNER_TEMP/release.jks"
+
+      - name: Keep the package with the run
+        uses: actions/upload-artifact@v4
+        with:
+          name: Oretsuba-Android-${{ github.sha }}
+          path: |
+            build/packages/Oretsuba-Android.apk
+            build/packages/Oretsuba-Android.apk.sha256
+            build/packages/signed-with.txt
+          if-no-files-found: error
+
+  publish:
+    name: Publish as the latest build
+    needs: [ios, android]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: packages
+          merge-multiple: true
+
+      - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ANDROID_SIGNED: ${{ needs.android.outputs.signed }}
         run: |
+          cd packages
           short="${GITHUB_SHA:0:7}"
-          sum="$(cut -d ' ' -f 1 build/packages/Oretsuba-iOS-unsigned.ipa.sha256)"
+          files="Oretsuba-iOS-unsigned.ipa Oretsuba-iOS-unsigned.ipa.sha256 source.json"
           {
-            echo "Built by GitHub Actions from commit [$short]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA) with $(xcodebuild -version | tr '\n' ' ')."
+            echo "Built by GitHub Actions from commit [$short]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA). The packages contain nothing of the game."
             echo
-            echo "The package is unsigned. Sign it with your own Apple account, for example with a sideloading tool: see the README. It contains nothing of the game."
+            echo "**iPhone and iPad:** \`Oretsuba-iOS-unsigned.ipa\`, built with $(cat built-with.txt). The package is unsigned. Sign it with your own Apple account, for example with a sideloading tool: see the README."
             echo
-            echo "SHA-256 of \`Oretsuba-iOS-unsigned.ipa\`: \`$sum\`"
+            echo "SHA-256: \`$(cut -d ' ' -f 1 Oretsuba-iOS-unsigned.ipa.sha256)\`"
             echo
             echo "Source for Feather, AltStore and SideStore, which always offers this newest build: \`$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/latest/download/source.json\`"
             echo
+            if [ "$ANDROID_SIGNED" = "true" ]; then
+              files="$files Oretsuba-Android.apk Oretsuba-Android.apk.sha256"
+              echo "**Android:** \`Oretsuba-Android.apk\`, for Android 8 and later. Install it over an earlier build to update; your game files and saves stay. See the README."
+              echo
+              echo "SHA-256: \`$(cut -d ' ' -f 1 Oretsuba-Android.apk.sha256)\`"
+            else
+              echo "**Android:** not published with this build, because the signing key was not to be had."
+            fi
+            echo
             echo "[The run that built it]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
-          } > build/release-notes.md
+          } > release-notes.md
           if gh release view latest-build > /dev/null 2>&1; then
             gh release delete latest-build --yes --cleanup-tag
           fi
-          gh release create latest-build \
-            build/packages/Oretsuba-iOS-unsigned.ipa \
-            build/packages/Oretsuba-iOS-unsigned.ipa.sha256 \
-            build/packages/source.json \
+          # shellcheck disable=SC2086
+          gh release create latest-build $files \
             --target "$GITHUB_SHA" \
             --title "Latest build ($short)" \
-            --notes-file build/release-notes.md \
+            --notes-file release-notes.md \
             --latest

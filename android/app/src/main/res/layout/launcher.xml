@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The first screen (LauncherActivity). -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <!-- One column, centred and no wider than is good to read on a wide screen. -->
+        <LinearLayout
+            android:id="@+id/column"
+            android:layout_width="@dimen/column_width"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:orientation="vertical"
+            tools:ignore="UselessParent"
+            android:paddingStart="24dp"
+            android:paddingTop="28dp"
+            android:paddingEnd="24dp"
+            android:paddingBottom="32dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/game_title"
+                android:textColor="@color/primary_text"
+                android:textSize="30sp"
+                android:textStyle="bold" />
+
+            <TextView
+                style="@style/Note"
+                android:layout_marginTop="4dp"
+                android:text="@string/subtitle"
+                android:textSize="15sp" />
+
+            <LinearLayout style="@style/Card">
+
+                <TextView
+                    style="@style/CardTitle"
+                    android:text="@string/files_title" />
+
+                <TextView
+                    android:id="@+id/files_status"
+                    style="@style/Body"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/files_detail"
+                    style="@style/Note"
+                    android:layout_marginTop="4dp" />
+
+                <TextView
+                    android:id="@+id/mining_status"
+                    style="@style/Body"
+                    android:layout_marginTop="10dp"
+                    android:textSize="14sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/start"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:layout_marginTop="20dp"
+                android:background="@drawable/start_button"
+                android:stateListAnimator="@null"
+                android:text="@string/start_game"
+                android:textAllCaps="false"
+                android:textColor="@color/background"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/options_card"
+                style="@style/Card"
+                android:visibility="gone">
+
+                <TextView
+                    style="@style/CardTitle"
+                    android:text="@string/options_title" />
+
+                <Switch
+                    android:id="@+id/keep_place"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/keep_place"
+                    android:textColor="@color/primary_text"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/keep_place_note"
+                    style="@style/Note" />
+            </LinearLayout>
+
+            <LinearLayout style="@style/Card">
+
+                <TextView
+                    android:id="@+id/import_title"
+                    style="@style/CardTitle"
+                    android:text="@string/import_files" />
+
+                <TextView
+                    android:id="@+id/import_by_cable"
+                    style="@style/Body" />
+
+                <TextView
+                    style="@style/Body"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/import_by_picker" />
+
+                <Button
+                    android:id="@+id/import_folder"
+                    style="@style/PlainButton"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/import_folder" />
+
+                <ProgressBar
+                    android:id="@+id/import_progress"
+                    style="@android:style/Widget.Material.ProgressBar.Horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/import_progress_text"
+                    style="@style/Note"
+                    android:layout_marginBottom="6dp"
+                    android:visibility="gone" />
+
+                <Button
+                    android:id="@+id/import_mining"
+                    style="@style/PlainButton"
+                    android:text="@string/import_mining" />
+
+                <Button
+                    android:id="@+id/remove_mining"
+                    style="@style/PlainButton"
+                    android:text="@string/remove_mining"
+                    android:visibility="gone" />
+
+                <Button
+                    android:id="@+id/check_again"
+                    style="@style/PlainButton"
+                    android:text="@string/check_again" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/error"
+                style="@style/Body"
+                android:layout_marginTop="16dp"
+                android:textColor="@color/error"
+                android:visibility="gone" />
+
+            <TextView
+                style="@style/Note"
+                android:layout_marginTop="20dp"
+                android:text="@string/controls_touch" />
+
+            <TextView
+                style="@style/Note"
+                android:layout_marginTop="4dp"
+                android:text="@string/controls_other" />
+
+            <Button
+                android:id="@+id/licences"
+                style="@style/PlainButton"
+                android:layout_marginTop="8dp"
+                android:text="@string/licences" />
+        </LinearLayout>
+    </FrameLayout>
+</ScrollView>

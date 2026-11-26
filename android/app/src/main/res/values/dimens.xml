@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The launcher's column: the screen's width (-1 means "match parent"). -->
+    <dimen name="column_width">-1px</dimen>
+</resources>

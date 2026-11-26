@@ -165,6 +165,70 @@ and dictionary in these runs was made up for the test or a throwaway.
 and visionOS apps beyond compiling; a keyboard's Escape and a controller's B in the app; and a dictionary's
 pictures inside the app (`dict_test` and `kit_test` cover reading them).
 
+## The Android app, 2026-11-26
+
+[ANDROID.md](ANDROID.md) describes the app. Run with the `SET_UP` folder of the game's disc on three devices: an
+emulator with Android 15 (x86_64, 1080x2400), an emulator with Android 8.0, the lowest version the app takes, and a
+phone with Android 14 (arm64, 1080x2412, a screen that can refresh 120 times a second). On the emulators and on the
+phone every input was sent through `adb`; nobody held the phone.
+
+**Without game files**, as the workflow runs it for every change: `cp932_test` converts all 9,604 two-byte codes of
+Shift-JIS to Unicode and back and agrees with the system's iconv in each, the lint check passes with warnings counted
+as errors, and the package builds for `arm64-v8a` and `x86_64`.
+
+**The game, Android 15 emulator.**
+
+- The launcher finds the game folder, says so, and starts the game. Its column follows the screen when it is turned.
+- Logo, title menu, START, the poem and the first opening film (800x600, watched for 87 seconds). The first twelve
+  lines stand as they should: line breaks, brackets, dashes, full-width digits, the name plate.
+- Controls: a tap advances; Back opens the game's menu once and closes it again; a swipe down opens the text history
+  and Back leaves it; a long press skips and stops when the finger lifts; skip stops at the first choice and one tap
+  on an option picks it. While a film plays, Back ends it, and the first line follows with no menu open.
+- Saving into a slot with the game's own question, a comment typed into Android's dialog with the keyboard, loading,
+  and the question before overwriting. The files are in `Saves/jpn`.
+- Leaving with Home stops the sound within seconds and keeps the app; coming back shows the same line and the sound
+  goes on. The same with the screen switched off and on. The game's own exit returns to the launcher. After a forced
+  stop the app starts anew in 0.4 seconds.
+- **Auto save and continue**: the switch stays on over a restart of the app; `DATA1200.SAV` appears within the first
+  five lines read and is written anew at once on Home; after a forced stop the button reads "Continue" and the saved
+  line stands on the screen a second later, with no logo and no title, and the lines that follow are the story's
+  next. With the switch off the logo and the title come and the file is left alone.
+- **Mining**, next to a VN Mining Server 0.2.0 on the same PC: the launcher names the server and its version, says
+  so when the key is wrong and when the server is down, and asks again on "Check again". `mining.txt` was brought in
+  by copying and through the system's file picker, and removed with the launcher's button. 38 lines read at a normal
+  pace arrived in order, each with its text, the speaker where there is one, and a screenshot (JPEG, 800x600, about
+  90 KB); voiced lines came with a valid Ogg Vorbis file. Of the lines the skip ran over, none arrived. The line
+  before the choice arrived when an option was picked, the options did not. A line left with Home arrived half a
+  second later, with the app in the background.
+- **Importing the folder** through the system's folder picker: the question before replacing the folder that is
+  there, progress that moves, then "Game files found". An import cut off by a forced stop left the old game folder
+  whole and nothing half-copied behind after the next start. Turning the screen during an import did not stop it.
+
+**Android 8.0 emulator.** The app installs and starts, the title appears, the sound stream opens and runs (through
+AAudio, which was new in that version), the letters are drawn with the system's Japanese font, Back reaches the app
+by the older route and does the same, the system's bars are hidden.
+
+**The phone.** A build signed with the key of the published builds installed, and six newer builds installed over
+it with the game files kept. The picture stands in the middle of the screen at exactly 4:3 (1440x1080), clear of
+the camera hole. The game was played from the title through the film into the first twelve lines; the lines laid
+next to the emulator's have the same text, line breaks and positions. The sound stream runs (float, stereo, 44,100 Hz, no underruns) and stops on
+Home. The screen runs at 60 Hz while the game is in front. A save with a comment: the keyboard comes up with the
+dialog. Mining to the server on the PC (reached through `adb reverse`): four lines with voice and screenshot.
+
+**How much of the processor it takes.** A text line that stands still costs about 2 % of one processor core in the
+emulator, a screen where nothing moves none. The moving star background of the prologue took three quarters of a
+core on the phone and reached only 30 pictures a second: a profile showed that its two background effects asked for
+every pixel on its own. They now copy whole spans, checked to give the same picture on 4,000 random cases, and the
+phone shows 60 pictures a second there at half of one of its small cores.
+
+**The build on GitHub** carries the same certificate as the builds made by hand (the fingerprint is in ANDROID.md).
+
+**Not checked:** playing by hand on a phone, and with it the tap with two fingers, which `adb` cannot send (in the
+code it takes the same path as Back). The sound by ear: the emulators ran silent, and on the phone only the state of
+the stream was read. Copying the game folder with a cable, and the folder picker on a real phone. A mouse, a
+keyboard or a game controller on a device. A tablet. The versions between Android 8 and 14. The story beyond the
+first choice of the prologue.
+
 ## The original project's checks on devices, 2026-10-18
 
 The original project checked its versions 0.1.0 and 0.1.1 on real devices. It played with a Chinese translation
@@ -224,7 +288,8 @@ The tests with the game need the player's own game files.
 
 ## Limits
 
-The iOS and visionOS IPAs are unsigned and need the user's own Apple account. For a native visionOS app, installing
+The Android package is signed with this project's own key and installs as it is; Android asks before it installs a
+package that does not come from a store. The iOS and visionOS IPAs are unsigned and need the user's own Apple account. For a native visionOS app, installing
 with Xcode is the checked way; whether Sideloadly handles such a package was not checked. The Mac package carries a
 local ad-hoc signature and is not notarised. The packages include the third-party licences and no game content, no
 provisioning profile and no Debug film entry.

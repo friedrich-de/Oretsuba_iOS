@@ -3,9 +3,10 @@
 This port has two ways of making Anki cards from what you read. They do not depend on each other and can both be
 on.
 
-* **In the game.** A tap on a word of the text shows a dictionary over the game, and a button in it makes the
-  card, with the sentence, its voice, a picture of the scene and the word's sound. You set it up in the launcher:
-  the AnkiConnect your cards go to, the dictionaries, and where the sound of a word comes from.
+* **In the game** (iPhone, iPad, Vision Pro and Mac; not yet in the Android app). A tap on a word of the text
+  shows a dictionary over the game, and a button in it makes the card, with the sentence, its voice, a picture
+  of the scene and the word's sound. You set it up in the launcher: the AnkiConnect your cards go to, the
+  dictionaries, and where the sound of a word comes from.
 * **Through a mining server.** The game sends every line you read to a
   [VN Mining Server](https://github.com/friedrich-de/VN-Mining-Server), whose page shows the lines as they come,
   looks words up and makes the cards, on the same phone or on any other device. It is on once a file named
@@ -99,6 +100,8 @@ Nothing is sent unless a file named `mining.txt` lies in the game folder.
    * **iPhone / iPad**: in the Files app, move `mining.txt` to "On My iPhone" › Oretsuba (or into the
      `SET_UP` folder inside it). With a cable, Finder's "Files" tab of the device does the same.
    * **Mac**: put it into the game directory you chose in the launcher.
+   * **Android**: press "Import mining.txt…" in the launcher and choose the downloaded file
+     ([ANDROID.md](ANDROID.md#mining)).
 3. Open the app. The launcher says where the lines go and whether the server takes the key:
    "Mining: lines go to vn.example.org (VN Mining Server 0.1.0)."
 
@@ -172,7 +175,7 @@ The code that sends lines to a server is in `engine/src/mining/`:
   tells it of every line the ADV loop begins, `Engine::frame` lets it look once per frame, `Engine::set_paused`
   tells it that the player leaves.
 * `engine/src/platform/apple/apple_http.mm`: the requests, through `NSURLSession`. Another host gives its own
-  through `Platform::http_sender`.
+  through `Platform::http_sender`; the Android app's go through `HttpURLConnection` (`android/.../Http.kt`).
 
 `engine/tests/mining_test.cpp` tests the first part and needs neither game files nor an Apple system:
 
