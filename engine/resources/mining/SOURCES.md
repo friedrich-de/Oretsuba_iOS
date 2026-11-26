@@ -1,3 +1,15 @@
+# What this folder is
+
+The mining kit's files that are not code of the engine (docs/MINING.md). An app copies the folder as it is and
+gives its place to `ore_kit_open`.
+
+- `transforms.json`: the rules for undoing Japanese inflections, see below.
+- `page/`: the page of the dictionary popup that a web view shows over the game. `popup.html`, `popup.css`,
+  `main.js`, `host.js`, `word.js`, `furigana.js` and `glossary-html.js` were written for this project (`word.js`,
+  `furigana.js` and `glossary-html.js` follow what [VN Mining Server](https://github.com/friedrich-de/VN-Mining-Server)'s
+  page does, so that both make the same cards). `page/vendor/dictionary-popup/` is Hachidori's dictionary popup,
+  GPL-3.0-or-later; its own `SOURCES.md` says where it comes from and what was changed.
+
 # Where the Japanese rules come from
 
 `transforms.json` is Yomitan's set of rules for undoing Japanese inflections, written as data by the

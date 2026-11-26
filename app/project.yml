@@ -31,6 +31,10 @@ targets:
           - "Info.plist"
       - path: ../engine/src
         compilerFlags: ["-w"]
+      # What the mining kit reads at run time and the popup's page, as the folder "mining".
+      - path: ../engine/resources/mining
+        type: folder
+        buildPhase: resources
     dependencies:
       # The mining kit (docs/MINING.md): dictionaries in SQLite, a line's voice as AAC.
       - sdk: libsqlite3.tbd

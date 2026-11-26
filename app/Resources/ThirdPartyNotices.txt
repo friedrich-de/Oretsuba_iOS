@@ -3,6 +3,30 @@ Third-party notices
 
 The game's files are supplied separately by the player and are not included in this application.
 
+Mining in the game: the dictionary popup and the Japanese rules
+The app carries two works under the GNU General Public License, version 3 or
+later, as files of their own in its folder "mining". The licence's full text
+is the file mining/page/vendor/dictionary-popup/LICENSE inside the app, and the
+source of everything in that folder is in this project's repository under
+engine/resources/mining.
+
+dictionary-popup (the dictionary popup of Hachidori)
+https://github.com/bee-san/dictionary-popup
+https://github.com/bee-san/hachidori
+SPDX-License-Identifier: GPL-3.0-or-later
+Its files name their authors; hachidori/ATTRIBUTION.md beside them says whose
+work they contain (GameSentenceMiner, Hoshi Reader, Yomitan and Yomichan,
+hoshidicts), and SOURCES.md what was changed for this app. Its icons are
+Fluent UI System Icons, MIT, Copyright (c) 2020 Microsoft Corporation
+(hachidori/LICENSE.fluent-icons).
+
+Rules for undoing Japanese inflections (mining/transforms.json)
+https://github.com/yomidevs/yomitan
+https://github.com/bee-san/hoshidicts
+SPDX-License-Identifier: GPL-3.0-or-later
+Copyright (C) 2024-2026 Yomitan Authors; written as data by the Hoshidicts
+Japanese language pack. See mining/SOURCES.md inside the app.
+
 pl_mpeg
 https://github.com/phoboslab/pl_mpeg
 SPDX-License-Identifier: MIT

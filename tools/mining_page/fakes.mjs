@@ -11,10 +11,10 @@ export const LAPIS_FIELDS = [
   'Frequency', 'FreqSort', 'MiscInfo',
 ];
 
-function listen(handler) {
+function listen(handler, port = 0) {
   const server = createServer(handler);
-  return new Promise((done) =>
-    server.listen(0, '127.0.0.1', () =>
+  return new Promise((done, failed) =>
+    server.once('error', failed).listen(port, '127.0.0.1', () =>
       done({
         url: `http://127.0.0.1:${server.address().port}`,
         stop: () => new Promise((closed) => (server.closeAllConnections?.(), server.close(closed))),
@@ -30,7 +30,7 @@ async function bodyOf(request) {
 }
 
 /** An AnkiConnect with a Lapis note type and two decks. What it was asked and what it holds can be read. */
-export async function fakeAnki() {
+export async function fakeAnki(port = 0) {
   const anki = { actions: [], notes: [], media: new Map(), decks: ['Default', 'Mining'], models: { Basic: ['Front', 'Back'], Lapis: LAPIS_FIELDS } };
   let nextId = 1700000000000;
   const firstField = (note) => String(note.fields?.[anki.models[note.modelName]?.[0]] ?? '').trim();
@@ -84,7 +84,7 @@ export async function fakeAnki() {
     } else error = 'unsupported action';
     answer.writeHead(200, { 'Content-Type': 'application/json' });
     answer.end(JSON.stringify({ result, error }));
-  });
+  }, port);
   return Object.assign(anki, server);
 }
 
@@ -111,7 +111,7 @@ export function silence() {
  * An audio source as Yomitan's custom ones: /list?term=…&reading=… answers with a list of two
  * sounds for every word but 友達, which it has none for. Its address for the kit is `address`.
  */
-export async function fakeAudioSource() {
+export async function fakeAudioSource(port = 0) {
   const source = { asked: [], fetched: [] };
   const server = await listen((request, answer) => {
     const url = new URL(request.url, 'http://audio');
@@ -132,7 +132,7 @@ export async function fakeAudioSource() {
       answer.writeHead(404);
       answer.end();
     }
-  });
+  }, port);
   return Object.assign(source, server, { address: `${server.url}/list?term={term}&reading={reading}` });
 }
 
