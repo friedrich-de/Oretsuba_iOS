@@ -19,6 +19,14 @@ final class MiningSettingsModel: ObservableObject {
         var id: String { field }
     }
 
+    /// A place cards can go to: an AnkiConnect, or the Anki app on this device (docs/ANKI_APPS.md).
+    struct Target: Identifiable, Hashable {
+        let name: String
+        let label: String
+        let detail: String
+        var id: String { name }
+    }
+
     struct Installed: Identifiable, Hashable {
         let id: String
         let title: String
@@ -52,6 +60,9 @@ final class MiningSettingsModel: ObservableObject {
     let kit: MiningKit?
 
     @Published var direct = false
+    /// The places cards can go to on this device, and the one that is chosen.
+    @Published var targets: [Target] = []
+    @Published var target = "connect"
     @Published var address = ""
     /// A key typed in and not yet told; the kit never gives a key back.
     @Published var key = ""
@@ -84,9 +95,14 @@ final class MiningSettingsModel: ObservableObject {
     /// The tags as the kit holds them; `tags` is what stands in the text field.
     private var keptTags = ""
     private var watching: Task<Void, Never>?
+    private var events: KitEvents?
 
     init(kit: MiningKit? = MiningKit.shared) {
         self.kit = kit
+        // AnkiMobile hands its decks and note types over later, when this app is in front again.
+        events = KitEvents { [weak self] name, payload in
+            if name == "anki.lists" { self?.heardLists(payload) }
+        }
     }
 
     var importRunning: Bool { importState == "downloading" || importState == "importing" }
@@ -113,6 +129,11 @@ final class MiningSettingsModel: ObservableObject {
                     Role(role: $0["role"] as? String ?? "", label: $0["label"] as? String ?? "", detail: $0["detail"] as? String ?? "")
                 }
             }
+            if targets.isEmpty, let list = (try? await kit.call("anki.targets")) as? [[String: Any]] {
+                targets = list.map {
+                    Target(name: $0["name"] as? String ?? "", label: $0["label"] as? String ?? "", detail: $0["detail"] as? String ?? "")
+                }
+            }
             apply(try await kit.call("settings.get"), typed: true)
             applyDictionaries(try await kit.call("dict.list"))
             problem = nil
@@ -132,6 +153,7 @@ final class MiningSettingsModel: ObservableObject {
         keySet = settings["ankiKeySet"] as? Bool ?? false
         audioSet = settings["audioSet"] as? Bool ?? false
         let anki = settings["anki"] as? [String: Any] ?? [:]
+        target = anki["target"] as? String ?? "connect"
         keptTags = (anki["tags"] as? [String] ?? []).joined(separator: " ")
         if typed {
             address = anki["address"] as? String ?? ""
@@ -202,6 +224,81 @@ final class MiningSettingsModel: ObservableObject {
     }
 
     // MARK: - Anki
+
+    /// Whether cards go to an AnkiConnect, and not to the Anki app on this device.
+    var toConnect: Bool { target == "connect" }
+
+    /// Cards go to another place from now on.
+    func choose(target name: String) async {
+        guard name != target else { return }
+        decks = []
+        noteTypes = []
+        anki = .idle
+        await change("settings.set", ["anki": ["target": name]])
+        await refreshPlaces(adopt: true)
+    }
+
+    /// The decks and note types to choose from, as far as they are to be had without the player:
+    /// from an AnkiConnect that is set already, or from the Anki app.
+    func refreshPlaces(adopt: Bool = false) async {
+        if toConnect {
+            if !address.isEmpty { await connect(adopt: false) }
+        } else {
+            await askApp(adopt: adopt)
+        }
+    }
+
+    /// Takes the decks and note types of the Anki app on this device. AnkiMobile's are the ones
+    /// it handed over last (`fetchFromAnkiMobile`). With `adopt`, where nothing was chosen yet
+    /// or the note type chosen is not there, the Lapis note type and its deck are. `saying` is
+    /// what to say when it went well; without it only the lists speak.
+    private func askApp(adopt: Bool, saying: String? = nil) async {
+        guard let kit else { return }
+        do {
+            let answer = try await kit.call("anki.check", ["adopt": adopt]) as? [String: Any] ?? [:]
+            decks = answer["decks"] as? [String] ?? []
+            noteTypes = answer["noteTypes"] as? [String] ?? []
+            if let settings = answer["settings"] { apply(settings) }
+            // A note type of the same name may have other fields there than in the Anki it was chosen for.
+            if noteTypes.contains(noteType), (try? await kit.call("anki.fields")) != nil,
+               let settings = try? await kit.call("settings.get") {
+                apply(settings)
+            }
+            if let saying {
+                anki = .good(answer["lapis"] is [String: Any]
+                    ? "\(saying) The Lapis note type is there."
+                    : "\(saying) There is no Lapis note type: choose a note type and what goes into its fields.")
+            }
+        } catch {
+            decks = []
+            noteTypes = []
+            // That AnkiMobile was not asked yet is no fault: the button below says what to do.
+            anki = saying == nil && target == "ankimobile" ? .idle : .bad(error.localizedDescription)
+        }
+        await refreshCards()
+    }
+
+    /// Asks AnkiMobile for its decks and note types. It comes to the front for that and sends
+    /// the player back; the lists then arrive as the kit's event `anki.lists`.
+    func fetchFromAnkiMobile() async {
+        guard let kit else { return }
+        anki = .working
+        do {
+            _ = try await kit.call("ankimobile.fetch")
+        } catch {
+            anki = .bad(error.localizedDescription)
+        }
+    }
+
+    private func heardLists(_ payload: String) {
+        guard let said = try? JSONSerialization.jsonObject(with: Data(payload.utf8)) as? [String: Any] else { return }
+        let message = said["message"] as? String ?? ""
+        if said["ok"] as? Bool == true {
+            Task { await askApp(adopt: true, saying: message) }
+        } else {
+            anki = .bad(message)
+        }
+    }
 
     /// Asks the AnkiConnect at the address for its decks and note types. With
     /// `adopt` the address and the key become the kit's, and where nothing was
@@ -378,5 +475,21 @@ final class MiningSettingsModel: ObservableObject {
                 }
             }
         }
+    }
+}
+
+/// Hears what the mining kit tells without having been asked, until it is let go.
+private final class KitEvents {
+    private let observer: NSObjectProtocol
+
+    init(_ heard: @escaping @MainActor (_ name: String, _ payload: String) -> Void) {
+        observer = NotificationCenter.default.addObserver(forName: .oreKitEvent, object: nil, queue: .main) { note in
+            guard let name = note.userInfo?["name"] as? String, let payload = note.userInfo?["payload"] as? String else { return }
+            Task { @MainActor in heard(name, payload) }
+        }
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(observer)
     }
 }

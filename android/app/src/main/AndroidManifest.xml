@@ -5,6 +5,15 @@
     <!-- Mining only (docs/MINING.md): lines go to the server named in mining.txt. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Cards straight into AnkiDroid on the same device (docs/MINING.md). The permission is
+         AnkiDroid's own, which the player grants; the queries let the app see that AnkiDroid
+         is there, which Android hides from an app that does not say what it looks for. -->
+    <uses-permission android:name="com.ichi2.anki.permission.READ_WRITE_DATABASE" />
+    <queries>
+        <package android:name="com.ichi2.anki" />
+        <provider android:authorities="com.ichi2.anki.flashcards" />
+    </queries>
+
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.hardware.gamepad" android:required="false" />
 
@@ -48,5 +57,13 @@
             android:screenOrientation="sensorLandscape"
             android:theme="@style/Game"
             tools:ignore="DiscouragedApi" />
+
+        <!-- A card's picture and sound on their way to AnkiDroid (AnkiMediaProvider.kt): not
+             exported; AnkiDroid is granted one file at a time, for the moment it reads it. -->
+        <provider
+            android:name=".AnkiMediaProvider"
+            android:authorities="${applicationId}.ankimedia"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>

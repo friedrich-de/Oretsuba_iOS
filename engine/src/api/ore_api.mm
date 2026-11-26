@@ -10,6 +10,7 @@
 
 #include "api/ore_kit_internal.h"
 #include "core/engine.h"
+#include "mining/anki_app.h"
 #include "mining/kit_tap.h"
 #include "mining/mining.h"
 #include "util/log.h"
@@ -176,6 +177,10 @@ int ore_mining_check(const char *data_dir, char *text, int text_len) {
 		text[text_len - 1] = 0;
 	}
 	return result;
+}
+
+void ore_app_opened_with(const char *link) {
+	if (link && *link) ore::AppReturns::shared().opened_with(link);
 }
 
 #if DEBUG

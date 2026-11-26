@@ -3,12 +3,20 @@ import SwiftUI
 @main
 struct OreApp: App {
     @StateObject private var model = AppModel()
+    #if DEBUG
+    @StateObject private var ankiCheck = AnkiCheck()
+    #endif
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(model)
                 .preferredColorScheme(.dark)
+                // AnkiMobile's way back after a card or its lists (docs/MINING.md).
+                .onOpenURL { link in ore_app_opened_with(link.absoluteString) }
+                #if DEBUG
+                .overlay(alignment: .top) { AnkiCheckLine(check: ankiCheck) }
+                #endif
         }
         #if os(visionOS)
         .defaultSize(width: 1600, height: 1200)

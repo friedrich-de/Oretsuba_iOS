@@ -13,6 +13,7 @@ JavaVM *g_vm = nullptr;
 jclass g_native = nullptr;  // global reference: found once, valid on every thread
 jmethodID g_render_glyph = nullptr;
 jmethodID g_http_send = nullptr;
+jmethodID g_anki_droid = nullptr;
 pthread_key_t g_detach_key;
 
 void detach_thread(void *) {
@@ -34,7 +35,8 @@ bool jni_bridge_init(JavaVM *vm, JNIEnv *env) {
 	env->DeleteLocalRef(local);
 	g_render_glyph = env->GetStaticMethodID(g_native, "renderGlyph", "(IZZI)[B");
 	g_http_send = env->GetStaticMethodID(g_native, "httpSend", "([B[B[[B[BI)[B");
-	return g_render_glyph && g_http_send;
+	g_anki_droid = env->GetStaticMethodID(g_native, "ankiDroid", "([B[B)[B");
+	return g_render_glyph && g_http_send && g_anki_droid;
 }
 
 JNIEnv *jni_env() {
@@ -134,6 +136,19 @@ int jni_http_send(const HttpRequest &request, std::string &answer) {
 	}
 	env->PopLocalFrame(nullptr);
 	return status;
+}
+
+// An answer that is no JSON is read as "AnkiDroid's answer could not be read"
+// by whoever asked (ankidroid_answer), so a failure here needs no words.
+std::string jni_ankidroid(const std::string &method, const std::string &json) {
+	JNIEnv *env = jni_env();
+	if (!env || env->PushLocalFrame(8) != 0) return std::string();
+	std::string answer;
+	auto result = static_cast<jbyteArray>(
+	    env->CallStaticObjectMethod(g_native, g_anki_droid, jni_bytes(env, method), jni_bytes(env, json)));
+	if (!jni_failed(env, "ankiDroid") && result) answer = jni_string(env, result);
+	env->PopLocalFrame(nullptr);
+	return answer;
 }
 
 }  // namespace ore
