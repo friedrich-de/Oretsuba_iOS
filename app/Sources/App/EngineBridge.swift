@@ -103,6 +103,7 @@ final class EngineBridge {
         guard !audio.isRunning else { return }
         do {
             try audio.start()
+            fputs("audio: the output runs\n", stderr)
         } catch {
             fputs("audio: \(error)\n", stderr)
         }

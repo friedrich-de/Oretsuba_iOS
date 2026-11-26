@@ -124,7 +124,9 @@ int ore_play_app_sound(OreEngine *e, const int16_t *samples, int frames, int cha
 		e->app_sound->stop();
 		return 0;
 	}
-	return e->app_sound->play(samples, size_t(frames), channels, rate) ? 1 : 0;
+	bool playing = e->app_sound->play(samples, size_t(frames), channels, rate);
+	log_info("app sound: %d frames, %d channel(s), %d Hz%s", frames, channels, rate, playing ? "" : ", not a sound");
+	return playing ? 1 : 0;
 }
 
 void ore_set_ui_callbacks(OreEngine *e, void *ctx, OreDialogCallback dialog, OreTextInputCallback text_input) {
