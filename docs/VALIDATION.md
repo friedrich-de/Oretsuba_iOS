@@ -169,8 +169,18 @@ both sides, every frame compared. Frames are counted from the click.
 - The original never starts a transition of mode 2 on the 169 lines logged; scene changes use mode 1, the menus
   and the loading of a save mode 0.
 
-The last two rows were changed after that comparison, from what it found in the original. They were measured on the
-test host with the same clock and the same clicks, not again next to the original.
+The last two rows were changed after that comparison, from what it found in the original, and then measured next to
+it once more:
+
+- The small button that waits for a click, with clicks 40, 55 and 70 frames after a line was complete: hidden for
+  one frame at each of the four clicks in both programs (the port before: 3, 1, 1 and 4 frames), and back on the
+  same frames in both. A round takes 38 frames in both and a click does not move its phase. Of the six pictures two
+  pairs look alike; both programs show the first pair for 12 frames, the third picture for 6, the second pair for 13
+  and the last picture for 7. Where in its round the button stands at a given frame cannot be compared, since the
+  original's button started before its clock was stepped.
+- The calls of the script around a plain click, from the frame before it to three frames after: the same natives
+  with the same results in every frame, 14, 14, 28, 14 and 14 calls.
+- The save screen, opened and closed again: still within 1 in each of the 26 frames compared in either direction.
 
 **What still differs:**
 
