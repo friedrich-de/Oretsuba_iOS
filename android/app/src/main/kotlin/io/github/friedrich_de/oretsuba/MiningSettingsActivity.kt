@@ -831,6 +831,11 @@ class MiningSettingsActivity : Activity() {
     }
 
     private fun askAddress() {
+        // A field of the screen that has the keyboard gives it up to the dialog: the system would
+        // otherwise hand it back to that field when the dialog closes, whatever the dialog did with it.
+        currentFocus?.let {
+            getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(it.windowToken, 0)
+        }
         val pad = (20 * resources.displayMetrics.density).toInt()
         val field = EditText(this)
         field.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI

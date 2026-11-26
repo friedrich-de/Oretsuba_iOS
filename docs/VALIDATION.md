@@ -353,7 +353,9 @@ real AnkiDroid, which now runs with the kit switched on, passes as before.
   clear text is nowhere in them. After "Forget the key" the AnkiConnect refuses again.
 - **Word audio.** "It answers, with 2 sounds for 食べる."; the address stays over a restart; a wrong one says so and
   is not kept.
-- Each of the four text fields stays above the keyboard while it is typed in, upright and sideways.
+- Each of the four text fields stays above the keyboard while it is typed in, upright and sideways. The dialog for
+  a dictionary's address shows its field above the keyboard too, the keyboard's Done downloads, and the keyboard
+  goes with the dialog.
 - **Plain `http://` stays in the own network.** `http://example.com` is turned down without a request, with "An
   address in the internet has to begin with https://. Plain http:// is for a server in your own network.", for a
   dictionary's address, the AnkiConnect and the word audio, each in its own card; what was kept before stays. The
