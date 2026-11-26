@@ -30,6 +30,7 @@ public:
 	LayerList *overlay = nullptr;  // points at the page's overlay list or null
 
 	ImageRef bg;
+	uint32_t bg_handle = 0;  // the object the script set as background (N_19d), handed back by N_1a3
 	int bg_x = 0, bg_y = 0;
 	uint32_t bg_color = 0;  // 0x00RRGGBB
 	ImageRef bg_cache;      // zoomed/rotated background (drawn at 0,0)
@@ -40,6 +41,10 @@ public:
 
 	// Composes everything into target (full redraw).
 	void compose(Image &target, int filter_mode = 0, int filter_tag = 0, bool with_overlay = true);
+	// The steps of compose, for a running transition.
+	void draw_background(Image &target);
+	void draw_list(Image &target, LayerList *l, int filter_mode = 0, int filter_tag = 0);
+	void draw_overlay(Image &target);
 	void swap_background(Compositor &o);
 };
 
@@ -64,7 +69,7 @@ public:
 	int trans_mode = 0;
 	bool trans_apply = false;
 
-	// Recomposes the page if anything changed.
+	// Recomposes the page if anything changed; draws the next frame of a running transition.
 	void update(int64_t now);
 	void invalidate() { dirty_ = true, gfx_touch(); }
 
@@ -75,6 +80,8 @@ public:
 	bool transition_active() const { return transition != nullptr; }
 
 private:
+	void draw_transition(int64_t now);
+
 	int type_;
 	ImageRef image_;
 	std::unique_ptr<Compositor> comp_;

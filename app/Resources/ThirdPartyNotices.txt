@@ -13,7 +13,7 @@ engine/resources/mining.
 
 The popup's page (mining/page: popup.html, popup.css, main.js, host.js,
 word.js, furigana.js, glossary-html.js)
-https://github.com/friedrich-de/Oretsuba_iOS
+https://github.com/friedrich-de/Oretsuba_iOS-Android-Mining
 SPDX-License-Identifier: GPL-3.0-or-later
 Written for this project around the two works below.
 
