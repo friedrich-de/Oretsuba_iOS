@@ -24,6 +24,16 @@ const int kTextSizes[] = {70, 80, 90, 100, 115, 130};
 const size_t kMaxName = 300, kMaxFields = 200, kMaxTags = 20;
 const uint64_t kMaxDictionaryDownload = 4ull * 1024 * 1024 * 1024;
 
+// Dictionaries a player adds with one tap, the same as VN Mining Server's page offers: free, and
+// the ones most people use. Each address always gives the newest release.
+struct Suggestion {
+	const char *name, *text, *url;
+};
+const Suggestion kSuggested[] = {
+    {"Jitendex", "Japanese to English", "https://github.com/stephenmk/stephenmk.github.io/releases/latest/download/jitendex-yomitan.zip"},
+    {"JMnedict", "Names of people and places", "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMnedict.zip"},
+};
+
 std::string lower(std::string s) {
 	for (char &c : s)
 		if (c >= 'A' && c <= 'Z') c = char(c - 'A' + 'a');
@@ -599,6 +609,15 @@ json::Value MiningKit::anki_choose(const json::Value &params) {
 	return settings_view();
 }
 
+// Whether a dictionary is the suggested one: by the address it updates from, or by its title,
+// which carries its revision ("Jitendex.org [2026-11-23]").
+static bool is_suggestion(const Suggestion &suggestion, const dict::DictionaryInfo &info) {
+	if (info.download_url == suggestion.url) return true;
+	std::string name = lower(suggestion.name), title = lower(info.title);
+	if (title.compare(0, name.size(), name) != 0) return false;
+	return title.size() == name.size() || title[name.size()] < 'a' || title[name.size()] > 'z';
+}
+
 json::Value MiningKit::dict_list() const {
 	json::Value result = json::Value::object();
 	json::Value &list = result.set("dictionaries", json::Value::array());
@@ -615,6 +634,22 @@ json::Value MiningKit::dict_list() const {
 	import.set("progress", state.progress);
 	import.set("title", state.title);
 	import.set("error", state.error);
+	// What is imported by a name a player knows, when it is a suggested dictionary.
+	std::string name;
+	for (const Suggestion &suggestion : kSuggested)
+		if (state.source == suggestion.url) name = suggestion.name;
+	import.set("name", name);
+	json::Value &suggested = result.set("suggested", json::Value::array());
+	for (const Suggestion &suggestion : kSuggested) {
+		bool installed = false;
+		for (const auto &item : library_->installed()) installed = installed || is_suggestion(suggestion, item.reader->info());
+		json::Value entry = json::Value::object();
+		entry.set("name", suggestion.name);
+		entry.set("text", suggestion.text);
+		entry.set("url", suggestion.url);
+		entry.set("installed", installed);
+		suggested.push(std::move(entry));
+	}
 	return result;
 }
 
