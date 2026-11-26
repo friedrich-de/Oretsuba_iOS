@@ -116,7 +116,11 @@ void read_pitches(const std::string &text, const std::string &reading, json::Val
 		json::Value nasal = morae(pitch, "nasal"), devoice = morae(pitch, "devoice");
 		if (!nasal.is_null()) view.set("nasal", std::move(nasal));
 		if (!devoice.is_null()) view.set("devoice", std::move(devoice));
-		out.push(std::move(view));
+		// A dictionary may hold a row twice; the accent is shown once, as Yomitan shows it.
+		std::string written = json::write(view);
+		bool there = false;
+		for (const json::Value &other : out.items()) there = there || json::write(other) == written;
+		if (!there) out.push(std::move(view));
 	}
 }
 

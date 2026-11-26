@@ -152,7 +152,7 @@ commands one frame earlier.
 of the test host (without `VOICE.LPK`) and on a Mac with macOS 26.6 and Xcode 27.2. Every AnkiConnect, audio source
 and dictionary in these runs was made up for the test or a throwaway.
 
-- `dict_test` (1,665 checks) and `kit_test` (195), on both: Yomitan's own tests for Japanese inflections, the
+- `dict_test` (1,666 checks) and `kit_test` (195), on both: Yomitan's own tests for Japanese inflections, the
   import of a dictionary and what a lookup finds, and the kit against a made-up AnkiConnect and audio source. The
   page's arithmetic has 12 tests of its own (`node --test engine/tests/page/*.test.mjs`).
 - Importing Jitendex takes about 2 seconds on the four-core machine these checks ran on and leaves a file of 94 MB.
@@ -189,6 +189,17 @@ and dictionary in these runs was made up for the test or a throwaway.
   buttons; "Add Jitendex" downloads the newest release from its makers and imports it (437,367 words), and the
   button is gone once the dictionary is there. The Simulator lets an app read any file, so the failure itself
   does not show there: on a real iPhone this is still to be tried.
+- **Two real dictionaries** that failed on a player's iPhone, run through the importer outside the app with
+  `dict_probe` on a Linux PC, before and after the fix in `zip_reader`. A Japanese-Japanese dictionary (334,748
+  words, 2,854 pictures) showed most of its pictures as failed: 24 of its files, the label pictures such as
+  漢-default.svg, are named in Shift-JIS in the zip with the UTF-8 name in an extra field, and 40,986 of the
+  44,429 picture references in its meanings ask for one of them. Before, the library found 3,443 of the
+  references; now it finds all 44,429, and no picture is kept under a name that is not UTF-8. A pitch accent
+  dictionary (88,089 rows) was refused with "term_meta_bank_1.json in that dictionary is damaged.": the zip
+  states a wrong checksum for all nine of its banks, which unpack whole. It now imports with 88,089 pitch
+  accents, and 昨日, 丈夫 and 食べる come with theirs. Three imports and eight lookups took 1.4 seconds.
+- **A dictionary's pictures in the iPad Simulator**: the SVG and the PNG of a made-up dictionary's meaning are
+  drawn in the popup over the game.
 - The Release packages for iOS, Mac and visionOS compile with the mining kit and carry the folder `mining`.
 
 **Not checked:** a real iPhone, iPad or Vision Pro; Anki on a computer with the AnkiConnect add-on itself; the Mac

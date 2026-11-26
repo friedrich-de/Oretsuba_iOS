@@ -701,11 +701,13 @@ void test_lookup() {
 	pitches.title = "Pitches";
 	pitches.metas = {R"(["食べる","pitch",{"reading":"たべる","pitches":[{"position":2,"devoice":1},{"position":"LHL"}]}])",
 	                 R"(["食べる","pitch",{"reading":"くらべる","pitches":[{"position":0}]}])",
+	                 R"(["食べる","pitch",{"reading":"たべる","pitches":[{"position":2,"devoice":[1]}]}])",
 	                 R"(["食べる","ipa",{"reading":"たべる","transcriptions":[{"ipa":"[tabeɾɯ]"}]}])"};
 	results = find("食べる", {words(), pitches});
 	const json::Value &groups = results[0]["term"]["pitches"];
 	check(groups.size() == 1 && groups[0].str("dictionary") == "Pitches", "a word has the pitch accents of its reading only");
 	const json::Value &group = groups[0]["pitches"];
+	check(group.size() == 2, "an accent the dictionary holds twice is shown once");
 	check(group.size() == 2 && group[0].number("position") == 2 && group[1].number("position") == 2, "a pattern gives where it falls");
 	check(group[0]["devoice"].size() == 1 && group[0]["devoice"][0].as_number() == 1 && !group[0].has("nasal") && !group[0].has("pattern") &&
 	          group[1].str("pattern") == "LHL",
