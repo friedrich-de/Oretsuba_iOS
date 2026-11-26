@@ -112,6 +112,13 @@ static void test_blur_mix() {
 	CHECK((b.row32(0)[2] & 0xff) == 85);  // (255*21845 + 0x8000) >> 16
 	CHECK((b.row32(0)[1] & 0xff) == 85);
 	CHECK((b.row32(0)[0] & 0xff) == 0);
+	// the last column is not read: the one before it stands in for it
+	uint32_t edge[5] = {0, 0, 0, 0x60, 0xff};
+	for (int i = 0; i < 5; ++i) a.row32(0)[i] = edge[i];
+	fx::hblur(b, a, 1);
+	CHECK((b.row32(0)[2] & 0xff) == 32);  // 0 + 0 + 0x60
+	CHECK((b.row32(0)[3] & 0xff) == 64);  // 0 + 0x60 + 0x60
+	CHECK((b.row32(0)[4] & 0xff) == 96);  // 0x60 three times
 	CHECK(fx::mix(0x000000, 0xffffff, 0) == 0);
 	CHECK((fx::mix(0x000000, 0x0000ff, 128) & 0xff) == 127);
 }

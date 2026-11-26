@@ -72,7 +72,11 @@ void hblur(Image &dst, const Image &src, int r) {
 		const uint32_t *s = src.row32(y);
 		uint32_t *d = dst.row32(y);
 		uint32_t sum[4] = {0, 0, 0, 0};
-		auto px = [&](int x) { return s[x < 0 ? 0 : x >= w ? w - 1 : x]; };
+		// The left edge repeats column 0. On the right the original never reads
+		// the last column: from there on it repeats the one before it (measured
+		// next to the original on 31 frames of a blur with R 32, all exact).
+		const int last = w > 1 ? w - 2 : 0;
+		auto px = [&](int x) { return s[x < 0 ? 0 : x > last ? last : x]; };
 		for (int i = -r; i <= r; ++i) {
 			uint32_t p = px(i);
 			for (int c = 0; c < 4; ++c) sum[c] += (p >> (c * 8)) & 0xff;

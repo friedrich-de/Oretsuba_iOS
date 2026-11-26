@@ -126,8 +126,11 @@ The package holds the engine for `arm64-v8a` (phones and tablets) and `x86_64` (
 no library besides Android itself and SQLite, which the dictionaries of mining are kept in. Android has no SQLite for
 native code, so the build fetches SQLite's source from sqlite.org the first time, in the one file its makers publish
 (version 3.54.1), checks it against its hash and compiles it in. For a build without the network, put `sqlite3.c` and
-`sqlite3.h` of that version into `engine/third_party/sqlite`. `ORE_BUILD_NUMBER` in the environment sets the build number (`versionCode`), which
-Android wants to grow from one update to the next.
+`sqlite3.h` of that version into `engine/third_party/sqlite`.
+
+`ORE_BUILD_NUMBER` in the environment sets the build number (`versionCode`), which Android wants to grow from one
+update to the next, and the last part of the version (`versionName`, 0.1.N). The build on GitHub passes the number of
+its run, the same for the iPhone package; a build that was given none is 0.1.0.
 
 ### The signing key
 

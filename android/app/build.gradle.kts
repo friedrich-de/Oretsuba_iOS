@@ -17,9 +17,12 @@ android {
         applicationId = "io.github.friedrich_de.oretsuba"
         minSdk = 26
         targetSdk = 36
-        // The build on GitHub passes its run number, as the iPhone package does.
-        versionCode = (System.getenv("ORE_BUILD_NUMBER") ?: "1").toInt()
-        versionName = "0.1.1"
+        // The build on GitHub passes its run number, as the iPhone package does: it is the build
+        // number and the last part of the version (0.1.N), so that every published build is newer
+        // than the one before. A build that was given no number is 0.1.0.
+        val buildNumber = System.getenv("ORE_BUILD_NUMBER")
+        versionCode = (buildNumber ?: "1").toInt()
+        versionName = "0.1." + (buildNumber ?: "0")
         ndk {
             // Phones and tablets, and the emulator on a PC.
             abiFilters += listOf("arm64-v8a", "x86_64")
