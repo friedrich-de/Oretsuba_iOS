@@ -328,6 +328,20 @@ messages unless `app+0xe2c`.)
 Note the one-frame latency: composition (7c) uses the state *before* this
 frame's VM run; a port can do input → VM → tick → compose → present.
 
+**Measured on the running game, 2026-11-26** (stepped clock, every call
+logged): task list #1 → input poll → VM → task list #2 → draw and present.
+The present in use there is the one that renders straight to the window
+(FUN_00437ff0 in the addresses above); the composing call of 7c and the
+windowed blit are not used. What follows from the order, each seen on
+screen:
+* A task that the script starts runs for the first time in the same frame,
+  after the script. A layer effect (N_d6) takes that frame's time as its
+  start and shows its first change in the next frame.
+* What a task does with the input reaches the script one run later. The text
+  window's state goes from 2 to 3 in task list #2 of the frame of the click;
+  the script reads N_300 = 3 in the next frame's run and only then starts the
+  next line (N_1ce, N_fb, N_d6 …).
+
 ### 3.3 Script scheduling & waiting **[V]**
 * FUN_004252d0 runs the interpreter until `end` (yield, returns 1) or the top
   level `ret` hits a null return address (returns 0). Mode flag

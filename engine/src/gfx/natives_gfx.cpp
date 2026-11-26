@@ -315,6 +315,7 @@ void register_gfx_natives(Engine &e) {
 		if (!s || !s->comp()) return 0;
 		Compositor *c = s->comp();
 		c->bg = a.u(1) ? e.image_of(a.u(1)) : nullptr;
+		c->bg_handle = c->bg ? a.u(1) : 0;
 		c->bg_x = a.i(2);
 		c->bg_y = a.i(3);
 		c->bg_cache.reset();
@@ -408,7 +409,12 @@ void register_gfx_natives(Engine &e) {
 		Surface *s = e.surface_of(a.u(0));
 		if (!s || !s->comp()) return 0;
 		Compositor *c = s->comp();
-		a.out(1, 0);  // background object handles are not exported
+		// The background object itself: the menus copy the game's picture into
+		// it before they fade away, so the page shows the game once its
+		// controls are hidden (SAVELOAD, HISTORY).
+		if (c->bg && e.image_of(c->bg_handle) != c->bg)
+			c->bg_handle = e.own_image(std::make_unique<ImageObj>(c->bg))->handle();
+		a.out(1, c->bg ? int32_t(c->bg_handle) : 0);
 		a.out(2, c->bg_x);
 		a.out(3, c->bg_y);
 		a.out(4, int(c->bg_color & 0xff));

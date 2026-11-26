@@ -10,8 +10,10 @@ The engine is a C++17 reimplementation of the Lucifen engine used by
 * `core/engine.h` `Engine`: owns everything (vfs, vm, mixer, sound, input,
   `tasks` scheduler, `text`, `ui`, image/view/layer registries, framebuffer,
   option block). One display frame = `Engine::frame(now)`: input poll → sound
-  update → `tasks.tick(now)` → VM run(s) → `render_frame()` (views →
-  800×600 BGRA framebuffer).
+  update → VM run → `tasks.tick(now)` → `render_frame()` (views → 800×600
+  BGRA framebuffer). That is the original's order as measured: a task the
+  script starts runs first in the same frame, and what a task does with a
+  click reaches the script one run later (docs/re/10_lifecycle_system.md 3.2).
 * `core/object.h` every script-visible object derives from `Object` and gets
   a 32-bit handle (`handle()`, `Object::as<T>(h)`). Natives return handles.
 * `core/args.h` `Args`: `a.i(k)`, `a.u(k)`, `a.s(k)` (C string), `a.out(k,v)`
@@ -26,7 +28,11 @@ The engine is a C++17 reimplementation of the Lucifen engine used by
   lowest), `Compositor` (bg image/offset/colour, `bg_cache` = transformed or
   effect-written background drawn at 0,0, main + overlay lists), `Surface`
   (pages type 7/9/10 with `linked` back page and a `Transition`), `View`.
-  Call `gfx_touch()` after changing anything visible.
+  Call `gfx_touch()` after changing anything visible. While a transition
+  runs, `Surface::update` draws it by its mode (0: both page images as they
+  lie, 1: both pages composed anew without their overlay lists, 2: the two
+  backgrounds with the front page's layers over them) and then draws the
+  page's overlay list over the frame (docs/re/30_effects.md 2.2).
 * `gfx/transition.h` transition interface used by `Surface`.
 * `audio/` mixer + sound manager; `input/` DIK-based input; `media/` movies.
 * `text/` fonts + message system; `ui/` controls. `platform/` host services
