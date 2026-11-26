@@ -72,6 +72,29 @@ android {
     }
 }
 
+// The mining kit's files (docs/MINING.md) go into the package as they are, from the
+// folder the Apple app takes them from, whole: the rules for undoing inflections,
+// the page of the dictionary popup, and the licences and notes that belong to them.
+abstract class CopyMiningFiles : DefaultTask() {
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val files: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val assets: DirectoryProperty
+
+    @get:Inject
+    abstract val fs: FileSystemOperations
+
+    @TaskAction
+    fun copy() {
+        fs.sync {
+            from(files)
+            into(assets.dir("mining"))
+        }
+    }
+}
+
 // The notices of the libraries inside the engine go into the package as they
 // are, from the one file the Apple app carries too.
 abstract class CopyNotices : DefaultTask() {
@@ -94,5 +117,10 @@ androidComponents {
             notices.set(rootProject.file("../app/Resources/ThirdPartyNotices.txt"))
         }
         variant.sources.assets?.addGeneratedSourceDirectory(copy, CopyNotices::assets)
+        val miningName = "copy" + variant.name.replaceFirstChar { it.uppercase() } + "MiningFiles"
+        val mining = tasks.register<CopyMiningFiles>(miningName) {
+            files.set(rootProject.file("../engine/resources/mining"))
+        }
+        variant.sources.assets?.addGeneratedSourceDirectory(mining, CopyMiningFiles::assets)
     }
 }

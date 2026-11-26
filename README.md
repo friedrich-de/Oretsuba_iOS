@@ -16,7 +16,7 @@ and on Android.
 
 **This repository contains nothing of the game.** You have to buy the game yourself and use your own game files.
 
-> **Mining.** This fork makes Anki cards from what you read, in two ways. In the game (on Apple devices so far):
+> **Mining.** This fork makes Anki cards from what you read, in two ways. In the game (on Apple devices and Android):
 > a tap on a word of the text shows a dictionary over the game, and a button makes the card, with the sentence,
 > its voice, a picture and the word's sound, through an AnkiConnect you name in the launcher or, on iPhone and
 > iPad, straight into the AnkiMobile app ([docs/ANKI_APPS.md](docs/ANKI_APPS.md)). Or through a
@@ -204,7 +204,7 @@ cd android && ./gradlew :app:assembleRelease   # app/build/outputs/apk/release/a
 * Libraries: stb_vorbis, stb_image, stb_image_write (public domain / MIT), pl_mpeg (MIT), minimp3 (CC0). The LPK and
   ELG formats were read with the help of GARbro (MIT). Licences and attributions are in
   [ThirdPartyNotices.txt](app/Resources/ThirdPartyNotices.txt), which is also inside the apps.
-* Mining in the game: the folder `engine/resources/mining`, which the Apple app carries as files of their own, is
+* Mining in the game: the folder `engine/resources/mining`, which the apps carry as files of their own, is
   under the GNU General Public License, version 3 or later ([LICENSE](engine/resources/mining/LICENSE)). It holds the
   page of the dictionary popup, whose own files say so at their head, and the two works the page is built on: the
   dictionary popup of [Hachidori](https://github.com/bee-san/hachidori)
@@ -213,7 +213,7 @@ cd android && ./gradlew :app:assembleRelease   # app/build/outputs/apk/release/a
   Hoshidicts language pack writes them (`transforms.json`). [SOURCES.md](engine/resources/mining/SOURCES.md) there
   has the details, also for the tests that belong to the folder (`engine/tests/page`, `engine/tests/japanese`).
   Dictionaries are not part of the app: you import your own, or have the app fetch Jitendex and JMnedict from
-  their makers.
+  their makers. The Android app also holds [SQLite](https://sqlite.org), which is in the public domain.
 
 ## Checks and packages
 

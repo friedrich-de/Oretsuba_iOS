@@ -12,6 +12,7 @@
 
 #include "android_platform.h"
 #include "api/ore_api.h"
+#include "api/ore_kit.h"
 #include "audio_out.h"
 #include "jni_bridge.h"
 #include "util/log.h"
@@ -109,7 +110,10 @@ void destroy(JNIEnv *env, jclass, jlong handle) {
 		if (s->window) ANativeWindow_release(s->window);
 		s->window = nullptr;
 	}
-	if (engine) ore_destroy(engine);
+	if (engine) {
+		ore_set_kit(engine, nullptr);
+		ore_destroy(engine);
+	}
 	if (s->host) env->DeleteGlobalRef(s->host);
 	delete s;
 }
@@ -228,6 +232,86 @@ jbyteArray mining_check(JNIEnv *env, jclass, jbyteArray data_dir, jintArray stat
 	return jni_bytes(env, text);
 }
 
+// ---------------------------------------------------------------- mining in the game (api/ore_kit.h)
+
+OreKit *kit_of(jlong handle) {
+	return reinterpret_cast<OreKit *>(handle);
+}
+
+void on_kit_event(void *, const char *name, const char *payload_json) {
+	ore::jni_kit_event(name, payload_json);
+}
+
+// Opens the app's one mining kit, which stays for as long as the app runs. 0
+// with the reason in error[0] when it cannot be opened.
+jlong kit_open(JNIEnv *env, jclass, jbyteArray folder, jbyteArray resources, jobjectArray error) {
+	std::string where = jni_string(env, folder), files = jni_string(env, resources);
+	char problem[512] = "";
+	OreKit *kit = ore_kit_open(where.c_str(), files.c_str(), problem, int(sizeof problem));
+	if (!kit) {
+		jbyteArray text = jni_bytes(env, problem[0] ? problem : "Mining in the game could not be started.");
+		env->SetObjectArrayElement(error, 0, text);
+		return 0;
+	}
+	ore_kit_set_events(kit, nullptr, on_kit_event);
+	return reinterpret_cast<jlong>(kit);
+}
+
+// The kit's answer to a method as JSON. Waits for the answer, which may come from the network.
+jbyteArray kit_call(JNIEnv *env, jclass, jlong kit, jbyteArray method, jbyteArray params) {
+	std::string name = jni_string(env, method), json = jni_string(env, params);
+	char *answer = ore_kit_call(kit_of(kit), name.c_str(), json.c_str());
+	jbyteArray out = jni_bytes(env, answer ? answer : R"({"ok":false,"error":"The kit did not answer.","kind":"internal"})");
+	ore_kit_free(answer);
+	return out;
+}
+
+// A file of the kit's for the popup's page, with its media type in type[0]. Null when there is none.
+jbyteArray kit_data(JNIEnv *env, jclass, jlong kit, jbyteArray method, jbyteArray params, jobjectArray type) {
+	std::string name = jni_string(env, method), json = jni_string(env, params);
+	uint8_t *bytes = nullptr;
+	int64_t length = 0;
+	char media[128] = "";
+	if (!ore_kit_data(kit_of(kit), name.c_str(), json.c_str(), &bytes, &length, media, int(sizeof media)) || !bytes) return nullptr;
+	jbyteArray out = env->NewByteArray(jsize(length));
+	if (out && length > 0) env->SetByteArrayRegion(out, 0, jsize(length), reinterpret_cast<const jbyte *>(bytes));
+	ore_kit_free(bytes);
+	jbyteArray text = jni_bytes(env, media);
+	env->SetObjectArrayElement(type, 0, text);
+	return out;
+}
+
+jboolean kit_direct(JNIEnv *, jclass, jlong kit) {
+	return kit && ore_kit_direct(kit_of(kit)) ? JNI_TRUE : JNI_FALSE;
+}
+
+// Gives the game the kit, or takes it away with 0 (the engine's thread).
+void set_kit(JNIEnv *, jclass, jlong handle, jlong kit) {
+	if (Session *s = session_of(handle); s->engine) ore_set_kit(s->engine, kit_of(kit));
+}
+
+// What a tap at a place of the game's screen is (ore_text_tap), into what[0]:
+// 0 the game's, 1 a word of the text, 2 the text box beside the words. For a
+// word the answer is the JSON the popup's page takes.
+jbyteArray text_tap(JNIEnv *env, jclass, jlong handle, jint x, jint y, jintArray what) {
+	Session *s = session_of(handle);
+	char *json = nullptr;
+	jint kind = s->engine ? ore_text_tap(s->engine, x, y, &json) : 0;
+	env->SetIntArrayRegion(what, 0, 1, &kind);
+	jbyteArray out = json ? jni_bytes(env, json) : nullptr;
+	ore_kit_free(json);
+	return out;
+}
+
+void set_reading_hold(JNIEnv *, jclass, jlong handle, jboolean hold) {
+	if (Session *s = session_of(handle); s->engine) ore_set_reading_hold(s->engine, hold ? 1 : 0);
+}
+
+// A request of the kit's is under way in Kotlin (KitHttp.kt): tells how far it is, and hears whether to go on.
+jboolean fetch_step(JNIEnv *, jclass, jlong handle, jlong taken, jlong expected) {
+	return ore::jni_fetch_step(handle, taken, expected) ? JNI_TRUE : JNI_FALSE;
+}
+
 const JNINativeMethod kMethods[] = {
     {"newSession", "(Lio/github/friedrich_de/oretsuba/EngineHost;)J", reinterpret_cast<void *>(new_session)},
     {"boot", "(J[B[BIZ)[B", reinterpret_cast<void *>(boot)},
@@ -246,6 +330,14 @@ const JNINativeMethod kMethods[] = {
     {"answerDialog", "(JI)V", reinterpret_cast<void *>(answer_dialog)},
     {"answerTextInput", "(JZ[B)V", reinterpret_cast<void *>(answer_text_input)},
     {"miningCheck", "([B[I)[B", reinterpret_cast<void *>(mining_check)},
+    {"kitOpen", "([B[B[[B)J", reinterpret_cast<void *>(kit_open)},
+    {"kitCall", "(J[B[B)[B", reinterpret_cast<void *>(kit_call)},
+    {"kitData", "(J[B[B[[B)[B", reinterpret_cast<void *>(kit_data)},
+    {"kitDirect", "(J)Z", reinterpret_cast<void *>(kit_direct)},
+    {"setKit", "(JJ)V", reinterpret_cast<void *>(set_kit)},
+    {"textTap", "(JII[I)[B", reinterpret_cast<void *>(text_tap)},
+    {"setReadingHold", "(JZ)V", reinterpret_cast<void *>(set_reading_hold)},
+    {"fetchStep", "(JJJ)Z", reinterpret_cast<void *>(fetch_step)},
 };
 
 }  // namespace

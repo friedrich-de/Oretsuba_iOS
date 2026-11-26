@@ -8,7 +8,7 @@
     <string name="files_found">✓ Game files found</string>
     <string name="files_missing">No game files found yet</string>
     <string name="files_missing_note">Bring in the SET_UP folder from the disc of your own copy of the game (the folder with SCRIPT.LPK, PIC.LPK and the other files).</string>
-    <string name="mining_off">Mining is off (optional: bring in the mining.txt of your mining server below)</string>
+    <string name="mining_off">Sending lines to a mining server is off (optional: bring in the mining.txt of your mining server below)</string>
 
     <string name="start_game">Start game</string>
     <string name="continue_game">Continue</string>
@@ -38,6 +38,99 @@
     <string name="controls_other">A mouse, a keyboard or a game controller works too, as on the PC.</string>
 
     <string name="licences">Licences</string>
+
+    <!-- Mining in the game (docs/MINING.md): the launcher's card and the settings screen. -->
+    <string name="kit_title">Mining in the game</string>
+    <string name="kit_set_up">Set up…</string>
+    <string name="kit_note">A dictionary over the game\'s text, and cards for Anki.</string>
+    <string name="kit_summary_off">Off: a tap on the text reads on.</string>
+    <string name="kit_summary_no_dictionary">On, but without a dictionary no word is found.</string>
+    <plurals name="kit_dictionaries">
+        <item quantity="one">%1$d dictionary</item>
+        <item quantity="other">%1$d dictionaries</item>
+    </plurals>
+    <string name="kit_summary_cards">On: %1$s, cards go to the deck %2$s.</string>
+    <string name="kit_summary_no_cards">On: %1$s, words are looked up. No cards yet: %2$s</string>
+    <string name="kit_old_web_view">The dictionary cannot be shown on this device: %1$s</string>
+    <string name="kit_done">Done</string>
+
+    <string name="kit_game_title">The game</string>
+    <string name="kit_direct">Look words up in the game</string>
+    <string name="kit_direct_note">A tap on a word of the text then shows the dictionary, and the game waits until the dictionary is closed. The text box no longer reads on: tap the picture above it, or use a key, the wheel or a controller.</string>
+
+    <string name="kit_anki_title">Anki</string>
+    <string name="kit_anki_address">Address of your AnkiConnect</string>
+    <string name="kit_anki_key">Key, if it asks for one</string>
+    <string name="kit_anki_key_kept">Key (one is kept; type to replace it)</string>
+    <string name="kit_connect">Connect</string>
+    <string name="kit_connected_lapis">Connected. The Lapis note type is there.</string>
+    <string name="kit_connected_plain">Connected. There is no Lapis note type: choose a note type and what goes into its fields.</string>
+    <string name="kit_forget_key">Forget the key</string>
+    <string name="kit_deck">Deck</string>
+    <string name="kit_note_type">Note type</string>
+    <string name="kit_none_chosen">None chosen</string>
+    <string name="kit_fields">What goes into the fields…</string>
+    <string name="kit_fields_title">The fields of %1$s</string>
+    <string name="kit_fields_note">The Lapis note type\'s fields are filled as its makers mean them to be. In any other note type, choose what each field gets.</string>
+    <string name="kit_fields_legend">What a field can get</string>
+    <string name="kit_role_line">%1$s: %2$s</string>
+    <string name="kit_tags">Tags</string>
+    <string name="kit_tags_hint">parted by blanks</string>
+    <string name="kit_anki_note">Cards go to the AnkiConnect you name here: the one of Anki on your computer, or a server of your own. With the Lapis note type there is nothing more to choose. An address in your own network may start with http; any other has to start with https. The key is kept on this device only, sealed with a key of the device\'s own.</string>
+    <string name="kit_not_kept">This device could not keep it: it has to be entered again after the app was closed.</string>
+
+    <string name="kit_dictionaries_title">Dictionaries</string>
+    <plurals name="kit_words">
+        <item quantity="one">%1$s word</item>
+        <item quantity="other">%1$s words</item>
+    </plurals>
+    <plurals name="kit_frequencies">
+        <item quantity="one">%1$s frequency</item>
+        <item quantity="other">%1$s frequencies</item>
+    </plurals>
+    <plurals name="kit_pitches">
+        <item quantity="one">%1$s pitch accent</item>
+        <item quantity="other">%1$s pitch accents</item>
+    </plurals>
+    <string name="kit_empty">empty</string>
+    <string name="kit_move_up">Up</string>
+    <string name="kit_move_down">Down</string>
+    <string name="kit_remove_question">Remove the dictionary %1$s?</string>
+    <string name="kit_add">Add %1$s</string>
+    <string name="kit_add_note">%1$s, its newest release</string>
+    <string name="kit_import_file">Import a file…</string>
+    <string name="kit_import_address">Download from an address…</string>
+    <string name="kit_download_title">Download a dictionary</string>
+    <string name="kit_download_note">The address of a dictionary in Yomitan\'s format (a zip file).</string>
+    <string name="kit_download_hint" translatable="false">https://…</string>
+    <string name="kit_download">Download</string>
+    <string name="kit_downloading">Downloading…</string>
+    <string name="kit_downloading_named">Downloading %1$s…</string>
+    <string name="kit_importing">Importing…</string>
+    <string name="kit_importing_named">Importing %1$s…</string>
+    <string name="kit_copying">Reading %1$s…</string>
+    <string name="kit_unreadable">%1$s could not be read: %2$s</string>
+    <string name="kit_unreadable_nothing">the place it lies in gave nothing.</string>
+    <string name="kit_stop">Stop</string>
+    <string name="kit_dictionaries_note">Dictionaries in Yomitan\'s format (zip files) are kept on this device. A word\'s meanings are shown in this order. Dictionaries of frequencies and of pitch accents count too.</string>
+
+    <string name="kit_audio_title">Word audio</string>
+    <string name="kit_audio_address">Address of an audio source</string>
+    <string name="kit_audio_address_kept">An address is kept; type to replace it</string>
+    <string name="kit_audio_check">Check</string>
+    <string name="kit_audio_check_keep">Check and keep</string>
+    <plurals name="kit_audio_answers">
+        <item quantity="one">It answers, with %1$d sound for 食べる.</item>
+        <item quantity="other">It answers, with %1$d sounds for 食べる.</item>
+    </plurals>
+    <string name="kit_forget_audio">Forget the address</string>
+    <string name="kit_audio_note">The address of an audio source as Yomitan takes a custom one, with {term} and {reading} where the word and its reading go. The popup plays its sounds, and a card gets the one chosen. The address is kept like the key, as it often holds a key.</string>
+
+    <string name="kit_popup_title">The dictionary</string>
+    <string name="kit_text_size">Text size</string>
+    <string name="kit_percent">%1$d %%</string>
+    <string name="kit_hide_tags">Hide tags</string>
+    <string name="kit_compact">Compact meanings</string>
 
     <string name="ok">OK</string>
     <string name="yes">Yes</string>
