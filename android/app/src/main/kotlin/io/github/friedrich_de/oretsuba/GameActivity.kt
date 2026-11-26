@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
 import android.text.InputType
 import android.view.Choreographer
 import android.view.Gravity
@@ -294,6 +295,9 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
                     false
                 }
             }
+            // The dialog is for typing: the keyboard comes up with it.
+            dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+            field.requestFocus()
             dialog.show()
         }
     }
@@ -531,6 +535,8 @@ class GameActivity : Activity(), SurfaceHolder.Callback, EngineHost, Choreograph
         private val ready = CountDownLatch(1)
 
         override fun run() {
+            // The thread that makes every picture: the system should run it like one.
+            Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY)
             Looper.prepare()
             handler = Handler(Looper.myLooper()!!)
             ready.countDown()
