@@ -18,7 +18,9 @@
 # (tools/mining_page/neighbours.mjs, ports 18765 to 18767) gives the card a
 # word's sound. With ORE_ADB_SERIAL it uses that device instead: use only one
 # whose AnkiDroid collection and mining settings do not matter, the checks add
-# notes and a deck and change the settings.
+# notes and a deck and change the settings. Its AnkiDroid is taken as it is;
+# ORE_ANKIDROID_NEW=yes says that it is new there, and has it set up as in the
+# script's own emulator.
 # ORE_ANKIDROID_APK names an AnkiDroid package to install; without it the
 # newest release is downloaded from AnkiDroid's page on GitHub. What it found
 # is in build/ankidroid-check; the emulator and the downloaded package are
@@ -124,12 +126,14 @@ if found:
 
 # A new AnkiDroid as a player sets it up: allowed to keep its collection where
 # it wants it, opened, and "Get started" pressed. Only in the script's own
-# emulator; a device given by ORE_ADB_SERIAL has its AnkiDroid as it is.
+# emulator, or where ORE_ANKIDROID_NEW says so; otherwise a device given by
+# ORE_ADB_SERIAL has its AnkiDroid as it is.
+new="$started${ORE_ANKIDROID_NEW:-}"
 open_ankidroid() {
-	[ -z "$started" ] || run shell appops set --uid com.ichi2.anki MANAGE_EXTERNAL_STORAGE allow
+	[ -z "$new" ] || run shell appops set --uid com.ichi2.anki MANAGE_EXTERNAL_STORAGE allow
 	run shell monkey -p com.ichi2.anki -c android.intent.category.LAUNCHER 1 > /dev/null 2>&1 || true
 	sleep 10
-	if [ -n "$started" ]; then
+	if [ -n "$new" ]; then
 		tap_text "Get started" && sleep 10 || true
 	fi
 	run exec-out screencap -p > "$OUT/$1.png" 2>/dev/null || true

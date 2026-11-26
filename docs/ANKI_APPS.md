@@ -115,7 +115,8 @@ tools/apple/ankimobile-standin/run.sh
 ```
 
 The second one takes a device instead of an emulator with `ORE_ADB_SERIAL`. It adds notes and a deck to that
-device's AnkiDroid and changes the app's mining settings, so use only one where neither matters. In its own
+device's AnkiDroid and changes the app's mining settings, so use only one where neither matters; with
+`ORE_ANKIDROID_NEW=yes` it also sets up an AnkiDroid that was never opened there. In its own
 emulator it sets a new AnkiDroid up as a player does and runs a second time with the apps installed in the other
 order, Oretsuba first; that time Android's question is refused twice, and the way through the system's settings
 is taken. The pictures it takes of the screen are in `build/ankidroid-check`.

@@ -16,6 +16,12 @@
 //   -e audioPort PORT   the port of an audio source on the computer an emulator
 //                       runs on (tools/mining_page/neighbours.mjs): the card then
 //                       gets the word's sound
+//   -e roles A,B,C      what the note type's first fields get, by the kit's names
+//                       (word,meaning,wordAudio without it; word,picture,sound
+//                       leaves settings with which a card made in the game
+//                       carries the picture and the line's voice)
+//   -e only notes       checks nothing: prints the notes AnkiDroid got in the
+//                       last day, newest first, as this app is let see them
 //
 // It adds a note and the deck "Oretsuba check" to AnkiDroid and changes this
 // app's mining settings, so run it where neither matters.
@@ -48,6 +54,8 @@ class MiningSettingsCheck : Instrumentation() {
     private var failed = 0
     private var refuseTwice = false
     private var audioPort = ""
+    private var roleNames = listOf("word", "meaning", "wordAudio")
+    private var onlyNotes = false
     private var shots: File? = null
     private var shot = 0
 
@@ -55,12 +63,15 @@ class MiningSettingsCheck : Instrumentation() {
         super.onCreate(arguments)
         refuseTwice = arguments?.getString("refuse") == "twice"
         audioPort = arguments?.getString("audioPort").orEmpty()
+        arguments?.getString("roles")?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.takeIf { it.isNotEmpty() }
+            ?.let { roleNames = it }
+        onlyNotes = arguments?.getString("only") == "notes"
         start()
     }
 
     override fun onStart() {
         try {
-            run(targetContext)
+            if (onlyNotes) notes(targetContext) else run(targetContext)
         } catch (e: Throwable) {
             check(false, "the check runs to its end ($e)")
             Log.w(TAG, e)
@@ -258,6 +269,21 @@ class MiningSettingsCheck : Instrumentation() {
 
     // ---------------------------------------------------------------- the check
 
+    /** The notes AnkiDroid got in the last day, newest first: their fields and tags. */
+    private fun notes(context: Context) {
+        val found = ArrayList<Pair<Long, String>>()
+        context.contentResolver.query(Uri.parse("content://com.ichi2.anki.flashcards/notes"), null, "added:1", null, null)?.use { rows ->
+            val id = rows.getColumnIndexOrThrow("_id")
+            val fields = rows.getColumnIndexOrThrow("flds")
+            val tags = rows.getColumnIndexOrThrow("tags")
+            while (rows.moveToNext()) {
+                found.add(rows.getLong(id) to (rows.getString(fields) ?: "").replace('\u001f', '|') + "   tags:" + (rows.getString(tags) ?: ""))
+            }
+        }
+        note("${found.size} notes of the last day in AnkiDroid")
+        for ((id, text) in found.sortedByDescending { it.first }.take(12)) note("$id  $text")
+    }
+
     private fun run(context: Context) {
         shots = context.getExternalFilesDir("check")?.also { folder ->
             folder.mkdirs()
@@ -330,7 +356,7 @@ class MiningSettingsCheck : Instrumentation() {
         val labels = HashMap<String, String>()
         val roles = MiningKit.call("anki.roleChoices") as? JSONArray ?: JSONArray()
         for (i in 0 until roles.length()) roles.getJSONObject(i).let { labels[it.getString("role")] = it.getString("label") }
-        val wanted = listOf("word", "meaning", "wordAudio").take(fields.size)
+        val wanted = roleNames.take(fields.size)
         pressButton(activity, R.id.anki_fields)
         check(waitFor { find(withText(fields[0])) != null }, "the fields dialog opens")
         for ((index, role) in wanted.withIndex()) {
@@ -384,9 +410,9 @@ class MiningSettingsCheck : Instrumentation() {
             }
             val values = kept.split('\u001f')
             note("the note's fields: " + values.joinToString(" | "))
-            check(values.getOrNull(0) == "食べる$stamp", "the word is in the first field")
-            check(values.getOrNull(1)?.contains("to eat ($stamp)") == true, "its meaning is in the second")
-            if (audioPort.isNotEmpty() && fields.size >= 3) {
+            if (wanted.getOrNull(0) == "word") check(values.getOrNull(0) == "食べる$stamp", "the word is in the first field")
+            if (wanted.getOrNull(1) == "meaning") check(values.getOrNull(1)?.contains("to eat ($stamp)") == true, "its meaning is in the second")
+            if (audioPort.isNotEmpty() && wanted.getOrNull(2) == "wordAudio") {
                 check(Regex("^\\[sound:[^\\]]+\\]$").matches(values.getOrNull(2).orEmpty()),
                       "the word's sound is in the third, under the name AnkiDroid stored it by")
                 check(made?.optBoolean("noWordAudio") == false, "and the kit does not say the sound was missing")
