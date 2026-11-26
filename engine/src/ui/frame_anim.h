@@ -60,12 +60,19 @@ private:
 // Plays a FrameAnim (FUN_004576c0 / FUN_00457550): loops `loops` cycles
 // (0 = forever) and calls finish() at the end. Ends by itself when the
 // source is freed (N_210 / N_211).
+//
+// An endless animation starts each cycle anew: the update that finds the
+// cycle over shows its last frame once more and takes that moment as the new
+// start, so what was over is dropped (at 16 ms a frame the six frames of the
+// 600 ms wait cursor take 38 frames, not 37.5). A pause does not move the
+// start; resuming only asks for the current frame to be drawn again.
 class FrameAnimTask : public Task {
 public:
 	static constexpr int kType = 0x32c9;
 	FrameAnimTask(FrameAnim *anim, int loops, int type = kType);
 	bool update(int64_t now) override;
 	void finish() override;
+	void on_resume(int64_t now, int64_t paused_for) override;
 	uint32_t anim_handle() const { return anim_; }
 
 private:

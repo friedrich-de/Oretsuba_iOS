@@ -356,6 +356,9 @@ which no script has run yet are kept for the next logic frame.
 - `menu_fade`: the load screen is opened from the title and closed again, and every frame is looked at: the screen
   fades in over the title's picture, it fades away with all its controls, and once it has faded away it does not
   show again.
+- `wait_cursor`, without the game: the animation of the small button that waits for a click takes 38 frames for its
+  six pictures at 16 ms a frame, draws in the frame it is shown again and keeps its phase over a hide; a click
+  region made with -1 as its fifth argument is switched off.
 - `fx_test` checks the arithmetic of the effects, and `elg_all` decodes every ELG picture.
 - `mining_test`: the mining settings file, the text of a record, which lines are sent, the request and the queue.
 - `dict_test`: undoing inflections against Yomitan's test corpus, reading a zip, importing a dictionary in Yomitan's

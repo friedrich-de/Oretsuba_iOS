@@ -137,6 +137,10 @@ bool FrameAnimTask::update(int64_t now) {
 	}
 	int f;
 	if (c > 0) {
+		if (loops_ == 0 && t >= c) {
+			start_ = now;
+			t = c - 1;
+		}
 		f = a->frame_at(t);
 	} else {  // random frame each interval (FUN_00457bc0)
 		if (last_ >= 0 && t < int64_t(a->interval)) return false;
@@ -154,6 +158,12 @@ bool FrameAnimTask::update(int64_t now) {
 
 void FrameAnimTask::finish() {
 	if (FrameAnim *a = Object::as<FrameAnim>(anim_)) a->finish();
+}
+
+// The original's resume sets the shown frame to -1: whoever hid the animation
+// restored the background under it, so the next update has to draw.
+void FrameAnimTask::on_resume(int64_t, int64_t) {
+	last_ = -1;
 }
 
 }  // namespace ore

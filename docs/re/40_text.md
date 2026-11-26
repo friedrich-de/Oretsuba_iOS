@@ -362,6 +362,27 @@ smaller than the frame period the speed is one character per frame.
   (relayout line metrics); 8: ignore.
 FUN_00409240 is the same loop without stopping at 1/2/3 (instant page).
 
+### 5.3 The click-wait cursor  [read and measured on the 1.01 EXE, 2026-11-26]
+The animation task of the window's `+0x2a4` (class vtable 0x4ee688; update
+0x457560, frame choice 0x457b90, pause 0x409080, resume 0x458290 in that
+EXE). It is created **paused at the first N_2fa**, so it stands behind the
+RevealController in the task list.
+
+* The first update after its init, that is the first time it is shown, sets
+  `start = now`.
+* An update that finds `now - start >= cycle` (600 ms for six frames of
+  100 ms) sets `start = now`, which drops what was over, and draws the last
+  frame once more. With 16 ms per frame a round is therefore exactly 38
+  frames: frames 0 to 3 last 6 frames each, frames 4 and 5 last 7.
+* Pause and resume shift only the task's due time. Resume also sets the shown
+  frame (+0x44) to -1, which forces a redraw. The animation's start is not
+  shifted: the phase runs on while the cursor is hidden.
+* Showing draws at once, since the cursor's task runs after the controller in
+  the same tick. The cursor is on screen in the frame the text is complete
+  and hidden only in the frame of the click (measured with clicks 40, 55 and
+  70 frames after a line was complete: hidden for one frame each time, the
+  38-frame round kept across the clicks).
+
 ---------------------------------------------------------------------------
 
 ## 6. Text object layout engine (type 5; base class vtable 0x4ee7f0)
