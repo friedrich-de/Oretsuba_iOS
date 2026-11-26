@@ -4,11 +4,18 @@ Third-party notices
 The game's files are supplied separately by the player and are not included in this application.
 
 Mining in the game: the dictionary popup and the Japanese rules
-The app carries two works under the GNU General Public License, version 3 or
-later, as files of their own in its folder "mining". The licence's full text
-is the file mining/page/vendor/dictionary-popup/LICENSE inside the app, and the
-source of everything in that folder is in this project's repository under
+The app carries, as files of their own in its folder "mining", the page of the
+dictionary popup and the rules for undoing Japanese inflections. Everything in
+that folder is under the GNU General Public License, version 3 or later. The
+licence's full text is the file mining/LICENSE inside the app, and the source
+of everything in that folder is in this project's repository under
 engine/resources/mining.
+
+The popup's page (mining/page: popup.html, popup.css, main.js, host.js,
+word.js, furigana.js, glossary-html.js)
+https://github.com/friedrich-de/Oretsuba_iOS-Android-Mining
+SPDX-License-Identifier: GPL-3.0-or-later
+Written for this project around the two works below.
 
 dictionary-popup (the dictionary popup of Hachidori)
 https://github.com/bee-san/dictionary-popup

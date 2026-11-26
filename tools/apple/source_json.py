@@ -31,6 +31,13 @@ def app_info(ipa):
         return plistlib.loads(package.read(plists[0]))
 
 
+def identifier(repository):
+    """The name a sideloading app knows the source by. It must stay the same for good, or the app takes the next
+    build's file for another source: so it is made of the owner alone and not of the repository's name, which has
+    changed once (it was Oretsuba_iOS)."""
+    return "io.github." + repository.split("/")[0].lower() + ".oretsuba-ios"
+
+
 def source(ipa, repository, tag, commit, date):
     info = app_info(ipa)
     site = f"https://github.com/{repository}"
@@ -42,7 +49,7 @@ def source(ipa, repository, tag, commit, date):
     notes = f"Build {build}, made by GitHub from commit {commit[:7]} of {repository}."
     return {
         "name": "Oretsuba",
-        "identifier": "io.github." + repository.lower().replace("/", ".").replace("_", "-"),
+        "identifier": identifier(repository),
         "subtitle": "The newest build of the port of 俺たちに翼はない",
         "website": site,
         "iconURL": icon,

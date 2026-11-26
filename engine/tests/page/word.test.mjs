@@ -1,3 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The contributors to friedrich-de/Oretsuba_iOS-Android-Mining
+//
+// This file tests the dictionary popup of the Oretsuba port. It is free software: you can
+// redistribute it and/or modify it under the terms of the GNU General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+// version. It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+// even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+// General Public License for more details: its text is the file LICENSE in engine/resources/mining.
+
 // The popup page's own parts that need no browser (engine/resources/mining/page): what a card
 // gets from a word, furigana, definitions as HTML, and the bridge to the host.
 //

@@ -58,11 +58,12 @@ Apps that install from sources can take the newest build straight from this addr
 under Sources) and the app appears there with its version and date:
 
 ```text
-https://github.com/friedrich-de/Oretsuba_iOS/releases/latest/download/source.json
+https://github.com/friedrich-de/Oretsuba_iOS-Android-Mining/releases/latest/download/source.json
 ```
 
 Every build of `main` writes that file anew, so it always points to the newest package. The package is unsigned; the
-app that installs it signs it with your own certificate.
+app that installs it signs it with your own certificate. The repository was called `Oretsuba_iOS` before: a source
+added under that name keeps working, as GitHub passes the old address on.
 
 ### iPhone / iPad (sideloading)
 
@@ -203,13 +204,16 @@ cd android && ./gradlew :app:assembleRelease   # app/build/outputs/apk/release/a
 * Libraries: stb_vorbis, stb_image, stb_image_write (public domain / MIT), pl_mpeg (MIT), minimp3 (CC0). The LPK and
   ELG formats were read with the help of GARbro (MIT). Licences and attributions are in
   [ThirdPartyNotices.txt](app/Resources/ThirdPartyNotices.txt), which is also inside the apps.
-* Mining in the game uses two works under the GPL-3.0-or-later, which the Apple app carries as files of their own: the
+* Mining in the game: the folder `engine/resources/mining`, which the Apple app carries as files of their own, is
+  under the GNU General Public License, version 3 or later ([LICENSE](engine/resources/mining/LICENSE)). It holds the
+  page of the dictionary popup, whose own files say so at their head, and the two works the page is built on: the
   dictionary popup of [Hachidori](https://github.com/bee-san/hachidori)
-  ([dictionary-popup](https://github.com/bee-san/dictionary-popup), in
-  `engine/resources/mining/page/vendor/dictionary-popup` with its licence and sources), and
-  [Yomitan](https://github.com/yomidevs/yomitan)'s rules for Japanese inflections as the Hoshidicts language pack
-  writes them (`engine/resources/mining/transforms.json`, see `SOURCES.md` beside it). Dictionaries are not part of
-  the app; you import your own.
+  ([dictionary-popup](https://github.com/bee-san/dictionary-popup), in `page/vendor/dictionary-popup` with its
+  licence and sources) and [Yomitan](https://github.com/yomidevs/yomitan)'s rules for Japanese inflections as the
+  Hoshidicts language pack writes them (`transforms.json`). [SOURCES.md](engine/resources/mining/SOURCES.md) there
+  has the details, also for the tests that belong to the folder (`engine/tests/page`, `engine/tests/japanese`).
+  Dictionaries are not part of the app: you import your own, or have the app fetch Jitendex and JMnedict from
+  their makers.
 
 ## Checks and packages
 
