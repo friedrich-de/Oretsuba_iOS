@@ -24,6 +24,9 @@ import javax.net.ssl.SSLException
 internal object KitHttp {
     private const val HOPS = 5
 
+    private const val GIVEN_UP = "The request was given up."
+    private const val LOOK_MS = 150L
+
     private class Answer {
         var status = 0
         var tooLarge = false
@@ -31,6 +34,47 @@ internal object KitHttp {
         var from = ""
         var error = ""
         var body = ByteArray(0)
+    }
+
+    /**
+     * Looks, beside a request, whether the kit has given it up, and then
+     * closes its connection: a request that waits for a server that does not
+     * answer would otherwise only hear of it when its time is over.
+     */
+    private class Watch(private val handle: Long) {
+        @Volatile
+        var connection: HttpURLConnection? = null
+
+        @Volatile
+        var givenUp = false
+            private set
+
+        private val thread = Thread({
+            try {
+                while (true) {
+                    Thread.sleep(LOOK_MS)
+                    // Without a length the kit's progress stays as it is; only the question is asked.
+                    if (!Native.fetchStep(handle, 0, 0)) {
+                        givenUp = true
+                        connection?.disconnect()
+                        return@Thread
+                    }
+                }
+            } catch (e: InterruptedException) {
+                // The request is over.
+            }
+        }, "mining-kit-watch")
+
+        fun start() {
+            thread.isDaemon = true
+            thread.start()
+        }
+
+        /** Returns once the watcher has ended: [handle] is the request's own and goes with it. */
+        fun end() {
+            thread.interrupt()
+            thread.join()
+        }
     }
 
     /**
@@ -45,8 +89,10 @@ internal object KitHttp {
               toFile: String?, handle: Long): ByteArray {
         val answer = Answer()
         var whole = false
+        val watch = Watch(handle)
+        watch.start()
         try {
-            whole = run(method, url, headers, body, maxOf(1000, timeoutMs), maxBytes, toFile, handle, answer)
+            whole = run(method, url, headers, body, maxOf(1000, timeoutMs), maxBytes, toFile, handle, answer, watch)
         } catch (e: MalformedURLException) {
             answer.error = "The address is not one."
         } catch (e: UnknownHostException) {
@@ -59,6 +105,13 @@ internal object KitHttp {
             answer.error = "No secure connection to the server: " + (e.localizedMessage ?: e.javaClass.simpleName)
         } catch (e: Exception) {
             answer.error = e.localizedMessage ?: e.javaClass.simpleName
+        } finally {
+            watch.end()
+        }
+        // A connection closed under the request fails in some way of its own; why is known here.
+        if (watch.givenUp) {
+            answer.error = GIVEN_UP
+            whole = false
         }
         if (answer.error.isNotEmpty()) answer.status = 0
         if (!whole && toFile != null) File(toFile).delete()
@@ -67,7 +120,7 @@ internal object KitHttp {
 
     /** True when the answer arrived whole. */
     private fun run(method: String, url: String, headers: Array<ByteArray>, body: ByteArray?, timeout: Int,
-                    maxBytes: Long, toFile: String?, handle: Long, answer: Answer): Boolean {
+                    maxBytes: Long, toFile: String?, handle: Long, answer: Answer, watch: Watch): Boolean {
         var address = URL(url)
         var verb = method.ifEmpty { "GET" }
         var sent = body
@@ -76,6 +129,11 @@ internal object KitHttp {
             val connection = address.openConnection() as? HttpURLConnection
             if (connection == null) {
                 answer.error = "The address is not one of a web server."
+                return false
+            }
+            watch.connection = connection
+            if (watch.givenUp) {
+                connection.disconnect()
                 return false
             }
             try {
@@ -135,7 +193,7 @@ internal object KitHttp {
                             }
                             output.write(buffer, 0, n)
                             if (!Native.fetchStep(handle, taken, expected)) {
-                                answer.error = "The request was given up."
+                                answer.error = GIVEN_UP
                                 return false
                             }
                         }

@@ -2,6 +2,7 @@
 <!-- Mining in the game (MiningSettingsActivity, docs/MINING.md). -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/scroll"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
@@ -82,7 +83,7 @@
                         style="@style/SettingField"
                     android:importantForAutofill="no"
                         android:hint="@string/kit_anki_address"
-                        android:imeOptions="actionDone"
+                        android:imeOptions="actionDone|flagNoExtractUi"
                         android:inputType="textUri" />
 
                     <EditText
@@ -90,7 +91,7 @@
                         style="@style/SettingField"
                     android:importantForAutofill="no"
                         android:hint="@string/kit_anki_key"
-                        android:imeOptions="actionDone"
+                        android:imeOptions="actionDone|flagNoExtractUi"
                         android:inputType="textPassword" />
 
                     <LinearLayout
@@ -168,7 +169,7 @@
                     style="@style/SettingField"
                     android:importantForAutofill="no"
                     android:hint="@string/kit_tags_hint"
-                    android:imeOptions="actionDone"
+                    android:imeOptions="actionDone|flagNoExtractUi"
                     android:inputType="textNoSuggestions" />
 
                 <TextView
@@ -267,7 +268,7 @@
                     style="@style/SettingField"
                     android:importantForAutofill="no"
                     android:hint="@string/kit_audio_address"
-                    android:imeOptions="actionDone"
+                    android:imeOptions="actionDone|flagNoExtractUi"
                     android:inputType="textUri" />
 
                 <LinearLayout

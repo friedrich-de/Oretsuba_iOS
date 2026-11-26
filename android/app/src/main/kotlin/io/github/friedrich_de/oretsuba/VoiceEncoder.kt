@@ -19,14 +19,19 @@ internal object VoiceEncoder {
     private const val WAIT_US = 10_000L
     /** A voice is some seconds long. An encoder that takes longer than this has hung. */
     private const val LIMIT_MS = 30_000L
+    /** Three frames of silence, in bytes: the encoder's delay of two frames, and the frame the voice ends in. */
+    private const val SILENCE_BYTES = 3 * 1024 * 4
 
     /**
-     * [samples] are 16-bit little-endian, two channels in turn. Null when the
+     * [voice] holds 16-bit little-endian samples, two channels in turn. Null when the
      * device cannot encode them; the card then carries the game's own file.
      */
-    fun encode(samples: ByteArray, rate: Int): ByteArray? {
+    fun encode(voice: ByteArray, rate: Int): ByteArray? {
         val folder = MiningKit.context?.cacheDir ?: return null
-        if (samples.size < 4 || rate <= 0) return null
+        if (voice.size < 4 || rate <= 0) return null
+        // The encoder gives out whole frames of 1024 moments only, and each 2048 moments late:
+        // without silence behind the voice, its last 50 to 70 ms would stay inside the encoder.
+        val samples = voice.copyOf((voice.size and 3.inv()) + SILENCE_BYTES)
         val file = File.createTempFile("ore-voice", ".m4a", folder)
         var codec: MediaCodec? = null
         var muxer: MediaMuxer? = null

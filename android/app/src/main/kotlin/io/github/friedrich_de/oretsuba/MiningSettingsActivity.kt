@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -13,6 +14,7 @@ import android.provider.OpenableColumns
 import android.text.InputType
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
@@ -94,6 +96,8 @@ class MiningSettingsActivity : Activity() {
     /** The name of a picked file while it is read into the app. */
     private var copying: String? = null
     private var watching = false
+    /** Stop was pressed and the import has not ended yet. */
+    private var stopping = false
     private var shownDictionaries: List<Installed>? = null
     private var shownSuggested: List<Suggested>? = null
     private var fieldSpinners: List<Pair<String, Spinner>> = emptyList()
@@ -194,11 +198,27 @@ class MiningSettingsActivity : Activity() {
             startActivityForResult(pick, REQUEST_DICTIONARY)
         }
         importAddress.setOnClickListener { askAddress() }
-        importStop.setOnClickListener { dictionaryCall("dict.cancel") }
+        importStop.setOnClickListener {
+            stopping = true
+            show()
+            dictionaryCall("dict.cancel")
+        }
         audioButton.setOnClickListener { checkAudio() }
         onDone(audioField) { checkAudio() }
         forgetAudio.setOnClickListener { forget(Secrets.AUDIO_ADDRESS) }
         findViewById<Button>(R.id.done).setOnClickListener { finish() }
+        // A field for a password is set in typewriter letters, its hint with it: this one looks like the others.
+        keyField.typeface = addressField.typeface
+
+        // The keyboard takes the lower part of the screen. From Android 15 on the window keeps its
+        // size and the list only gets a margin there, which does not move it: the field that is
+        // typed in is brought above the keyboard here.
+        val scroll = findViewById<ScrollView>(R.id.scroll)
+        scroll.setOnApplyWindowInsetsListener { view, insets ->
+            val applied = view.onApplyWindowInsets(insets)
+            view.post { showFocused(scroll) }
+            applied
+        }
 
         if (!MiningKit.open(this)) {
             problem = MiningKit.problem
@@ -206,6 +226,25 @@ class MiningSettingsActivity : Activity() {
             return
         }
         load()
+    }
+
+    /** Scrolls the list so that the text field with the cursor lies between the bars and the keyboard. */
+    private fun showFocused(scroll: ScrollView) {
+        val focused = currentFocus as? EditText ?: return
+        if (isDestroyed) return
+        val place = Rect()
+        focused.getDrawingRect(place)
+        try {
+            scroll.offsetDescendantRectToMyCoords(focused, place)
+        } catch (e: IllegalArgumentException) {
+            // A field of a dialog's, which is not in the list.
+            return
+        }
+        val margin = (12 * resources.displayMetrics.density).toInt()
+        val top = scroll.scrollY + scroll.paddingTop
+        val bottom = scroll.scrollY + scroll.height - scroll.paddingBottom
+        if (place.bottom + margin > bottom) scroll.smoothScrollBy(0, place.bottom + margin - bottom)
+        else if (place.top - margin < top) scroll.smoothScrollBy(0, place.top - margin - top)
     }
 
     override fun onPause() {
@@ -557,10 +596,13 @@ class MiningSettingsActivity : Activity() {
         note.setText(R.string.kit_fields_note)
         column.addView(note)
         val spinners = mutableListOf<Pair<String, Spinner>>()
+        // A style's margins only count in a layout file: here each label gets its gap by hand.
+        val gap = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        gap.topMargin = (10 * resources.displayMetrics.density).toInt()
         for ((field, role) in fields) {
             val label = TextView(this, null, 0, R.style.SettingLabel)
             label.text = field
-            column.addView(label)
+            column.addView(label, LinearLayout.LayoutParams(gap))
             val spinner = Spinner(this)
             spinner.minimumHeight = (48 * resources.displayMetrics.density).toInt()
             label.labelFor = View.generateViewId().also { spinner.id = it }
@@ -653,7 +695,9 @@ class MiningSettingsActivity : Activity() {
         suggestedRows.visibility = if (busy || offered.isEmpty()) View.GONE else View.VISIBLE
         importStateText.visibility = if (busy) View.VISIBLE else View.GONE
         importProgressBar.visibility = if (busy) View.VISIBLE else View.GONE
+        if (!importRunning) stopping = false
         importStop.visibility = if (importRunning) View.VISIBLE else View.GONE
+        importStop.isEnabled = !stopping
         importFile.visibility = if (busy) View.GONE else View.VISIBLE
         importAddress.visibility = if (busy) View.GONE else View.VISIBLE
         importStateText.text = when {
@@ -779,13 +823,26 @@ class MiningSettingsActivity : Activity() {
         holder.setPadding(pad, 0, pad, 0)
         holder.addView(field, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                                                         ViewGroup.LayoutParams.WRAP_CONTENT))
-        AlertDialog.Builder(this).setTitle(R.string.kit_download_title).setMessage(R.string.kit_download_note)
+        val download = { dictionaryCall("dict.download", JSONObject().put("url", field.text.toString().trim())) }
+        val dialog = AlertDialog.Builder(this).setTitle(R.string.kit_download_title).setMessage(R.string.kit_download_note)
             .setView(holder)
             .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.kit_download) { _, _ ->
-                dictionaryCall("dict.download", JSONObject().put("url", field.text.toString().trim()))
+            .setPositiveButton(R.string.kit_download) { _, _ -> download() }
+            .create()
+        // The keyboard comes with the dialog, and its Done downloads: held sideways, a phone's
+        // keyboard lies over the dialog's buttons.
+        field.setOnEditorActionListener { _, action, _ ->
+            if (action == EditorInfo.IME_ACTION_DONE) {
+                dialog.dismiss()
+                download()
+                true
+            } else {
+                false
             }
-            .show()
+        }
+        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+        dialog.show()
+        field.requestFocus()
     }
 
     /** Follows an import until it is over. */

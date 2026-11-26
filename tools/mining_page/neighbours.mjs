@@ -9,7 +9,8 @@
 // The words named are added to the dictionary (RULES as Yomitan has them: v1, v5, adj-i, n).
 // Every card the AnkiConnect is given is printed with its fields and the sizes of its files.
 // ORE_NEIGHBOUR_PORT is the first of the three ports (8765 without it, which is also where a real
-// Anki's AnkiConnect listens); ORE_NEIGHBOUR_MEDIA is a folder that gets the cards' files.
+// Anki's AnkiConnect listens); ORE_NEIGHBOUR_MEDIA is a folder that gets the cards' files;
+// ORE_NEIGHBOUR_KEY is a key the AnkiConnect then asks for, as the add-on does with an apiKey.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { basename, join } from 'node:path';
@@ -25,7 +26,7 @@ const port = Number(process.env.ORE_NEIGHBOUR_PORT ?? 8765);
 const mediaFolder = process.env.ORE_NEIGHBOUR_MEDIA ?? '';
 if (mediaFolder !== '') mkdirSync(mediaFolder, { recursive: true });
 
-const anki = await fakeAnki(port);
+const anki = await fakeAnki(port, process.env.ORE_NEIGHBOUR_KEY ?? '');
 const audio = await fakeAudioSource(port + 1);
 const zip = smallDictionary(words);
 const dictionary = createServer((request, answer) => {
