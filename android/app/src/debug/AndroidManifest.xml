@@ -7,4 +7,11 @@
         android:name=".AnkiDroidCheck"
         android:label="AnkiDroid check"
         android:targetPackage="${applicationId}" />
+
+    <!-- Debug builds only: plays the player on the mining settings screen with the real
+         AnkiDroid beside it (MiningSettingsCheck.kt says how to run it). -->
+    <instrumentation
+        android:name=".MiningSettingsCheck"
+        android:label="Mining settings check"
+        android:targetPackage="${applicationId}" />
 </manifest>

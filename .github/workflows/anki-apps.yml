@@ -17,6 +17,8 @@ on:
       - "app/Sources/App/AnkiCheck.swift"
       - "tools/apple/ankimobile-standin/**"
       - "android/app/src/**/AnkiDroid*.kt"
+      - "android/app/src/**/MiningSettings*.kt"
+      - "android/app/src/main/res/layout/mining_settings.xml"
       - "android/app/src/**/AnkiMediaProvider.kt"
       - "android/app/src/**/AndroidManifest.xml"
       - "tools/android/ankidroid_check.sh"

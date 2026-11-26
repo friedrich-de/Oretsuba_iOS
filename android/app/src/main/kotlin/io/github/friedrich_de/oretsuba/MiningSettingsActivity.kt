@@ -2,15 +2,19 @@ package io.github.friedrich_de.oretsuba
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.OpenableColumns
+import android.provider.Settings
 import android.text.InputType
 import android.view.View
 import android.view.ViewGroup
@@ -56,6 +60,13 @@ class MiningSettingsActivity : Activity() {
     /** How asking a server went. */
     private class Check(val state: Int, val text: String = "")
 
+    /** A place cards can go: an AnkiConnect, or the Anki app on this device (docs/ANKI_APPS.md). */
+    private class Target(val name: String, val label: String)
+
+    /** What asking AnkiDroid gave: whether it is there and lets this app in, and its answer or why there is none. */
+    private class Droid(val installed: Boolean, val allowed: Boolean, val answer: JSONObject?, val refused: String?,
+                        val cards: String?)
+
     private val main = Handler(Looper.getMainLooper())
 
     // What the kit holds, as it was last heard.
@@ -70,6 +81,21 @@ class MiningSettingsActivity : Activity() {
     private var decks: List<String> = emptyList()
     private var noteTypes: List<String> = emptyList()
     private var roles: List<Role> = emptyList()
+    /** The places this device has for cards, and the one they go to. */
+    private var targets: List<Target> = emptyList()
+    private var target = CONNECT
+    /** What AnkiDroid said of itself when it was last asked. */
+    private var droidInstalled = true
+    private var droidAllowed = true
+    /** Android no longer shows its question about AnkiDroid: the way left leads through the system's settings. */
+    private var droidRefused = false
+    /** When Android was last asked for AnkiDroid's leave, and whether it said then that it would explain itself. */
+    private var droidAskedAt = 0L
+    private var droidAskedBefore = false
+    /** Counts the questions to AnkiDroid: only the answer to the last one is shown. */
+    private var droidAsk = 0
+    /** The settings were read: from then on, coming back to this screen asks AnkiDroid anew. */
+    private var ready = false
     private var dictionaries: List<Installed> = emptyList()
     private var importState = "idle"
     private var importProgress = 0.0
@@ -109,6 +135,13 @@ class MiningSettingsActivity : Activity() {
 
     private lateinit var problemText: TextView
     private lateinit var directSwitch: Switch
+    private lateinit var targetBox: View
+    private lateinit var targetSpinner: Spinner
+    private lateinit var connectBox: View
+    private lateinit var droidBox: View
+    private lateinit var droidButton: Button
+    private lateinit var droidWorking: ProgressBar
+    private lateinit var ankiNote: TextView
     private lateinit var addressField: EditText
     private lateinit var keyField: EditText
     private lateinit var connectButton: Button
@@ -147,6 +180,13 @@ class MiningSettingsActivity : Activity() {
         setContentView(R.layout.mining_settings)
         problemText = findViewById(R.id.problem)
         directSwitch = findViewById(R.id.direct)
+        targetBox = findViewById(R.id.anki_target)
+        targetSpinner = findViewById(R.id.anki_target_choice)
+        connectBox = findViewById(R.id.anki_connect)
+        droidBox = findViewById(R.id.anki_droid)
+        droidButton = findViewById(R.id.anki_droid_button)
+        droidWorking = findViewById(R.id.anki_droid_working)
+        ankiNote = findViewById(R.id.anki_note)
         addressField = findViewById(R.id.anki_address)
         keyField = findViewById(R.id.anki_key)
         connectButton = findViewById(R.id.anki_connect_button)
@@ -195,6 +235,7 @@ class MiningSettingsActivity : Activity() {
         onDone(addressField) { connect(adopt = true) }
         onDone(keyField) { connect(adopt = true) }
         forgetKey.setOnClickListener { forget(Secrets.ANKI_KEY) }
+        droidButton.setOnClickListener { droidPressed() }
         fieldsButton.setOnClickListener { showFields() }
         onDone(tagsField) { setTags() }
         tagsField.setOnFocusChangeListener { _, focused -> if (!focused) setTags() }
@@ -257,6 +298,12 @@ class MiningSettingsActivity : Activity() {
         if (MiningKit.kit != 0L) setTags()
     }
 
+    // Back from AnkiDroid or from the system's settings: what AnkiDroid allows and holds may have changed.
+    override fun onResume() {
+        super.onResume()
+        if (ready && target == DROID && anki.state != WORKING) askDroid(adopt = decks.isEmpty(), quiet = true)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         main.removeCallbacksAndMessages(null)
@@ -274,6 +321,23 @@ class MiningSettingsActivity : Activity() {
     override fun onActivityResult(request: Int, result: Int, data: Intent?) {
         super.onActivityResult(request, result, data)
         if (request == REQUEST_DICTIONARY && result == RESULT_OK) data?.data?.let { importPicked(it) }
+    }
+
+    override fun onRequestPermissionsResult(request: Int, permissions: Array<out String>, results: IntArray) {
+        super.onRequestPermissionsResult(request, permissions, results)
+        if (request != REQUEST_ANKIDROID) return
+        // No answer at all: the question was taken away before the player answered it.
+        if (results.isNotEmpty()) {
+            // After a second no, Android answers for the player without showing its question. It
+            // does not say so: it only stops offering to explain itself. That is also how things
+            // stand before the first question and after one that was put aside without an answer,
+            // which a player takes longer for than Android does.
+            val granted = results[0] == PackageManager.PERMISSION_GRANTED
+            val quick = SystemClock.elapsedRealtime() - droidAskedAt < ANSWERED_BY_ANDROID_MS
+            droidRefused = !granted && !shouldShowRequestPermissionRationale(AnkiDroid.PERMISSION) &&
+                (droidAskedBefore || quick)
+        }
+        askDroid(adopt = true)
     }
 
     // ---------------------------------------------------------------- asking the kit
@@ -310,6 +374,7 @@ class MiningSettingsActivity : Activity() {
         kit({
             val loaded = JSONObject()
             loaded.put("roles", MiningKit.call("anki.roleChoices"))
+            loaded.put("targets", MiningKit.call("anki.targets"))
             loaded.put("settings", MiningKit.call("settings.get"))
             loaded.put("list", MiningKit.call("dict.list"))
             loaded.put("cards", askCards())
@@ -322,6 +387,10 @@ class MiningSettingsActivity : Activity() {
                 roles = (0 until list.length()).mapNotNull { list.optJSONObject(it) }.map {
                     Role(it.optString("role"), it.optString("label"), it.optString("detail"))
                 }
+                val places = loaded.optJSONArray("targets") ?: JSONArray()
+                targets = (0 until places.length()).mapNotNull { places.optJSONObject(it) }.map {
+                    Target(it.optString("name"), it.optString("label"))
+                }
                 loaded.optJSONObject("settings")?.let { take(it, typed = true) }
                 loaded.optJSONObject("list")?.let { takeDictionaries(it) }
                 if (loaded.has("cards")) cardProblem = loaded.optString("cards")
@@ -330,8 +399,9 @@ class MiningSettingsActivity : Activity() {
             }
             show()
             if (importRunning) watchImport()
-            // The decks and note types to choose from, when an AnkiConnect is set already.
-            if (addressField.text.isNotBlank()) connect(adopt = false)
+            ready = loaded != null
+            // The decks and note types to choose from, when it is known whom to ask for them.
+            refreshPlaces(adopt = false)
         }
     }
 
@@ -350,6 +420,7 @@ class MiningSettingsActivity : Activity() {
             addressField.setText(card.optString("address"))
             tagsField.setText(keptTags)
         }
+        target = card.optString("target").ifEmpty { CONNECT }
         deck = card.optString("deck")
         noteType = card.optString("noteType")
         val list = card.optJSONArray("fields") ?: JSONArray()
@@ -417,12 +488,27 @@ class MiningSettingsActivity : Activity() {
         hideTagsSwitch.isChecked = hideTags
         compactSwitch.isChecked = compact
 
+        // Where cards go is only asked on a device that has more than one place for them.
+        val places = if (targets.any { it.name == target }) targets else targets + Target(target, target)
+        targetBox.visibility = if (targets.size > 1 || target != CONNECT) View.VISIBLE else View.GONE
+        fill(targetSpinner, places.map { it.name }, places.map { it.label }, target) { chooseTarget(it) }
+        connectBox.visibility = if (target == CONNECT) View.VISIBLE else View.GONE
+        droidBox.visibility = if (target == DROID) View.VISIBLE else View.GONE
+        droidButton.setText(when {
+            !droidInstalled || droidAllowed -> R.string.kit_droid_again
+            droidRefused -> R.string.kit_droid_permissions
+            else -> R.string.kit_droid_allow
+        })
+        droidButton.isEnabled = anki.state != WORKING
+        droidWorking.visibility = if (anki.state == WORKING) View.VISIBLE else View.GONE
+        ankiNote.setText(if (target == DROID) R.string.kit_droid_note else R.string.kit_anki_note)
+
         keyField.setHint(if (keySet) R.string.kit_anki_key_kept else R.string.kit_anki_key)
         connectButton.isEnabled = anki.state != WORKING
         ankiWorking.visibility = if (anki.state == WORKING) View.VISIBLE else View.GONE
         showCheck(ankiCheck, anki)
-        forgetKey.visibility = if (keySet) View.VISIBLE else View.GONE
-        showLine(ankiProblemText, ankiProblem)
+        forgetKey.visibility = if (keySet && target == CONNECT) View.VISIBLE else View.GONE
+        showLine(ankiProblemText, ankiProblem?.takeIf { it.isNotEmpty() } ?: notInDroid())
         choice(deckSpinner, deckLabel, decks, deck) {
             change("anki.choose", JSONObject().put("deck", it), forAnki = true)
         }
@@ -431,7 +517,9 @@ class MiningSettingsActivity : Activity() {
         }
         fieldsButton.visibility = if (fields.isEmpty()) View.GONE else View.VISIBLE
         for ((field, spinner) in fieldSpinners) markRole(field, spinner, fields.firstOrNull { it.first == field }?.second)
-        val cards = cardProblem.isNotEmpty() && addressField.text.isNotBlank()
+        // Why no card can be made is said once there is an Anki to make one for.
+        val asked = if (target == CONNECT) addressField.text.isNotBlank() else decks.isNotEmpty()
+        val cards = cardProblem.isNotEmpty() && asked
         cardProblemText.text = cardProblem
         cardProblemText.visibility = if (cards) View.VISIBLE else View.GONE
 
@@ -514,6 +602,133 @@ class MiningSettingsActivity : Activity() {
 
     // ---------------------------------------------------------------- Anki
 
+    /** Asks the place cards go to for its decks and note types, when it is known where to ask. */
+    private fun refreshPlaces(adopt: Boolean) {
+        if (target == DROID) askDroid(adopt)
+        else if (target == CONNECT && addressField.text.isNotBlank()) connect(adopt = false)
+    }
+
+    /** Cards go to another place from now on, which is asked for its decks and note types at once. */
+    private fun chooseTarget(name: String) {
+        // The lists of the place before go at once, not when the kit has answered.
+        target = name
+        decks = emptyList()
+        noteTypes = emptyList()
+        anki = Check(IDLE)
+        ankiProblem = null
+        droidRefused = false
+        // An answer that is still on its way belongs to the place before.
+        droidAsk++
+        show()
+        change("settings.set", JSONObject().put("anki", JSONObject().put("target", name)), forAnki = true) {
+            if (target == DROID && AnkiDroid.installed(this) && !AnkiDroid.allowed(this)) {
+                // Choosing AnkiDroid is the moment Android asks whether this app may reach it.
+                droidInstalled = true
+                droidAllowed = false
+                show()
+                askLeave()
+            } else {
+                refreshPlaces(adopt = true)
+            }
+        }
+    }
+
+    /**
+     * Asks AnkiDroid whether it is there and lets this app in, and then for
+     * its decks and note types. With [adopt], where nothing was chosen yet, the
+     * Lapis note type and its deck are. [quiet] is for asking without having
+     * been told to: what the screen shows stays until the answer is there.
+     */
+    private fun askDroid(adopt: Boolean, quiet: Boolean = false) {
+        val asked = ++droidAsk
+        if (!quiet) {
+            anki = Check(WORKING)
+            ankiProblem = null
+            show()
+        }
+        kit({
+            val status = MiningKit.call("ankidroid.status") as? JSONObject ?: JSONObject()
+            val installed = status.optBoolean("installed")
+            val allowed = status.optBoolean("allowed")
+            var answer: JSONObject? = null
+            var refused: String? = null
+            if (installed && allowed) {
+                try {
+                    answer = MiningKit.call("anki.check", JSONObject().put("adopt", adopt)) as? JSONObject ?: JSONObject()
+                } catch (e: KitError) {
+                    refused = e.message ?: ""
+                }
+                // The chosen note type's fields as AnkiDroid has them: they may still be those of another Anki.
+                val chosen = answer?.optJSONObject("settings")?.optJSONObject("anki")?.optString("noteType").orEmpty()
+                if (answer != null && chosen in strings(answer.optJSONArray("noteTypes"))) {
+                    try {
+                        MiningKit.call("anki.fields")
+                        answer.put("settings", MiningKit.call("settings.get"))
+                    } catch (e: KitError) {
+                        // The lists stand; the fields are asked for again when the note type is chosen.
+                    }
+                }
+            }
+            Droid(installed, allowed, answer, refused, askCards())
+        }) { result, failure ->
+            if (asked != droidAsk || target != DROID) return@kit
+            if (result == null) {
+                anki = Check(BAD, failure.orEmpty())
+                show()
+                return@kit
+            }
+            droidInstalled = result.installed
+            droidAllowed = result.allowed
+            if (result.allowed) droidRefused = false
+            val answer = result.answer
+            if (answer == null) {
+                decks = emptyList()
+                noteTypes = emptyList()
+                anki = Check(BAD, when {
+                    !result.installed -> getString(R.string.kit_droid_missing)
+                    !result.allowed -> getString(if (droidRefused) R.string.kit_droid_refused else R.string.kit_droid_not_allowed)
+                    else -> result.refused.orEmpty()
+                })
+            } else {
+                decks = strings(answer.optJSONArray("decks"))
+                noteTypes = strings(answer.optJSONArray("noteTypes"))
+                answer.optJSONObject("settings")?.let { take(it) }
+                anki = Check(GOOD, getString(if (answer.optJSONObject("lapis") != null) R.string.kit_droid_lapis
+                                             else R.string.kit_droid_plain))
+            }
+            result.cards?.let { cardProblem = it }
+            show()
+        }
+    }
+
+    /** The button under AnkiDroid does what its words say (show). */
+    private fun droidPressed() {
+        when {
+            !AnkiDroid.installed(this) || AnkiDroid.allowed(this) -> askDroid(adopt = true)
+            droidRefused -> try {
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)))
+            } catch (e: ActivityNotFoundException) {
+                // A device without that screen: the line above the button says where the permission is.
+            }
+            else -> askLeave()
+        }
+    }
+
+    /** Has Android ask the player whether this app may read and write AnkiDroid's cards (onRequestPermissionsResult). */
+    private fun askLeave() {
+        droidAskedAt = SystemClock.elapsedRealtime()
+        droidAskedBefore = shouldShowRequestPermissionRationale(AnkiDroid.PERMISSION)
+        AnkiDroid.ask(this, REQUEST_ANKIDROID)
+    }
+
+    /** A deck or a note type that was chosen for another Anki and that AnkiDroid does not have. */
+    private fun notInDroid(): String? = when {
+        target != DROID || decks.isEmpty() -> null
+        noteType.isNotEmpty() && noteType !in noteTypes -> getString(R.string.kit_droid_no_note_type, noteType)
+        deck.isNotEmpty() && deck !in decks -> getString(R.string.kit_droid_no_deck, deck)
+        else -> null
+    }
+
     /**
      * Asks the AnkiConnect at the address for its decks and note types. With
      * [adopt] the address and the key become the kit's, and where nothing was
@@ -545,6 +760,8 @@ class MiningSettingsActivity : Activity() {
             val kept = !adopt || key.isEmpty() || Secrets.set(context, Secrets.ANKI_KEY, key)
             Triple(answer, kept, askCards())
         }) { result, failure ->
+            // Cards go elsewhere by now: this answer is no longer asked for.
+            if (target != CONNECT) return@kit
             if (result == null) {
                 anki = Check(BAD, failure.orEmpty())
                 show()
@@ -952,6 +1169,12 @@ class MiningSettingsActivity : Activity() {
 
     companion object {
         private const val REQUEST_DICTIONARY = 1
+        private const val REQUEST_ANKIDROID = 2
+        /** An answer to the question about AnkiDroid that comes sooner than this was Android's own. */
+        private const val ANSWERED_BY_ANDROID_MS = 600L
+        /** The names the kit has for the places cards go (the setting anki.target). */
+        private const val CONNECT = "connect"
+        private const val DROID = "ankidroid"
         private const val WATCH_MS = 300L
         private const val COPY_PREFIX = "ore-dictionary-"
         private const val IDLE = 0

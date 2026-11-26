@@ -48,6 +48,9 @@ In the launcher, under "Mining in the game", press **Set up…**. The screen ask
 and the switch **Look words up in the game**. From then on a tap on a word of the text shows the dictionary, and
 the text box no longer reads on: tap the picture above it.
 
+* **Send cards to** chooses between an AnkiConnect and AnkiDroid on the same device. With AnkiDroid, Android asks
+  once whether Oretsuba may read and write AnkiDroid's cards; after that the decks and note types are AnkiDroid's
+  and no address is needed. [ANKI_APPS.md](ANKI_APPS.md#ankidroid-android) has the steps.
 * **Dictionaries** come in with **Import a file…**, which opens the system's file picker (have the zip file on the
   device first), or with **Download from an address…**. The app keeps its own copy inside the app, not in the
   folder above.
@@ -213,6 +216,8 @@ interface the Apple app uses, is compiled as plain C++ here and takes `AndroidPl
   key of the device's Keystore. `KitHttp` does the kit's requests (a dictionary is downloaded into a file),
   `VoiceEncoder` turns a line's voice into AAC in an `.m4a` file with `MediaCodec`.
 * `MiningSettingsActivity`: the mining settings. It holds nothing itself: it asks the kit and shows what it answers.
+  For AnkiDroid it also has Android ask for AnkiDroid's permission (`AnkiDroid.kt`, which speaks to AnkiDroid's
+  content provider; `AnkiMediaProvider.kt` hands a card's files over).
 * `MiningPopup`: the dictionary over the game, a web view that shows the kit's page from the package
   (`assets/mining`, which the build copies from `engine/resources/mining`). `GameActivity` asks the engine what a tap
   on the picture hit before the tap becomes a click of the game.

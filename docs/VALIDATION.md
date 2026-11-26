@@ -405,6 +405,67 @@ The sounds by ear. An Anki on a computer with the AnkiConnect add-on itself. Fre
 on a card made in the app, and a dictionary's pictures in the popup. A controller's B. Versions of the web view
 between 69 and 124: the limit of 88 comes from what the page uses, not from a test.
 
+## Cards straight into the Anki app, 2026-11-26
+
+[ANKI_APPS.md](ANKI_APPS.md) describes it: **Send cards to** in the mining settings, AnkiMobile on iPhone and iPad,
+AnkiDroid on Android, beside AnkiConnect. The real AnkiMobile costs money and no Simulator takes it, so on the Apple
+side a stand-in stood in for it; on Android the real AnkiDroid 2.25.3 from its release page was used throughout.
+
+**AnkiMobile's stand-in, iPhone Simulator** (GitHub's workflow "Anki apps", on every change to this code): a small
+app takes AnkiMobile's links, the debug build fetches the lists through it and sends three cards, a UI test plays
+the player, and both sides are compared afterwards: the lists arrive, each card arrives with its fields, and its
+picture and voice are fetched from the game while it is in the back. The Simulator does not ask before a paste.
+
+**AnkiDroid, Android 14** (the same workflow, an emulator on GitHub's runner, AnkiDroid set up as a player sets it
+up). One check plays the player on the mining settings screen, a second adds cards of every kind through the bridge
+and reads them back; both run twice, the second time with Oretsuba installed before AnkiDroid.
+
+- "Send cards to" offers AnkiConnect and AnkiDroid. Choosing AnkiDroid brings Android's question: "Allow Oretsuba to
+  access existing notes, cards, note types, and decks, as well as create new ones?" After a no the screen says that
+  AnkiDroid's cards are closed and its button asks again. After a second no it says that Android no longer asks, and
+  its button opens the system's settings for Oretsuba. There the check taps the player's way: Permissions,
+  Additional permissions, "Read and write to the AnkiDroid database", Allow. Back leads to the mining settings,
+  which then have AnkiDroid's lists.
+- Decks and note types arrive, the address, key and Connect are gone, and a deck, a note type and what goes into its
+  fields are chosen on the screen. A card made the way the dictionary's + makes it arrives at once with the word,
+  the meaning and the word's sound from a made-up audio source, in the chosen deck. The word is marked as in Anki
+  from then on, and a second card of it is refused.
+- A deck made in AnkiDroid meanwhile is in the list when the screen comes back to the front. Switching to AnkiConnect
+  and back keeps the chosen deck and does not ask Android again.
+- A note type with the fields of Lapis and a card of it in a deck of its own: with nothing chosen, fetching the lists
+  again takes Lapis together with that deck, among three, and fills its fields the way Lapis means them.
+- Through the bridge: a picture and three sounds (Ogg, which AnkiDroid stores as `.oga`, `.m4a` and `.mp3`) land in
+  their field, a file that was never written is named as missing, tags arrive with a blank made an underscore, and a
+  word full of the marks an Anki search reads is found again exactly. A deck or note type that is not there, an
+  empty first field and an unknown request are refused with their own words.
+
+**AnkiDroid, Android 15** (the emulator on the PC of the section above, shaped like a phone), in two runs. Both
+checks pass, the second time with Lapis and its deck. Then, with the settings giving the first field the word, the
+second the picture and the third the line's voice, four cards were made with + in the running game, each of a word in
+a voiced line: 危難, 照れる, 付きあう and 紛れる. After + the popup said "Making a card of 危難…" and then "Made a
+card of 危難.", and the game stayed in front the whole time: the window in focus was read 40 times around each +, and
+AnkiDroid never came up. Tapped again, the word shows the mark for a card that exists, also for a card made in the
+run before. In AnkiDroid each note holds the word, the picture (a JPEG of 800x600 of 113 to 123 KB that shows the
+scene at that line, without the popup) and the voice (AAC in an `.m4a` file, 50 to 70 milliseconds longer than the
+game's voice, for voices of 2.7 to 9.1 seconds). From + until AnkiDroid had the card took 1.2 to 3.7 seconds,
+most of it the encoding of the voice, and the longer the voice the longer it took.
+
+**Found and fixed on the way:** AnkiDroid answers a search that finds nothing with no rows at all, which the bridge
+took for no answer, so no card of a new word could have been made through the kit. Lapis got its deck in AnkiDroid
+only when there was one deck besides Default; AnkiDroid is now asked which deck the note type's newest card is in,
+as an AnkiConnect is. The settings check took the lists of an AnkiConnect that answered at the address kept from
+before for AnkiDroid's; the screen now drops the old lists the moment the choice changes, and the check waits for
+AnkiDroid's own answer.
+
+**Seen and left:** the mark that takes the place of + does nothing when pressed, which is the popup's way with every
+place for cards. The voice in the `.m4a` file has two channels where the game's has one. Anki keeps a note's tags in
+its own order. An AnkiConnect that refuses the key is told on the settings screen with the popup's words, "Check it
+in the settings".
+
+**Not checked:** the real AnkiMobile, so whether iOS asks before the paste, whether AnkiMobile fetches the picture
+and voice while the game is in the back, and whether it plays the `.m4a`. A real Android phone with AnkiDroid.
+Versions of AnkiDroid other than 2.25.3, and AnkiDroid on Android 8 to 13.
+
 ## The original project's checks on devices, 2026-10-18
 
 The original project checked its versions 0.1.0 and 0.1.1 on real devices. It played with a Chinese translation
@@ -460,6 +521,9 @@ which no script has run yet are kept for the next logic frame.
 - `kit_test`: the mining kit's methods against a made-up AnkiConnect and audio source: settings, the Lapis defaults,
   what a card's note holds, duplicates, wrong keys and addresses, imports and downloads, and the dictionaries
   suggested for one tap.
+- `anki_app_test`, `anki_target_test`: AnkiMobile and AnkiDroid as places for cards, against a made-up AnkiMobile and
+  a made-up AnkiDroid: AnkiMobile's links and lists, the small web server that hands it a card's files, a card on its
+  way and its coming back, AnkiDroid's requests and answers, Lapis and its deck, and both through the kit.
 - `engine/tests/page/*.test.mjs` (Node): where a word stands in its sentence, furigana, and a meaning as a card's HTML.
 - `tools/test_mining_page.mjs` (Node and Playwright's Chromium): the popup's page over a made-up line, and over the
   game when given `SET_UP`.

@@ -69,6 +69,8 @@ public:
 
 	bool places(CardPlaces &places, AnkiProblem &problem) override;
 	bool field_names(const std::string &note_type, std::vector<std::string> &names, AnkiProblem &problem) override;
+	bool deck_of_newest(const std::string &note_type, const std::vector<std::string> &decks, std::string &deck,
+	                    AnkiProblem &problem) override;
 	bool known(const std::vector<CardNote> &notes, std::vector<Known> &answers, AnkiProblem &problem) override;
 	bool add(const CardNote &note, AddOutcome &outcome, AnkiProblem &problem) override;
 

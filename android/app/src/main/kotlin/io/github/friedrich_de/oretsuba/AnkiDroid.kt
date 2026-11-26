@@ -7,6 +7,7 @@
 //   status  {}                                   -> {installed, allowed, mediaFolder}
 //   info    {}                                   -> {decks: [name], noteTypes: [{name, fields: [name]}]}
 //   known   {noteType, field, value}             -> {known}
+//   deckOfNewest {noteType}                      -> {deck}, "" when the note type has no note yet
 //   add     {deck, noteType, fields: {name: html}, tags: [tag], allowDuplicate,
 //            media: [{name, sound, fields: [name]}]}
 //                                                -> {id, missing: [name]}
@@ -44,7 +45,7 @@ object AnkiDroid {
     private const val FIELD_SEPARATOR = "\u001f"
 
     private const val NOT_THERE = "AnkiDroid is not on this device."
-    private const val NOT_ALLOWED = "AnkiDroid has not allowed this app to add cards yet. Allow it in the launcher."
+    private const val NOT_ALLOWED = "AnkiDroid has not allowed this app to add cards yet. Allow it in the mining settings."
     private const val NO_ANSWER = "AnkiDroid did not answer. Open AnkiDroid once, then try again."
     private const val NOT_SET_UP = "AnkiDroid has no decks yet. Open AnkiDroid and go through its first screens, then try again."
 
@@ -82,6 +83,7 @@ object AnkiDroid {
                 "status" -> status(app)
                 "info" -> guarded(app) { info(app.contentResolver) }
                 "known" -> guarded(app) { known(app.contentResolver, JSONObject(json)) }
+                "deckOfNewest" -> guarded(app) { deckOfNewest(app.contentResolver, JSONObject(json)) }
                 "add" -> guarded(app) { add(app, JSONObject(json)) }
                 else -> problem("AnkiDroid cannot do \"$method\".", "failed")
             }
@@ -150,6 +152,28 @@ object AnkiDroid {
         return JSONObject().put("decks", deckNames).put("noteTypes", types)
     }
 
+    /**
+     * The deck the newest note of a note type has its first card in, for a
+     * first choice of deck: where the player's cards of that type go already.
+     * Empty when there is no such note, or when the card is in a filtered deck.
+     */
+    private fun deckOfNewest(resolver: ContentResolver, ask: JSONObject): JSONObject {
+        val answer = JSONObject().put("deck", "")
+        // A note's number is the time it was made, so the largest is the newest.
+        var newest = 0L
+        resolver.query(notes, arrayOf("_id"), "\"note:${searchText(ask.getString("noteType"))}\"", null, null)?.use { rows ->
+            val id = rows.getColumnIndexOrThrow("_id")
+            while (rows.moveToNext()) newest = maxOf(newest, rows.getLong(id))
+        }
+        if (newest == 0L) return answer
+        var deckId = -1L
+        resolver.query(Uri.withAppendedPath(Uri.withAppendedPath(notes, newest.toString()), "cards"), null, null, null, null)?.use { rows ->
+            if (rows.moveToFirst()) deckId = rows.getLong(rows.getColumnIndexOrThrow("deck_id"))
+        }
+        val deck = deckList(resolver)?.firstOrNull { it.id == deckId } ?: return answer
+        return answer.put("deck", deck.name)
+    }
+
     // ------------------------------------------------------------ is the word there already
 
     /** A text inside the quotes of an Anki search: the marks a search reads are taken as plain letters. */
@@ -162,18 +186,20 @@ object AnkiDroid {
         return out.toString()
     }
 
-    /** Whether a note of this type has exactly `value` in `field`: Anki's own search does the comparing. */
-    private fun isKnown(resolver: ContentResolver, noteType: String, field: String, value: String): Boolean? {
+    /**
+     * Whether a note of this type has exactly `value` in `field`: Anki's own
+     * search does the comparing. AnkiDroid answers a search that finds nothing
+     * with no rows at all (null), not with an empty list. An AnkiDroid that
+     * cannot be reached gives the same; adding the card then says so.
+     */
+    private fun isKnown(resolver: ContentResolver, noteType: String, field: String, value: String): Boolean {
         if (value.isBlank()) return false
         val search = "\"note:${searchText(noteType)}\" \"${searchText(field)}:${searchText(value)}\""
-        return resolver.query(notes, arrayOf("_id"), search, null, null)?.use { it.count > 0 }
+        return resolver.query(notes, arrayOf("_id"), search, null, null)?.use { it.count > 0 } ?: false
     }
 
-    private fun known(resolver: ContentResolver, ask: JSONObject): JSONObject {
-        val found = isKnown(resolver, ask.getString("noteType"), ask.getString("field"), ask.getString("value"))
-            ?: return problem(NO_ANSWER, "failed")
-        return JSONObject().put("known", found)
-    }
+    private fun known(resolver: ContentResolver, ask: JSONObject): JSONObject =
+        JSONObject().put("known", isKnown(resolver, ask.getString("noteType"), ask.getString("field"), ask.getString("value")))
 
     // ------------------------------------------------------------ a new card
 
@@ -182,9 +208,9 @@ object AnkiDroid {
         val typeName = card.getString("noteType")
         val deckName = card.getString("deck")
         val type = (noteTypes(resolver) ?: return problem(NO_ANSWER, "failed")).firstOrNull { it.name == typeName }
-            ?: return problem("AnkiDroid has no note type \"$typeName\" any more. Fetch the lists again in the launcher.", "noteType")
+            ?: return problem("AnkiDroid has no note type \"$typeName\". Choose one of its note types in the mining settings.", "noteType")
         val deck = (deckList(resolver) ?: return problem(NO_ANSWER, "failed")).firstOrNull { it.name == deckName }
-            ?: return problem("AnkiDroid has no deck \"$deckName\" any more. Fetch the lists again in the launcher.", "deck")
+            ?: return problem("AnkiDroid has no deck \"$deckName\". Choose one of its decks in the mining settings.", "deck")
 
         val given = card.optJSONObject("fields") ?: JSONObject()
         val values = type.fields.map { given.optString(it, "").replace(FIELD_SEPARATOR, "") }.toMutableList()
@@ -193,7 +219,7 @@ object AnkiDroid {
         if (values[0].isBlank()) {
             return problem("The card's first field, \"${type.fields[0]}\", is empty.", "empty")
         }
-        if (!card.optBoolean("allowDuplicate", false) && isKnown(resolver, type.name, type.fields[0], values[0]) == true) {
+        if (!card.optBoolean("allowDuplicate", false) && isKnown(resolver, type.name, type.fields[0], values[0])) {
             return problem("This word is in AnkiDroid already.", "duplicate")
         }
 

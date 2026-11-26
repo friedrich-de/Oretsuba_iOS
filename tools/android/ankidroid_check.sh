@@ -1,18 +1,26 @@
 #!/bin/sh
 # Checks the cards for AnkiDroid against the real AnkiDroid in an Android
 # emulator: installs AnkiDroid and the app's debug build, opens AnkiDroid
-# once, and runs the check the debug build carries (AnkiDroidCheck.kt), which
-# adds cards and looks at what arrived. On a machine with the Android SDK
+# once, and runs the two checks the debug build carries. The first plays the
+# player on the mining settings screen (MiningSettingsCheck.kt): "Send cards
+# to" AnkiDroid, Android's question, a deck, a note type, its fields, and a
+# card made through the mining kit. The second (AnkiDroidCheck.kt) adds cards
+# of every kind and looks at what arrived. On a machine with the Android SDK
 # (ANDROID_HOME) and the debug build made (./gradlew :app:assembleDebug):
 #
 #   tools/android/ankidroid_check.sh
 #
 # Without ORE_ADB_SERIAL it makes an emulator of its own (Android 14, x86_64;
 # needs hardware virtualisation), starts it without a window and shuts it down
-# at the end; there it runs the check a second time with the two apps
-# installed in the other order. With ORE_ADB_SERIAL it uses that device
-# instead: use only one whose AnkiDroid collection does not matter, the check
-# adds notes to it.
+# at the end; there it runs the checks a second time with the two apps
+# installed in the other order, and with Android's question refused until
+# Android stops asking. Where node is installed, a made-up audio source
+# (tools/mining_page/neighbours.mjs, ports 18765 to 18767) gives the card a
+# word's sound. With ORE_ADB_SERIAL it uses that device instead: use only one
+# whose AnkiDroid collection and mining settings do not matter, the checks add
+# notes, two decks and a note type and change the settings. Its AnkiDroid is
+# taken as it is; ORE_ANKIDROID_NEW=yes says that it is new there, and has it
+# set up as in the script's own emulator.
 # ORE_ANKIDROID_APK names an AnkiDroid package to install; without it the
 # newest release is downloaded from AnkiDroid's page on GitHub. What it found
 # is in build/ankidroid-check; the emulator and the downloaded package are
@@ -70,8 +78,19 @@ if [ -z "$serial" ]; then
 fi
 adb=adb
 run() { "$adb" -s "$serial" "$@"; }
+
+# A made-up audio source on this machine, which the script's own emulator reaches at 10.0.2.2.
+neighbours=""
+audio=""
+if [ -n "$started" ] && command -v node > /dev/null 2>&1; then
+	ORE_NEIGHBOUR_PORT=18765 node "$ROOT/tools/mining_page/neighbours.mjs" > "$OUT/neighbours.log" 2>&1 &
+	neighbours=$!
+	audio="-e audioPort 18766"
+fi
+
 finish() {
 	run logcat -d > "$OUT/logcat.txt" 2>/dev/null || true
+	[ -z "$neighbours" ] || kill "$neighbours" 2>/dev/null || true
 	[ -z "$started" ] || run emu kill > /dev/null 2>&1 || true
 }
 trap finish EXIT
@@ -107,15 +126,31 @@ if found:
 
 # A new AnkiDroid as a player sets it up: allowed to keep its collection where
 # it wants it, opened, and "Get started" pressed. Only in the script's own
-# emulator; a device given by ORE_ADB_SERIAL has its AnkiDroid as it is.
+# emulator, or where ORE_ANKIDROID_NEW says so; otherwise a device given by
+# ORE_ADB_SERIAL has its AnkiDroid as it is.
+new="$started${ORE_ANKIDROID_NEW:-}"
 open_ankidroid() {
-	[ -z "$started" ] || run shell appops set --uid com.ichi2.anki MANAGE_EXTERNAL_STORAGE allow
+	[ -z "$new" ] || run shell appops set --uid com.ichi2.anki MANAGE_EXTERNAL_STORAGE allow
 	run shell monkey -p com.ichi2.anki -c android.intent.category.LAUNCHER 1 > /dev/null 2>&1 || true
 	sleep 10
-	if [ -n "$started" ]; then
+	if [ -n "$new" ]; then
 		tap_text "Get started" && sleep 10 || true
 	fi
 	run exec-out screencap -p > "$OUT/$1.png" 2>/dev/null || true
+}
+
+# The player on the mining settings screen (MiningSettingsCheck.kt). $1 names what it
+# leaves in OUT, its report and its pictures of the screen; the rest goes to the check.
+settings_check() {
+	name="$1"
+	shift
+	result=0
+	run shell am instrument -w "$@" "$PACKAGE/.MiningSettingsCheck" > "$OUT/$name.txt" 2>&1 || result=$?
+	cat "$OUT/$name.txt"
+	rm -rf "${OUT:?}/$name"
+	run pull "/sdcard/Android/data/$PACKAGE/files/check" "$OUT/$name" > /dev/null 2>&1 || echo "  (its pictures of the screen could not be fetched)"
+	grep -q "Mining settings check passed" "$OUT/$name.txt" || result=1
+	return "$result"
 }
 
 # AnkiDroid first: Android gives an app a permission of another app's only when that app is there.
@@ -124,7 +159,12 @@ run install -r "$APP" > /dev/null
 echo "AnkiDroid $(run shell dumpsys package com.ichi2.anki | grep -m1 versionName | tr -d ' \r')"
 open_ankidroid ankidroid
 
+# The settings first: there Android's question is answered, as a player answers it.
 status=0
+echo "---- the mining settings: Send cards to AnkiDroid"
+# shellcheck disable=SC2086
+settings_check settings-check $audio || status=1
+echo "---- cards of every kind"
 run shell am instrument -w ${ORE_CHECK_DECK:+-e deck "$ORE_CHECK_DECK"} "$PACKAGE/.AnkiDroidCheck" > "$OUT/check.txt" 2>&1 || status=$?
 cat "$OUT/check.txt"
 grep -q "AnkiDroid check passed" "$OUT/check.txt" || status=1
@@ -140,6 +180,8 @@ if [ "$status" = 0 ] && [ -n "$started" ]; then
 	run install -r -g "$apk" > /dev/null
 	open_ankidroid ankidroid-other-order
 	run shell dumpsys package "$PACKAGE" | grep "com.ichi2.anki.permission" | tr -d '\r' | sed 's/^ */  /' || echo "  (Android does not list the permission for this app)"
+	# shellcheck disable=SC2086
+	settings_check settings-check-other-order -e refuse twice $audio || status=1
 	run shell am instrument -w "$PACKAGE/.AnkiDroidCheck" > "$OUT/check-other-order.txt" 2>&1 || status=$?
 	tail -n 3 "$OUT/check-other-order.txt"
 	grep -q "AnkiDroid check passed" "$OUT/check-other-order.txt" || status=1

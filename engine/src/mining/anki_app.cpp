@@ -961,6 +961,12 @@ std::string ankidroid_known_request(std::string_view note_type, std::string_view
 	return json::write(root);
 }
 
+std::string ankidroid_newest_request(std::string_view note_type) {
+	json::Value root = json::Value::object();
+	root.set("noteType", note_type);
+	return json::write(root);
+}
+
 AnkiDroidAnswer ankidroid_answer(std::string_view text) {
 	AnkiDroidAnswer answer;
 	json::Value root;
@@ -981,6 +987,7 @@ AnkiDroidAnswer ankidroid_answer(std::string_view text) {
 	answer.media_folder = root.str("mediaFolder");
 	anki_app_info_from_text(text, answer.info);
 	answer.known = root.boolean("known");
+	answer.deck = root.str("deck");
 	answer.id = root.str("id");
 	add_names(root["missing"], answer.missing);
 	return answer;

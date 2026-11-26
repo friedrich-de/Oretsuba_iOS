@@ -69,7 +69,18 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:visibility="gone" />
+                    android:visibility="gone">
+
+                    <TextView
+                        style="@style/SettingLabel"
+                        android:layout_marginTop="0dp"
+                        android:labelFor="@+id/anki_target_choice"
+                        android:text="@string/kit_send_to" />
+
+                    <Spinner
+                        android:id="@+id/anki_target_choice"
+                        style="@style/SettingSpinner" />
+                </LinearLayout>
 
                 <!-- What only an AnkiConnect needs: its address, its key and the way to it. -->
                 <LinearLayout
@@ -113,6 +124,29 @@
                             android:layout_marginStart="12dp"
                             android:visibility="gone" />
                     </LinearLayout>
+                </LinearLayout>
+
+                <!-- What only AnkiDroid needs: its leave, and asking it again. -->
+                <LinearLayout
+                    android:id="@+id/anki_droid"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <Button
+                        android:id="@+id/anki_droid_button"
+                        style="@style/PlainButton"
+                        android:text="@string/kit_droid_again" />
+
+                    <ProgressBar
+                        android:id="@+id/anki_droid_working"
+                        style="@android:style/Widget.Material.ProgressBar.Small"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:visibility="gone" />
                 </LinearLayout>
 
                 <TextView

@@ -188,7 +188,7 @@ struct MiningSettingsView: View {
             return "Cards go to the AnkiConnect you name here: the one of Anki on your computer, or a server of your own. With the Lapis note type there is nothing more to choose. An address in your own network may start with http; any other has to start with https. The key is kept in this device's Keychain."
         }
         if model.target == "ankimobile" {
-            return "Cards go to AnkiMobile on this device, which comes to the front for a moment with every card. Fetch its decks and note types once, and again after adding one there: AnkiMobile hands them over on the clipboard, so allow Oretsuba to paste from it when iOS asks. With the Lapis note type there is nothing more to choose. In any other, the picture and each sound need a field of their own."
+            return "Cards go to AnkiMobile on this device, which comes to the front for a moment with every card. Fetch its decks and note types once, and again after adding one there: AnkiMobile hands them over on the clipboard, so allow Oretsuba to paste from it when iOS asks. With the Lapis note type at most the deck is left to choose. In any other, the picture and each sound need a field of their own."
         }
         return model.targets.first { $0.name == model.target }?.detail ?? ""
     }
