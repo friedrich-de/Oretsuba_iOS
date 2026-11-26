@@ -93,6 +93,6 @@
 		<true/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Sends the lines you read to the mining server named in mining.txt, when that server is in your own network.</string>
+	<string>Sends the lines you read to the mining server named in mining.txt, and makes Anki cards through the AnkiConnect you set, when these are in your own network.</string>
 </dict>
 </plist>
