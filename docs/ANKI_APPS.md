@@ -67,7 +67,8 @@ The code is in `engine/src/mining/`:
   files, and reads AnkiMobile's answer from the clipboard. The app's own link scheme is `oretsuba`
   (`app/Resources/Info.plist`); the links it is opened with go to `ore_app_opened_with`. The Android app's is in
   `android/app/src/main/cpp/android_platform.cpp` and goes through `Native.ankiDroid` to `AnkiDroid.kt`, which
-  speaks to AnkiDroid's content provider; `AnkiMediaProvider.kt` hands a card's files over.
+  speaks to AnkiDroid's content provider; `AnkiMediaProvider.kt` hands a card's files over. AnkiDroid names each
+  file it stores after its type, so a voice in Ogg arrives as `.oga`.
 
 The setting is `anki.target`: `connect`, `ankimobile` or `ankidroid`.
 

@@ -145,10 +145,13 @@ class AnkiDroidCheck : Instrumentation() {
         note("the note's tags: $tags")
         check(fields.startsWith("$word\u001fto eat"), "the fields of text arrive as they are")
         check(Regex("<img src=\"oretsuba_${stamp}[^\"]*\\.jpe?g\">").containsMatchIn(fields), "the picture is in its field as an image")
-        for (ending in listOf("ogg", "m4a", "mp3")) {
-            val stored = Regex("\\[sound:(oretsuba_${stamp}[^\\]]*)\\]").findAll(fields).map { it.groupValues[1] }.toList()
-            check(stored.any { it.endsWith(".$ending") }, "the .$ending sound is in its field and keeps its ending (stored: $stored)")
+        // AnkiDroid names a stored file's ending after its type: Ogg sound becomes .oga, Ogg's own ending for sound alone.
+        val stored = Regex("\\[sound:(oretsuba_${stamp}[^\\]]*)\\]").findAll(fields).map { it.groupValues[1] }.toList()
+        check(stored.any { it.endsWith(".ogg") || it.endsWith(".oga") }, "the .ogg sound is in its field, as .ogg or .oga (stored: $stored)")
+        for (ending in listOf("m4a", "mp3")) {
+            check(stored.any { it.endsWith(".$ending") }, "the .$ending sound is in its field and keeps its ending")
         }
+        check(stored.size == 3, "three sounds in all")
         check(tags.split(' ').filter { it.isNotEmpty() }.toSet() == setOf("oretsuba-check", "two_words"),
             "the tags arrive, a blank inside one made an underscore")
 

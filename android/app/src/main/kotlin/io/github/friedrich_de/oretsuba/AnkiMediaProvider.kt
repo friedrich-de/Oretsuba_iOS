@@ -29,6 +29,7 @@ class AnkiMediaProvider : ContentProvider() {
         /**
          * The type AnkiDroid is told. It names the stored file's ending after
          * this type, so every one here is a type Android knows an ending for.
+         * For Ogg sound that ending is .oga, whatever the file was called.
          */
         fun typeOf(name: String): String = when (name.substringAfterLast('.', "").lowercase()) {
             "jpg", "jpeg" -> "image/jpeg"
