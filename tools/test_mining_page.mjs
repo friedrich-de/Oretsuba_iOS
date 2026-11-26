@@ -104,6 +104,12 @@ async function madeUpLine(browser, harness, anki, audio) {
   check((await popup.locator('.mark').count()) === 2, 'a tap on 友 while the popup is open shows 友達');
   await cardButton(popup, 'add').waitFor();
 
+  // Its definition carries two pictures of the dictionary's: both are drawn.
+  const pictures = popup.locator('.dictionary-popup .gloss-image-link');
+  await until('the pictures', async () => (await pictures.count()) === 2 && (await pictures.locator('img').evaluateAll((all) => all.every((img) => img.complete))));
+  const drawn = await pictures.evaluateAll((all) => all.map((link) => `${link.dataset.imageLoadState} ${link.querySelector('img')?.naturalWidth > 0}`));
+  check(drawn.length === 2 && drawn.every((state) => state === 'loaded true'), `the dictionary's pictures are drawn (${drawn.join(', ')})`);
+
   // A word in a definition is looked up in place, and Back returns.
   await tapGame(page, ...cell(7));
   await popup.locator('.dictionary-popup').getByText('cooked rice; meal').first().waitFor();
