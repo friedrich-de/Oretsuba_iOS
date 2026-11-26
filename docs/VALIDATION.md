@@ -123,6 +123,48 @@ port writes them unpacked, and the original reads those.
 **Not compared:** effects and transitions between pictures, a choice with three or more options, and the menus
 other than save, load and the text history.
 
+## Mining in the game, 2026-11-26
+
+[MINING.md](MINING.md) describes the feature. Run with the `SET_UP` folder of the game's disc, with the Linux build
+of the test host (without `VOICE.LPK`) and on a Mac with macOS 26.6 and Xcode 27.2. Every AnkiConnect, audio source
+and dictionary in these runs was made up for the test or a throwaway.
+
+- `dict_test` (1,652 checks) and `kit_test` (193), on both: Yomitan's own tests for Japanese inflections, the
+  import of a dictionary and what a lookup finds, and the kit against a made-up AnkiConnect and audio source. The
+  page's arithmetic has 12 tests of its own (`node --test engine/tests/page/*.test.mjs`).
+- Importing Jitendex takes about 2 seconds on the four-core machine these checks ran on and leaves a file of 94 MB.
+- `tools/test_mining_page.mjs`, the popup's page in Chromium: 31 checks over a made-up line and 57 over the game.
+  The marks lie on the tapped word, the popup stands beside it and inside the picture, a card is made once, and the
+  game's line is the same when the popup closes.
+- `tools/test_mining_kit.mjs`, the engine and the kit without a browser: 38 checks with the Linux host and 40 on the
+  Mac, where the card carries the line's voice as an M4A file of 112,642 bytes. A tap on a character names that
+  character and holds the game; clicks, keys, the wheel and commands during the hold do not reach it; a tap in the
+  text box beside the characters does nothing and one outside it reads on.
+- With the Linux host and the game: in the game's menu, in the history and with the text box hidden, a tap where
+  the text was is the game's own click and no word is looked up; the LOG button in the text box still opens the
+  history.
+- **Next to the code of a real AnkiConnect server** ([anki-connect-server](https://github.com/friedrich-de/anki-connect-server)
+  0.3.0 with Anki 26.9.4 and a throwaway collection), with the Linux host and the game: a wrong key is told in a
+  sentence, the Lapis note type and its deck are found, the card arrives with word, reading, meaning, the sentence
+  with the word in bold, the picture (60 KB) and the word's sound, both files lie in the collection, and a second
+  card of the word is refused as a duplicate.
+- **The app in the iPad Simulator** (iPad Pro 11-inch, iOS 27.2). In the launcher's settings: Connect finds Lapis
+  and its deck, the list of fields shows what each gets, a dictionary is downloaded from an address and imported,
+  the audio source is checked and kept, and the launcher then says "On: 1 dictionary, cards go to the deck
+  Mining." In the game: a tap on 自分 marks it and shows its entry; + makes the card, which arrives with the
+  line's voice (M4A), the picture, the word's sound and the game's title; a tap on 気付いた finds 気付く; a tap
+  beside the popup closes it and the line stays; a tap in the text box beside the text does nothing; a tap on
+  the picture reads on. After closing and starting the app the settings are as they were, the key and the audio
+  address among them: from the Keychain in a build signed to run locally, and from the file beside the settings
+  in an unsigned one, where the Keychain refuses.
+- **The app in the iPhone Simulator** (iPhone 17 Pro, iOS 27.2, landscape): the popup stands above the line and
+  inside the screen, and a word Anki has already shows as known.
+- The Release packages for iOS, Mac and visionOS compile with the mining kit and carry the folder `mining`.
+
+**Not checked:** a real iPhone, iPad or Vision Pro; Anki on a computer with the AnkiConnect add-on itself; the Mac
+and visionOS apps beyond compiling; a keyboard's Escape and a controller's B in the app; and a dictionary's
+pictures inside the app (`dict_test` and `kit_test` cover reading them).
+
 ## The original project's checks on devices, 2026-10-18
 
 The original project checked its versions 0.1.0 and 0.1.1 on real devices. It played with a Chinese translation
@@ -167,6 +209,14 @@ which no script has run yet are kept for the next logic frame.
   return to the script.
 - `fx_test` checks the arithmetic of the effects, and `elg_all` decodes every ELG picture.
 - `mining_test`: the mining settings file, the text of a record, which lines are sent, the request and the queue.
+- `dict_test`: undoing inflections against Yomitan's test corpus, reading a zip, importing a dictionary in Yomitan's
+  format, lookups, frequencies and pitch, pictures, and the library of installed dictionaries.
+- `kit_test`: the mining kit's methods against a made-up AnkiConnect and audio source: settings, the Lapis defaults,
+  what a card's note holds, duplicates, wrong keys and addresses, imports and downloads.
+- `engine/tests/page/*.test.mjs` (Node): where a word stands in its sentence, furigana, and a meaning as a card's HTML.
+- `tools/test_mining_page.mjs` (Node and Playwright's Chromium): the popup's page over a made-up line, and over the
+  game when given `SET_UP`.
+- `tools/test_mining_kit.mjs` (Node): the engine and the kit together with the game.
 - `FolderImportTests`: importing the folder that is already there, a name that is taken, a copy that fails, and an
   import that succeeds.
 
