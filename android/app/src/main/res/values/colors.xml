@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The night sky of the app's icon. -->
+    <color name="background">#0B1020</color>
+    <color name="card">#161D33</color>
+    <color name="card_line">#262F4D</color>
+    <color name="accent">#8AB4F8</color>
+    <color name="primary_text">#ECEFF7</color>
+    <color name="secondary_text">#9BA4BD</color>
+    <color name="good">#7BD88F</color>
+    <color name="warning">#F2B45A</color>
+    <color name="error">#FF8A80</color>
+</resources>

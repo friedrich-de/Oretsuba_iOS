@@ -232,13 +232,29 @@ private:
 		copy_rect(w, 0, 0, *c->bg, Rect(c->bg_x, c->bg_y, c->bg_x + w.width(), c->bg_y + w.height()));
 	}
 
-	// Base pixel at window coordinates (x, y); false if outside the background.
-	static bool base_px(const Compositor *c, int x, int y, uint32_t &out) {
+	// One row of the work image: the pixel at x is the background's at (x + sx, by),
+	// and where the background has none, the fill colour or what stood there. The
+	// rows are copied a span at a time; asking pixel by pixel gave the same picture
+	// and took most of a phone's processor core while such a background moved.
+	void copy_row(const Compositor *c, uint32_t *d, int width, int sx, int by, uint32_t fillc) const {
 		const Image &b = *c->bg;
-		int bx = x + c->bg_x, by = y + c->bg_y;
-		if (bx < 0 || by < 0 || bx >= b.width() || by >= b.height()) return false;
-		out = b.pixel(bx, by);
-		return true;
+		int lo = 0, hi = 0;  // [lo, hi): the part of the row the background covers
+		if (by >= 0 && by < b.height()) {
+			lo = int(std::clamp<int64_t>(-int64_t(sx), 0, width));
+			hi = int(std::clamp<int64_t>(int64_t(b.width()) - sx, lo, width));
+		}
+		if (fill_) {
+			std::fill(d, d + lo, fillc);
+			std::fill(d + hi, d + width, fillc);
+		}
+		if (hi <= lo) return;
+		if (b.bpp() == 8) {
+			const uint8_t *src = b.row8(by) + (lo + sx);
+			const uint32_t *palette = b.palette();
+			for (int x = lo; x < hi; ++x) d[x] = palette[src[x - lo]];
+		} else {
+			memcpy(d + lo, b.row32(by) + (lo + sx), size_t(hi - lo) * 4);
+		}
 	}
 
 	void render_rast(Compositor *c, int phase, int A) {
@@ -247,14 +263,7 @@ private:
 		uint32_t fillc = c->bg_color & 0xffffff;
 		for (int y = 0; y < w.height(); ++y, ph += step) {
 			int dx = int((int64_t(icos(int((ph >> 16) - 128) & 511)) * A) >> 16);
-			uint32_t *d = w.row32(y);
-			for (int x = 0; x < w.width(); ++x) {
-				uint32_t p;
-				if (base_px(c, x - dx, y, p))
-					d[x] = p;
-				else if (fill_)
-					d[x] = fillc;
-			}
+			copy_row(c, w.row32(y), w.width(), c->bg_x - dx, y + c->bg_y, fillc);
 		}
 	}
 
@@ -264,14 +273,7 @@ private:
 		for (int y = 0; y < w.height(); ++y) {
 			int k = (off + y) % n_;
 			int d = (T_[size_t(k)] * A) >> 9;
-			uint32_t *row = w.row32(y);
-			for (int x = 0; x < w.width(); ++x) {
-				uint32_t p;
-				if (base_px(c, x + d, y + d, p))
-					row[x] = p;
-				else if (fill_)
-					row[x] = fillc;
-			}
+			copy_row(c, w.row32(y), w.width(), c->bg_x + d, y + d + c->bg_y, fillc);
 		}
 	}
 

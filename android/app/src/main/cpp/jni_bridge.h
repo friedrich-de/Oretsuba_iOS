@@ -1,0 +1,36 @@
+// The way from native code into the app's Kotlin: the calls any native thread
+// may make (letters, HTTP) and the helpers the JNI functions share.
+#pragma once
+
+#include <jni.h>
+
+#include <string>
+
+#include "mining/mining.h"
+#include "platform/platform.h"
+
+namespace ore {
+
+// The app's Kotlin classes, by their JNI names.
+inline constexpr char kNativeClass[] = "io/github/friedrich_de/oretsuba/Native";
+inline constexpr char kHostClass[] = "io/github/friedrich_de/oretsuba/EngineHost";
+
+// Once, from JNI_OnLoad: remembers the Java machine and the Native class.
+bool jni_bridge_init(JavaVM *vm, JNIEnv *env);
+
+// The calling thread's JNI environment. A thread Java does not know yet (the
+// mining queue's, the audio restart's) is attached and detached when it ends.
+JNIEnv *jni_env();
+
+// Texts cross as UTF-8 bytes: JNI's own strings are not UTF-8 for every character.
+jbyteArray jni_bytes(JNIEnv *env, const std::string &text);
+std::string jni_string(JNIEnv *env, jbyteArray bytes);
+// True when a Java exception was pending; it is logged and cleared.
+bool jni_failed(JNIEnv *env, const char *what);
+
+// Native.renderGlyph: one letter drawn by android.graphics.
+bool jni_render_glyph(uint32_t codepoint, bool serif, bool bold, int size, GlyphBitmap &out);
+// Native.httpSend: one request through HttpURLConnection (the HttpSend of mining/mining.h).
+int jni_http_send(const HttpRequest &request, std::string &answer);
+
+}  // namespace ore
