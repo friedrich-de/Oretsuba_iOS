@@ -304,6 +304,8 @@ every pixel on its own. They now copy whole spans, checked to give the same pict
 phone shows 60 pictures a second there at half of one of its small cores.
 
 **The build on GitHub** carries the same certificate as the builds made by hand (the fingerprint is in ANDROID.md).
+The first one that was published, build 31, was installed on the phone over the last build made by hand: the game
+files stayed, and the title and its sound came up.
 
 **Not checked:** playing by hand on a phone, and with it the tap with two fingers, which `adb` cannot send (in the
 code it takes the same path as Back). The sound by ear: the emulators ran silent, and on the phone only the state of

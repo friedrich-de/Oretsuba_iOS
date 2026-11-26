@@ -57,6 +57,8 @@ the text box no longer reads on: tap the picture above it.
 * **Back** closes the dictionary. While it is open the game waits.
 * The AnkiConnect's key and the address of the audio source are kept on the device only, sealed with a key that
   the device's Keystore holds.
+* Addresses follow the rule of MINING.md, and the app holds to it: `https://` for anything in the internet, plain
+  `http://` only for a server in your own network (an IP address, a name without dots, or one ending in `.local`).
 
 ### Through a mining server
 
@@ -67,7 +69,8 @@ the text box no longer reads on: tap the picture above it.
 * Or copy the file with a cable into the folder above, next to the `SET_UP` folder or into it.
 
 The launcher then says where the lines go and whether the server takes the key. The rule for addresses is the one of
-MINING.md: `https://` for a server in the internet, plain `http://` only for a server in your own network.
+MINING.md: `https://` for a server in the internet, plain `http://` only for a server in your own network. The app
+does not send to an address that breaks it, and the launcher says so.
 
 ## Controls
 

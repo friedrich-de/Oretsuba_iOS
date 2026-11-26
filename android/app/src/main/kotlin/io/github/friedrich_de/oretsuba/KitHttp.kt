@@ -126,6 +126,10 @@ internal object KitHttp {
         var sent = body
         var hops = 0
         while (true) {
+            if (!Http.mayGo(address)) {
+                answer.error = Http.PLAIN_REFUSED
+                return false
+            }
             val connection = address.openConnection() as? HttpURLConnection
             if (connection == null) {
                 answer.error = "The address is not one of a web server."

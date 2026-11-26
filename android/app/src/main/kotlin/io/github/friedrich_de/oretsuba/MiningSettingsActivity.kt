@@ -74,6 +74,8 @@ class MiningSettingsActivity : Activity() {
     private var importError = ""
     /** What is downloaded, by a name the player knows, when it is a suggested dictionary. */
     private var importName = ""
+    /** The picked file's name while it is imported; empty for a download, whose source is its address. */
+    private var importFileName = ""
     private var suggested: List<Suggested> = emptyList()
     private var textSize = 100
     private var hideTags = false
@@ -369,6 +371,7 @@ class MiningSettingsActivity : Activity() {
         importTitle = state.optString("title")
         importError = state.optString("error")
         importName = state.optString("name")
+        importFileName = state.optString("source").takeIf { "://" !in it }.orEmpty()
         val offered = answer.optJSONArray("suggested") ?: JSONArray()
         suggested = (0 until offered.length()).mapNotNull { offered.optJSONObject(it) }.map {
             Suggested(it.optString("name"), it.optString("text"), it.optString("url"), it.optBoolean("installed"))
@@ -383,7 +386,8 @@ class MiningSettingsActivity : Activity() {
      */
     private fun change(method: String, params: JSONObject, forAnki: Boolean = false, after: (() -> Unit)? = null) {
         kit({ (MiningKit.call(method, params) as? JSONObject) to askCards() }) { answer, failure ->
-            if (forAnki) ankiProblem = failure else problem = failure
+            // What Anki refuses takes the place of the line that says how asking it went: one line, not two.
+            if (!forAnki) problem = failure else if (failure != null) anki = Check(BAD, failure)
             answer?.first?.let { take(it) }
             answer?.second?.let { cardProblem = it }
             show()
@@ -567,6 +571,8 @@ class MiningSettingsActivity : Activity() {
             if (failure == null && secret == Secrets.ANKI_KEY) {
                 keyField.setText("")
                 keySet = false
+                // "Connected" was said with the key; whether it still holds is asked anew below.
+                anki = Check(IDLE)
             } else if (failure == null) {
                 audioField.setText("")
                 audioSet = false
@@ -574,6 +580,7 @@ class MiningSettingsActivity : Activity() {
             }
             show()
             refreshCards()
+            if (failure == null && secret == Secrets.ANKI_KEY && addressField.text.isNotBlank()) connect(adopt = false)
         }
     }
 
@@ -685,8 +692,11 @@ class MiningSettingsActivity : Activity() {
                 val add = Button(this, null, 0, R.style.PlainButton)
                 add.text = getString(R.string.kit_add, dictionary.name)
                 add.setOnClickListener { dictionaryCall("dict.download", JSONObject().put("url", dictionary.url)) }
-                suggestedRows.addView(add, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
-                                                                     ViewGroup.LayoutParams.WRAP_CONTENT))
+                // A style's margins only count in a layout file: the button stands where "Import a file…" does.
+                val place = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                                                      ViewGroup.LayoutParams.WRAP_CONTENT)
+                place.marginStart = (-8 * resources.displayMetrics.density).toInt()
+                suggestedRows.addView(add, place)
                 val about = TextView(this, null, 0, R.style.Note)
                 about.text = getString(R.string.kit_add_note, dictionary.text)
                 suggestedRows.addView(about)
@@ -698,18 +708,23 @@ class MiningSettingsActivity : Activity() {
         if (!importRunning) stopping = false
         importStop.visibility = if (importRunning) View.VISIBLE else View.GONE
         importStop.isEnabled = !stopping
+        // Its red is a plain colour, which a button that is off keeps: it is dimmed by hand.
+        importStop.alpha = if (stopping) 0.38f else 1f
         importFile.visibility = if (busy) View.GONE else View.VISIBLE
         importAddress.visibility = if (busy) View.GONE else View.VISIBLE
         importStateText.text = when {
             reading != null -> getString(R.string.kit_copying, reading)
             importState == "downloading" && importName.isNotEmpty() -> getString(R.string.kit_downloading_named, importName)
             importState == "downloading" -> getString(R.string.kit_downloading)
-            importTitle.isEmpty() -> getString(R.string.kit_importing)
-            else -> getString(R.string.kit_importing_named, importTitle)
+            // The dictionary's title is only known once it is in; until then its name, or the file's.
+            else -> importTitle.ifEmpty { importName }.ifEmpty { importFileName }.let {
+                if (it.isEmpty()) getString(R.string.kit_importing) else getString(R.string.kit_importing_named, it)
+            }
         }
         importProgressBar.isIndeterminate = reading != null
         importProgressBar.progress = (importProgress.coerceIn(0.0, 1.0) * 1000).toInt()
-        val failed = importState == "failed" && importError.isNotEmpty() && !busy
+        // What was refused just now is said below; why an earlier import ended would only stand in its way.
+        val failed = importState == "failed" && importError.isNotEmpty() && !busy && dictionaryProblem.isNullOrEmpty()
         importErrorText.text = importError
         importErrorText.visibility = if (failed) View.VISIBLE else View.GONE
         showLine(dictionaryProblemText, dictionaryProblem)
@@ -840,7 +855,10 @@ class MiningSettingsActivity : Activity() {
                 false
             }
         }
-        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+        // Shifted, not squeezed: with the keyboard up from the start, a phone held sideways has room
+        // for the title and the note only, and the field would be left without any height.
+        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or
+                                        WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN)
         dialog.show()
         field.requestFocus()
     }
