@@ -102,7 +102,8 @@ adb install -r app/build/outputs/apk/release/app-release.apk
 
 The package holds the engine for `arm64-v8a` (phones and tablets) and `x86_64` (emulators, Chromebooks). The app uses
 no library besides Android itself. `ORE_BUILD_NUMBER` in the environment sets the build number (`versionCode`), which
-Android wants to grow from one update to the next.
+Android wants to grow from one update to the next, and the last part of the version (`versionName`, 0.1.N). The build
+on GitHub passes the number of its run, the same for the iPhone package; a build that was given none is 0.1.0.
 
 ### The signing key
 
