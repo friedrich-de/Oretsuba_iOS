@@ -3,8 +3,8 @@
 This port has two ways of making Anki cards from what you read. They do not depend on each other and can both be
 on.
 
-* **In the game** (iPhone, iPad, Vision Pro and Mac; not yet in the Android app). A tap on a word of the text
-  shows a dictionary over the game, and a button in it makes the card, with the sentence, its voice, a picture
+* **In the game** (iPhone, iPad, Vision Pro, Mac and Android). A tap on a word of the text shows a dictionary
+  over the game, and a button in it makes the card, with the sentence, its voice, a picture
   of the scene and the word's sound. You set it up in the launcher: where your cards go, the dictionaries, and
   where the sound of a word comes from.
 * **Through a mining server.** The game sends every line you read to a
@@ -31,11 +31,13 @@ In the launcher, under "Mining in the game", press **Set up…**.
    * An address in the internet has to begin with `https://`. Plain `http://` is for a server in your own
      network, given by its IP address, a name without dots or one ending in `.local`; iOS then asks once for
      access to the local network.
+   * The Android app sends its cards to an AnkiConnect.
 2. **Dictionaries.** Import dictionaries in [Yomitan](https://yomitan.wiki/dictionaries/)'s format, as the zip
-   files they come in: from the Files app, or by their address (`https://`). Dictionaries of words, of
-   frequencies and of pitch accents all count. A word's meanings are shown in the order of the list, and a card
-   gets the meaning of the first; Edit changes the order, and a swipe removes a dictionary. Importing a large
-   dictionary takes a few seconds and can be stopped.
+   files they come in: from the Files app (on Android: **Import a file…**, which opens the system's file
+   picker), or by their address (`https://`). Dictionaries of words, of frequencies and of pitch accents all
+   count. A word's meanings are shown in the order of the list, and a card gets the meaning of the first; Edit
+   changes the order, and a swipe removes a dictionary (on Android each dictionary has the buttons Up, Down and
+   Remove). Importing a large dictionary takes a few seconds and can be stopped.
 3. **Word audio** (optional). The address of an audio source as Yomitan takes a custom one, with `{term}` and
    `{reading}` where the word and its reading go. It may answer with a sound or with Yomitan's list of sounds.
    Check asks it for 食べる and keeps an address that answers.
@@ -53,7 +55,7 @@ without Anki; the button for a card then says what is missing.
   press on it lists the sounds the source has, and the one you choose is the one a card gets.
 * A tap on another character of the line looks that one up. Inside a meaning, a tap on a word looks that word
   up, and the popup's arrow goes back.
-* **×**, a tap beside the popup, Escape or the controller's B closes it.
+* **×**, a tap beside the popup, Escape or the controller's B closes it, and on Android Back does too.
 * **While the popup is open the game stands still**: the script and the animations wait, no click, key, wheel
   or controller button reaches the game, and what was sounding goes on sounding.
 
@@ -86,6 +88,11 @@ stay out of device backups, since they can be imported again. The AnkiConnect's 
 address, which often holds a key, are kept in the device's Keychain and are not written into the settings. A
 Mac build that is signed without a team has no Keychain of its own; there the two lie in a file beside the
 settings that only your user can read.
+
+The Android app keeps the settings and the dictionaries in its inner folder (`files/mining`), which no other app
+and no file manager reads; it goes with the app when the app is uninstalled, unless you tell Android to keep the
+app's data. The two secrets lie beside the app's own settings, sealed with a key that the device's Keystore
+holds and does not give out.
 
 ## Sending lines to a mining server
 
@@ -225,8 +232,9 @@ system needs only that layer.
   the name of a method with JSON in and out. `mining/kit_tap`: `KitTap` ties it to the engine: which character a
   tap hits, the line's voice and picture, and the reading hold.
 * `mining/kit_host.h`: the two things a system gives the kit, an HTTP fetcher and an encoder for the voice
-  (`platform/apple/apple_kit_host.mm`: `NSURLSession` and AAC through AudioToolbox; the Linux test host has
-  sockets and no encoder, so its cards carry the game's Ogg file).
+  (`platform/apple/apple_kit_host.mm`: `NSURLSession` and AAC through AudioToolbox; the Android app's
+  `android_kit_host.cpp`: `HttpURLConnection` and AAC through `MediaCodec`; the Linux test host has sockets and
+  no encoder, so its cards carry the game's Ogg file).
 * `dict/kit_config.h`: `ORE_MINING_KIT` is 0 on Windows, where the test host stands next to the original game
   and needs none of this; the functions below are then empty.
 
@@ -277,6 +285,12 @@ the bundle's `mining/page` folder and `kit/data/`. `GameViewController` asks `or
 primary click becomes a click of the game, holds the game while the popup is open and ends the hold when the
 page calls `popup.close`.
 
+In the Android app it is `MiningPopup.kt` and `GameActivity`, which do the same with Android's web view: the
+page comes from an address no server has (`https://mining.oretsuba.invalid/`), and every request to it is
+answered from the package's `mining/page` folder or by the kit. A script served with the page sets
+`window.oreHost`; its calls cross to Kotlin with a number each and come back as the answer to that number.
+[ANDROID.md](ANDROID.md#for-developers) names the files.
+
 **Tests.** None of them needs an Apple system.
 
 ```sh
@@ -296,4 +310,6 @@ on its standard input (`run N`, `tap X Y`, `call METHOD JSON`, `data METHOD JSON
 head of `engine/host/main.mm` lists them) and answers each with a line of JSON. `tools/mining_page/` holds the
 made-up AnkiConnect, audio source and dictionary these tests use, and the stage that stands in for the app.
 `node tools/mining_page/neighbours.mjs` runs the three at fixed addresses, for trying the app in the Simulator
-by hand.
+by hand, or in an Android emulator, which reaches them at `10.0.2.2`. `ORE_NEIGHBOUR_PORT` moves them away from
+8765, where a real Anki's AnkiConnect listens, and `ORE_NEIGHBOUR_MEDIA` names a folder that gets the pictures
+and sounds of the cards they are given.

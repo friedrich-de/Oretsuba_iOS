@@ -13,9 +13,10 @@ everywhere (a Mac has AnkiConnect alone, and the choice is not shown there). The
 fields are chosen in the same settings, whichever it is. They are kept once, not for each place: after changing
 where cards go, look at the deck and the note type again.
 
-> **Android.** The Android app does not look words up in the game yet ([ANDROID.md](ANDROID.md)), so it has no
-> mining settings and this choice does not show there. The part that speaks to AnkiDroid is in the app and checked
-> against the real AnkiDroid; it is what the choice will use once the dictionary popup is on Android.
+> **Android.** The Android app looks words up in the game and has its mining settings
+> ([ANDROID.md](ANDROID.md#in-the-game)), with an AnkiConnect as the place for its cards: the choice does not show
+> there yet. The part that speaks to AnkiDroid is in the app and checked against the real AnkiDroid; it is what
+> the choice will use once it is in those settings.
 
 ## AnkiMobile (iPhone, iPad)
 
@@ -46,7 +47,7 @@ AnkiMobile can be reached only by links, which is why it works differently from 
 
 ## AnkiDroid (Android)
 
-How it will go once the Android app has the dictionary popup and its settings (see the note above):
+How it will go once the choice is in the Android app's mining settings (see the note above):
 
 1. Install [AnkiDroid](https://play.google.com/store/apps/details?id=com.ichi2.anki) and open it once.
 2. In the mining settings, set **Send cards to** to AnkiDroid. Android asks once whether Oretsuba may read and

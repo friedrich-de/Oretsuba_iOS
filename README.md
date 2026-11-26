@@ -16,7 +16,7 @@ and on Android.
 
 **This repository contains nothing of the game.** You have to buy the game yourself and use your own game files.
 
-> **Mining.** This fork makes Anki cards from what you read, in two ways. In the game (on Apple devices so far):
+> **Mining.** This fork makes Anki cards from what you read, in two ways. In the game (on Apple devices and Android):
 > a tap on a word of the text shows a dictionary over the game, and a button makes the card, with the sentence,
 > its voice, a picture and the word's sound, through an AnkiConnect you name in the launcher or, on iPhone and
 > iPad, straight into the AnkiMobile app ([docs/ANKI_APPS.md](docs/ANKI_APPS.md)). Or through a
@@ -199,13 +199,14 @@ cd android && ./gradlew :app:assembleRelease   # app/build/outputs/apk/release/a
 * Libraries: stb_vorbis, stb_image, stb_image_write (public domain / MIT), pl_mpeg (MIT), minimp3 (CC0). The LPK and
   ELG formats were read with the help of GARbro (MIT). Licences and attributions are in
   [ThirdPartyNotices.txt](app/Resources/ThirdPartyNotices.txt), which is also inside the apps.
-* Mining in the game uses two works under the GPL-3.0-or-later, which the Apple app carries as files of their own: the
+* Mining in the game uses two works under the GPL-3.0-or-later, which the apps carry as files of their own: the
   dictionary popup of [Hachidori](https://github.com/bee-san/hachidori)
   ([dictionary-popup](https://github.com/bee-san/dictionary-popup), in
   `engine/resources/mining/page/vendor/dictionary-popup` with its licence and sources), and
   [Yomitan](https://github.com/yomidevs/yomitan)'s rules for Japanese inflections as the Hoshidicts language pack
   writes them (`engine/resources/mining/transforms.json`, see `SOURCES.md` beside it). Dictionaries are not part of
-  the app; you import your own.
+  the app; you import your own. The Android app also holds [SQLite](https://sqlite.org), which is in the public
+  domain.
 
 ## Checks and packages
 
