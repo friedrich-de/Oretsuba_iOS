@@ -196,6 +196,13 @@ Per frame:
    the window.
 5. `if (tr->done()) → S->finish(S+0x9d)`. The last frame (progress = 100%) is
    rendered before the finish.
+   So the VM run that follows in the same frame already sees `N_fd` = 0, and with
+   the flag set the pages are already swapped. A port that runs the VM before it
+   draws must end the transition right after drawing its last frame, not in
+   the next frame's drawing: else a mode 0 transition whose script does the
+   page action itself (the menus' `L+2a150`) shows the old page for one frame
+   more, and chained transitions get one still frame between their stages
+   **[measured: 1109 line 45, last picture at k 20, next N_fb at k 21]**.
 
 Progress convention: **progress 0 shows src1 (old), 100% shows src2 (new).**
 

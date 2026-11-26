@@ -162,10 +162,7 @@ void Engine::render_frame() {
 		if (movie->finished()) movie_state = 0;
 		return;
 	}
-	// end finished transitions (their last frame is the new page content)
-	for (auto &o : images)
-		if (auto *s = dynamic_cast<Surface *>(o.get()))
-			if (s->transition && s->transition->done) s->end_transition(s->trans_apply);
+	end_finished_transitions();
 	if (rendered_gen_ == g_gfx_generation) {
 		bool animating = false;
 		for (View *v : view_list)
@@ -188,6 +185,17 @@ void Engine::render_frame() {
 	}
 	rendered_gen_ = g_gfx_generation;
 	++frame_serial_;
+	// A transition ends in the frame that shows its last step (0x4bd580: render,
+	// then finish), so the script's next run already finds it over and the page
+	// action done. Ended a frame later, a transition that leaves the page
+	// action to the script showed the old page once more for one frame.
+	end_finished_transitions();
+}
+
+void Engine::end_finished_transitions() {
+	for (auto &o : images)
+		if (auto *s = dynamic_cast<Surface *>(o.get()))
+			if (s->transition && s->transition->done) s->end_transition(s->trans_apply);
 }
 
 void Engine::game_command(int command) {

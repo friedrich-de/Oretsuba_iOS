@@ -120,8 +120,30 @@ option of a choice, a setting that is on when the game is installed. The port ke
 screen it would only light a button nobody pointed at. The original packs `GAMEDATA.DAT` and `TEXT_LOG.DAT`; the
 port writes them unpacked, and the original reads those.
 
-**Not compared:** effects and transitions between pictures, a choice with three or more options, and the menus
-other than save, load and the text history.
+**Not compared:** a choice with three or more options, and the menus other than save, load and the text history.
+Effects and transitions followed a day later, see the next section.
+
+## Frame by frame next to the original, 2026-11-26
+
+For effects both programs were given the same stepped clock: 16 ms per shown frame, in the original through its
+time imports, in the port's test host with `--frame-ms 16`. A click goes in at a chosen frame, and every frame after
+it is kept on both sides (`--shot-range`). Over 200 frames the original's clock stepped by exactly 16 and its script
+ran once per frame; on a line that stands still all 227 frames were the same.
+
+**Same in both:** the letters of a line appear one every second frame in both, on the same frames; a cross fade
+has the same strength on every frame; character moves, the inset picture and the bounce match on every frame (two
+moves within one colour step); the pattern transition number 86 is the same pixel for pixel in both directions.
+
+**Found and changed:**
+
+| What | Before | Now |
+|---|---|---|
+| The end of a transition | The port ended a transition one frame after its last step. A screen that fades away and leaves the change of pages to the script, as the save, load and history screens do, showed once more for one frame after its fade; two transitions in a row had one still frame more between them than in the original | A transition ends in the frame that shows its last step, as the original's loop does (render, then finish) |
+
+**Still different, not changed yet:** the save, load and history screens fade in over 300 ms in the original and
+appear at once in the port; the text window and the name box stay above a transition in the original and fade with
+the picture in the port; the horizontal blur takes its right edge from the column before the last; a layer effect
+starts one frame later in the port, and a click reaches the next line's commands one frame earlier.
 
 ## The Android app, 2026-11-26
 
@@ -229,6 +251,8 @@ which no script has run yet are kept for the next logic frame.
   a start that goes back to that line and reads on as an unbroken run does.
 - `movie_flow`: both opening films of the game's MoviePlay script, with no input to skip them, end by themselves and
   return to the script.
+- `menu_fade`: the load screen is opened from the title and closed again, and every frame of the closing is looked
+  at: once the screen has faded away it does not show again.
 - `fx_test` checks the arithmetic of the effects, and `elg_all` decodes every ELG picture.
 - `mining_test`: the mining settings file, the text of a record, which lines are sent, the request and the queue.
 - `FolderImportTests`: importing the folder that is already there, a name that is taken, a copy that fails, and an

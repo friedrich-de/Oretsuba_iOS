@@ -203,6 +203,7 @@ build/host/native_coverage /path/to/SET_UP
 build/host/image_blend
 build/host/mining_test
 build/host/movie_flow /path/to/SET_UP
+build/host/menu_fade /path/to/SET_UP
 python3 tools/test_save.py /path/to/SET_UP
 python3 tools/test_quick_save.py /path/to/SET_UP
 python3 tools/test_history_toggle.py /path/to/SET_UP
