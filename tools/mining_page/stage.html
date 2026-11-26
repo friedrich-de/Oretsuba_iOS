@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mining popup: the stage</title>
+    <style>
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+      }
+      #picture,
+      #line {
+        position: fixed;
+        left: 0;
+        top: 0;
+      }
+      #line {
+        box-sizing: border-box;
+        background: linear-gradient(#20242c, #0c0e12);
+        color: #fff;
+        font-family: 'Noto Sans CJK JP', 'Noto Sans JP', 'IPAGothic', sans-serif;
+      }
+      #line span {
+        position: absolute;
+        text-align: center;
+      }
+      #popup {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        visibility: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <img id="picture" alt="" hidden />
+    <div id="line" hidden></div>
+    <iframe id="popup" src="page/popup.html" title="Dictionary"></iframe>
+    <script type="module" src="stage.js"></script>
+  </body>
+</html>

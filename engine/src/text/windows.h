@@ -30,6 +30,13 @@ struct FrameSet {
 	void compose(int mode, uint32_t rgb, int alpha);
 };
 
+// A character as it stands in a text window: its code in the game's encoding
+// and the cell it was drawn into, in the window's own coordinates.
+struct TextGlyph {
+	uint16_t code = 0;
+	int x = 0, y = 0, w = 0, h = 0;
+};
+
 class TextWindow : public UiControl {
 public:
 	TextWindow(Engine &e, UiSystem &ui);
@@ -90,7 +97,14 @@ public:
 
 protected:
 	void touch();
+	// A window that wants to know what stands in it hears of every character
+	// drawn and of the page being wiped.
+	virtual void glyph_drawn(uint16_t code, int x, int y, int w, int h) { (void)code, (void)x, (void)y, (void)w, (void)h; }
+	virtual void page_wiped() {}
 	std::unique_ptr<Sprite> sprite_;
+
+private:
+	void tell_string_drawn(const std::string &s, int x, int y);
 };
 
 class MessageWindow : public TextWindow {
@@ -112,6 +126,10 @@ public:
 	void set_cursor(uint32_t anim);  // N_2fd
 	bool advance_pressed();     // FUN_004093c0
 
+	// The characters of the page as it stands, in the order they were drawn
+	// (for looking a tapped word up, mining/kit_tap.h).
+	const std::vector<TextGlyph> &glyphs() const { return glyphs_; }
+
 	MessageManager &mm;
 	uint32_t name_box = 0;   // +0x2c0
 	uint32_t skip_button = 0;  // +0x2c4
@@ -123,8 +141,13 @@ public:
 	std::string voice_id;         // +0x2a9
 	RevealTask *ctrl = nullptr;   // +0x2a0
 
+protected:
+	void glyph_drawn(uint16_t code, int x, int y, int w, int h) override { glyphs_.push_back(TextGlyph{code, x, y, w, h}); }
+	void page_wiped() override { glyphs_.clear(); }
+
 private:
 	int start(bool instant, bool allow_skip);  // FUN_00409570
+	std::vector<TextGlyph> glyphs_;
 	friend class RevealTask;
 };
 

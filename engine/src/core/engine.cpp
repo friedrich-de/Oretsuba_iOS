@@ -5,6 +5,7 @@
 
 #include "gfx/blend.h"
 #include "gfx/transition.h"
+#include "mining/kit_tap.h"
 #include "mining/mining_tap.h"
 #include "text/font.h"
 #include "text/text_system.h"
@@ -113,6 +114,37 @@ void Engine::set_paused(bool p) {
 	}
 }
 
+void Engine::set_kit(MiningKit *kit) {
+#if ORE_MINING_KIT
+	kit_tap = kit ? std::make_unique<KitTap>(*this, *kit) : nullptr;
+#else
+	(void)kit;
+#endif
+}
+
+void Engine::kit_line_shown(MessageWindow &window) {
+#if ORE_MINING_KIT
+	if (kit_tap) kit_tap->line_shown(window);
+#else
+	(void)window;
+#endif
+}
+
+void Engine::kit_window_gone(MessageWindow &window) {
+#if ORE_MINING_KIT
+	if (kit_tap) kit_tap->window_gone(window);
+#else
+	(void)window;
+#endif
+}
+
+void Engine::set_reading_hold(bool hold) {
+	if (hold == reading_hold_) return;
+	reading_hold_ = hold;
+	// What was pressed before or during the hold is not a press after it.
+	input.set_muted(hold);
+}
+
 bool Engine::run_vm() {
 	Vm::RunResult r = vm.run_frame();
 	if (r == Vm::RunResult::Error) {
@@ -126,6 +158,14 @@ bool Engine::run_vm() {
 int Engine::frame(int64_t t) {
 	if (!booted_) return -1;
 	if (paused_) return 0;
+	if (reading_hold_) {
+		// The game waits for the popup to close; the picture and the sound go on.
+		last_logic_ = t;
+		now = t;
+		sound.update(now);
+		render_frame();
+		return quit_requested ? 1 : 0;
+	}
 	if (last_logic_ < 0) last_logic_ = t - 16;
 	int64_t elapsed = t - last_logic_;
 	// Keep input pending until at least one logical step will run.

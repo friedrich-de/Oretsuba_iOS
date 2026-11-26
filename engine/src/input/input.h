@@ -21,6 +21,10 @@ public:
 		return command >= 0 && command < 12 && (commands_cur_ & (1u << command));
 	}
 	void on_leave() { inside_ = false; }
+	// While muted the game hears nothing of the host but where the pointer is,
+	// and what was pressed before is forgotten: nothing held or pressed during
+	// that time counts once it is over (Engine::set_reading_hold).
+	void set_muted(bool muted);
 
 	// Samples the host state into the frame state; call once per frame.
 	void poll();
@@ -63,6 +67,7 @@ private:
 	bool inside_ = true;
 	bool host_moved_ = false;
 	uint16_t commands_pending_ = 0, commands_cur_ = 0;
+	bool muted_ = false;
 	// frame side
 	bool cur_[256] = {}, prev_[256] = {};
 	bool btn_cur_[3] = {}, btn_prev_[3] = {};

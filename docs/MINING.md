@@ -1,12 +1,99 @@
 # Mining
 
+This port has two ways of making Anki cards from what you read. They do not depend on each other and can both be
+on.
+
+* **In the game** (iPhone, iPad, Vision Pro and Mac; not yet in the Android app). A tap on a word of the text
+  shows a dictionary over the game, and a button in it makes the card, with the sentence, its voice, a picture
+  of the scene and the word's sound. You set it up in the launcher: the AnkiConnect your cards go to, the
+  dictionaries, and where the sound of a word comes from.
+* **Through a mining server.** The game sends every line you read to a
+  [VN Mining Server](https://github.com/friedrich-de/VN-Mining-Server), whose page shows the lines as they come,
+  looks words up and makes the cards, on the same phone or on any other device. It is on once a file named
+  `mining.txt` lies in the game folder.
+
+## Mining in the game
+
+### Setting it up
+
+In the launcher, under "Mining in the game", press **Set up…**.
+
+1. **Anki.** Enter the address of your AnkiConnect and, if it asks for one, its key, then press Connect. That is the
+   AnkiConnect add-on of Anki on your computer (`http://192.168.1.20:8765`; the add-on listens to its own
+   computer only until its setting `webBindAddress` is `0.0.0.0`), or a server of your own that speaks
+   AnkiConnect. The game is a client of it and nothing of Anki is in the app.
+   * If the collection has the [Lapis](https://github.com/donkuri/lapis) note type, it is chosen together with
+     the deck its newest card is in, and its fields are filled the way Lapis means them to be. There is nothing
+     more to set.
+   * Otherwise choose a deck and a note type, and under "What goes into the fields" what each field gets.
+   * An address in the internet has to begin with `https://`. Plain `http://` is for a server in your own
+     network, given by its IP address, a name without dots or one ending in `.local`; iOS then asks once for
+     access to the local network.
+2. **Dictionaries.** Import dictionaries in [Yomitan](https://yomitan.wiki/dictionaries/)'s format, as the zip
+   files they come in: from the Files app, or by their address (`https://`). Dictionaries of words, of
+   frequencies and of pitch accents all count. A word's meanings are shown in the order of the list, and a card
+   gets the meaning of the first; Edit changes the order, and a swipe removes a dictionary. Importing a large
+   dictionary takes a few seconds and can be stopped.
+3. **Word audio** (optional). The address of an audio source as Yomitan takes a custom one, with `{term}` and
+   `{reading}` where the word and its reading go. It may answer with a sound or with Yomitan's list of sounds.
+   Check asks it for 食べる and keeps an address that answers.
+4. Turn on **Look words up in the game**.
+
+The launcher then says how things stand: "On: 2 dictionaries, cards go to the deck Mining." Looking words up works
+without Anki; the button for a card then says what is missing.
+
+### In the game
+
+* **A tap on a word** of the line shows the dictionary for the longest word that starts at the character you
+  tapped, with inflections undone (気付いた is found as 気付く). The word is marked in the line and the popup
+  stands above or below it. With a mouse or trackpad a click does the same.
+* **+** makes the card. It turns into a mark when Anki has the word already. The loudspeaker plays the word; a long
+  press on it lists the sounds the source has, and the one you choose is the one a card gets.
+* A tap on another character of the line looks that one up. Inside a meaning, a tap on a word looks that word
+  up, and the popup's arrow goes back.
+* **×**, a tap beside the popup, Escape or the controller's B closes it.
+* **While the popup is open the game stands still**: the script and the animations wait, no click, key, wheel
+  or controller button reaches the game, and what was sounding goes on sounding.
+
+Because the text now answers to taps, **the text box no longer reads on**. Tap the picture above it, or use
+Enter, the wheel or a controller. The game's own buttons in the text box (SAVE, LOG, SKIP ...) work as ever, and
+while a line is still appearing a tap on it completes it as before. In the history and in the game's menus
+nothing is looked up.
+
+### What a card gets
+
+| Field of Lapis | |
+| --- | --- |
+| Expression, ExpressionReading, ExpressionFurigana | The word in its dictionary form, its reading, and both together (食[た]べる). |
+| MainDefinition | Its meanings in your first dictionary. |
+| SelectionText | What you had selected in the popup when you pressed +, if anything. |
+| Sentence | The line, with the word in bold. |
+| SentenceAudio | The voice of the line, as AAC in an `.m4a` file, which every Anki plays. Empty for a line without a voice. |
+| Picture | The screen as it was when you first tapped the line, with the text box, as a JPEG. |
+| ExpressionAudio | The sound of the word from the audio source. |
+| Frequency, FreqSort, PitchPosition, PitchCategories | From your frequency and pitch dictionaries. |
+| MiscInfo | The game's title. |
+
+Cards get the tags you set (at first `vn-miner`). A word Anki has already in that deck is refused as a duplicate,
+and the popup says so.
+
+### Where it is kept
+
+The settings and the dictionaries lie in the app's own folder (`Application Support/Mining`); the dictionaries
+stay out of device backups, since they can be imported again. The AnkiConnect's key and the audio source's
+address, which often holds a key, are kept in the device's Keychain and are not written into the settings. A
+Mac build that is signed without a team has no Keychain of its own; there the two lie in a file beside the
+settings that only your user can read.
+
+## Sending lines to a mining server
+
 The game can send every line you read to a [VN Mining Server](https://github.com/friedrich-de/VN-Mining-Server):
 the text, who speaks, the voice and a screenshot. The server's page shows the lines as they come, looks words up
 and makes Anki cards of them, on the same phone or on any other device.
 
 Nothing is sent unless a file named `mining.txt` lies in the game folder.
 
-## Setting it up
+### Setting it up
 
 1. Open your mining server's page, go to its settings, and under "The game" press **Download mining.txt**.
 2. Put the file into the game folder, next to `SCRIPT.LPK`. One of the two folders above it works as well.
@@ -20,7 +107,7 @@ Nothing is sent unless a file named `mining.txt` lies in the game folder.
 
 Then read. Each line appears on the server's page a moment after its text stands complete on the screen.
 
-## mining.txt
+### mining.txt
 
 ```text
 server = https://vn.example.org
@@ -42,7 +129,7 @@ An address in the internet has to begin with `https://`. Plain `http://` is for 
 given by its IP address, a name without dots or one ending in `.local` (`http://192.168.1.20:8733`); iOS then
 asks once for access to the local network.
 
-## What is sent, and when
+### What is sent, and when
 
 * A line is sent once its whole text stands on the screen and waits for you, 0.3 seconds after it began at
   the earliest. Lines you click through faster than that, and lines the skip function runs over, are not sent.
@@ -62,13 +149,13 @@ and sent in their order once the server answers again; beyond that the oldest go
 key, the game stops sending until it is started again, because repeated wrong keys get an address locked out
 for a while.
 
-## When no lines arrive
+### When no lines arrive
 
 The launcher's line under the game files says what is wrong:
 
 | The launcher says | |
 | --- | --- |
-| Mining is off | No `mining.txt` was found in the game folder or the two folders above it. |
+| Sending lines to a mining server is off | No `mining.txt` was found in the game folder or the two folders above it. |
 | mining.txt has no line "server = ..." (or "key = ...") | The file is there but incomplete. |
 | ... could not be reached | The address is wrong, the server is down, or the device has no connection to it. |
 | ... does not take the key in mining.txt | The key was changed on the server: download the file again. |
@@ -77,7 +164,9 @@ Press Check again in the launcher to ask again.
 
 ## For developers
 
-The code is in `engine/src/mining/`:
+### The sender
+
+The code that sends lines to a server is in `engine/src/mining/`:
 
 * `mining.h`, `mining.cpp`: the part without the engine. The settings file, the text of a record, `LineGate`
   (which lines count as read), the multipart request and `MiningQueue` (one thread that sends in order, tries
@@ -114,3 +203,92 @@ build/host/orehost --data SET_UP --save /tmp/ore-save --frames 31970 --debug \
 Of the 634 lines it runs through, the 61 that are read at a normal pace are sent, 28 of them with a voice. The
 lines clicked away after 0.2 seconds and the lines the skip key runs over are not. Line 11 of the first script
 goes out 0.5 seconds after it began, when the app is paused.
+
+### The mining kit
+
+Mining in the game is the "mining kit": portable C++ in `engine/src/dict` and `engine/src/mining`, a web page
+for the popup in `engine/resources/mining/page`, and a thin layer of each system's own code that carries calls
+between them. The Swift side (`app/Sources/App/Mining*.swift`) holds no dictionary and no Anki logic, so another
+system needs only that layer.
+
+* `dict/`: dictionaries. `yomitan_import` reads a Yomitan zip into an SQLite file, `dictionary_db` reads it,
+  `deinflector` undoes inflections with Yomitan's rules (`engine/resources/mining/transforms.json`), `lookup`
+  finds the words that start a text, and `library` keeps the installed dictionaries, their order and one
+  import at a time.
+* `mining/anki_connect`, `anki_fields`, `card_note`, `word_audio`: the AnkiConnect client behind the `CardTarget`
+  seam, the Lapis defaults and the guesses for other note types, the note of a card, and the audio source.
+* `mining/mining_kit`: `MiningKit`, one per app. It keeps the settings (`settings.json`) and answers calls by
+  the name of a method with JSON in and out. `mining/kit_tap`: `KitTap` ties it to the engine: which character a
+  tap hits, the line's voice and picture, and the reading hold.
+* `mining/kit_host.h`: the two things a system gives the kit, an HTTP fetcher and an encoder for the voice
+  (`platform/apple/apple_kit_host.mm`: `NSURLSession` and AAC through AudioToolbox; the Linux test host has
+  sockets and no encoder, so its cards carry the game's Ogg file).
+* `dict/kit_config.h`: `ORE_MINING_KIT` is 0 on Windows, where the test host stands next to the original game
+  and needs none of this; the functions below are then empty.
+
+**The C interface** is `engine/src/api/ore_kit.h`: `ore_kit_open` and `ore_kit_close`, `ore_kit_call(kit,
+method, params_json)` for every method, `ore_kit_data` for the files the page shows, `ore_kit_set_events`, and
+with the engine `ore_set_kit`, `ore_text_tap` (what a tap is: the game's, a word with the JSON for the page, or
+nothing) and `ore_set_reading_hold`. A call may wait for the network and belongs on a thread of its own.
+
+**Methods.** Every answer is `{"ok":true,"result":…}` or `{"ok":false,"error":"a sentence for the
+player","kind":"…"}` with a kind of `address`, `settings`, `anki`, `unreachable`, `duplicate`, `dictionary`,
+`busy`, `stale`, `audio` or `internal`.
+
+| Method | |
+| --- | --- |
+| `settings.get`, `settings.set {direct?, anki?, popup?}` | The settings: `direct` (the text takes taps), `anki {target, address, deck, noteType, fields:[{field, role}], tags}`, `popup {textSize, hideTags, compact}`, and whether the two secrets are set. |
+| `secrets.set {ankiKey?, audioAddress?}` | The two secrets, which the kit does not write down: the host keeps them and tells them at each start. |
+| `anki.check {address?, key?, adopt?}` | Asks the AnkiConnect for its decks and note types and whether Lapis is there. With `adopt` the address and key become the kit's, and Lapis is chosen where nothing was. |
+| `anki.fields {noteType?}`, `anki.choose {deck?, noteType?}`, `anki.setRole {field, role}`, `anki.roleChoices` | The fields of a note type and what goes into them. |
+| `audio.check {address?}`, `audio.sources {term, reading}` | The audio source: whether it answers, and the names of the sounds it has for a word. |
+| `dict.list`, `dict.import {path, name?, remove?}`, `dict.download {url}`, `dict.cancel`, `dict.arrange {order, disabled}`, `dict.enable {id, enabled}`, `dict.remove {id}` | The dictionaries. An import runs beside the call; `dict.list` says how far it is. |
+| `page.init` | What the popup needs to draw itself: its look, the dictionaries and their styles, whether a card can be made and why not. |
+| `lookup {text}` | The words that start `text`, longest first, each with its entries in every dictionary. |
+| `card.known {words}`, `card.add {word, audioChoice?}` | Whether Anki has the words, and a card of one. `word` is `{expression, reading, furigana, meaning, frequency, pitch, pitchCategories, selection, at:{start, length}}`, with `at` in UTF-16 units of the sentence. |
+| `line.get`, `line.set {sentence, speaker}` | The line the next card is made of. The engine sets it at a tap. |
+
+Files, through `ore_kit_data`: `dict.media {dictionary, path}`, `audio.word {term, reading, source?}`,
+`line.picture`, `line.voice`.
+
+**The popup's page** is shown in a web view over the game's picture and is the same on every system. Its host
+gives it three things:
+
+* A way to call. The page looks for `window.oreHost = { call(method, paramsJson) }`, which returns the answer's
+  JSON as a string or a promise of one (the way for a web view whose bridge is an injected object); then for
+  WKWebView's message handler `oreKit`, to which it posts `{method, params}` with `params` as JSON text and
+  takes the answer as the reply; and without either it sends `POST kit/call/<method>` to where it was loaded
+  from. Methods that begin with `popup.` are the host's own: `popup.ready` (the page can show words),
+  `popup.found {length}` (how many characters the found word takes) and `popup.close` (hide the page and end the
+  reading hold).
+* The kit's files, fetched beside the page as `kit/data/<method>?p=<the parameters as JSON>`.
+* The tap: `window.oreMining.show(what)` with the JSON of `ore_text_tap` (`{line, text, index, rects, sentence,
+  speaker, box, screen}`, places in the game's 800x600 pixels) and `picture: [x, y, width, height]` added, the
+  place of the game's picture on the page in CSS pixels. `window.oreMining.hide()` closes the popup from outside,
+  and `window.oreMining.event(name, payload)` passes on what the kit tells without being asked.
+
+In the app that is `MiningPopup.swift`: the page comes from the scheme `ore-mining://page/`, whose handler serves
+the bundle's `mining/page` folder and `kit/data/`. `GameViewController` asks `ore_text_tap` before a tap or a
+primary click becomes a click of the game, holds the game while the popup is open and ends the hold when the
+page calls `popup.close`.
+
+**Tests.** None of them needs an Apple system.
+
+```sh
+make -C engine tests
+build/host/dict_test engine      # dictionaries, the import, Yomitan's inflection tests
+build/host/kit_test engine       # the kit against a made-up AnkiConnect and audio source
+node --test engine/tests/page/*.test.mjs   # the page's own arithmetic
+
+# the popup's page in a browser (Playwright's Chromium), over a made-up line or, with SET_UP, over the game
+node tools/test_mining_page.mjs [SET_UP]
+# the engine and the kit with the game: a tap, the line's picture and voice, the card, the hold
+node tools/test_mining_kit.mjs SET_UP
+```
+
+The last two drive the test host, which opens the kit with `--kit FOLDER` and with `--control` takes commands
+on its standard input (`run N`, `tap X Y`, `call METHOD JSON`, `data METHOD JSON`, `hold 0|1`, `state` ...; the
+head of `engine/host/main.mm` lists them) and answers each with a line of JSON. `tools/mining_page/` holds the
+made-up AnkiConnect, audio source and dictionary these tests use, and the stage that stands in for the app.
+`node tools/mining_page/neighbours.mjs` runs the three at fixed addresses, for trying the app in the Simulator
+by hand.
