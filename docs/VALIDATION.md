@@ -139,12 +139,53 @@ moves within one colour step); the pattern transition number 86 is the same pixe
 | What | Before | Now |
 |---|---|---|
 | The end of a transition | The port ended a transition one frame after its last step. A screen that fades away and leaves the change of pages to the script, as the save, load and history screens do, showed once more for one frame after its fade; two transitions in a row had one still frame more between them than in the original | A transition ends in the frame that shows its last step, as the original's loop does (render, then finish) |
-| Right edge of the horizontal blur | The last column was repeated beyond the edge; the last columns were off by up to 17 steps | The column before the last is repeated and the last one is not read, the rule that fits all 31 frames measured on the original. Not yet measured again with the changed code |
+| Right edge of the horizontal blur | The last column was repeated beyond the edge; the last columns were off by up to 17 steps | The column before the last is repeated and the last one is not read, the rule that fits all 31 frames measured on the original. Measured again with the changed code: the same pixel for pixel |
 
-**Still different, not changed yet:** the save, load and history screens fade in over 300 ms in the original and
-appear at once in the port; the text window and the name box stay above a transition in the original and fade with
-the picture in the port; a layer effect starts one frame later in the port, and a click reaches the next line's
-commands one frame earlier.
+| How the save, load and history screens fade | They appeared at once. When they closed, their controls vanished first and only the background faded | They fade in over the game's picture in 300 ms and fade away whole. The original's script copies the game's picture into the menu's page and starts a transition of a kind that composes nothing while it runs; the port composed the page anyway, so both ends of the fade were the menu. On the test host the strength of the fade is now 13, 27, … 244 on the frames 3 to 20 after the click and the screen is complete at frame 21; closing runs over the frames 1 to 18 and is complete at 19. Those are the frames measured on the original |
+| The text window during a scene change | Window and name box faded away with the old picture and came back when the change was over | They stay above the change, and the text goes on writing while the picture changes. The original draws the page's overlay list, which holds the window and the name box, over every frame of a transition |
+| When a click and an effect take hold | A click on the text started the next line one frame earlier than in the original, and a layer effect showed its first change one frame later. On screen the two cancelled each other for a plain line | The engine runs the script before the tasks, the order logged on the original. The next line's commands start in the frame after the click, and a layer effect takes the frame of its call as its start |
+
+**Measured after the changes,** port against original on the same stepped clock, the click held for two frames on
+both sides, every frame compared. Frames are counted from the click.
+
+- The save, load and history screens: no frame of the opening or of the closing differs by more than 1 in any of
+  the three. Both programs change from frame 3 to 21 when the screen opens and from frame 1 to 19 when it closes,
+  and neither shows the screen again after that. What differs by 1 is letter edges in the game's picture below (at
+  most 50 pixels) and one spot of 6 pixels in the menu.
+- Loading a save from the title: the original starts a transition by a rule picture (750 ms) 127 frames after the
+  click on the slot and a cross fade (500 ms) at frame 175. Both run on the same frames in the port. The cross
+  fade's 33 frames are the same pixel for pixel; the rule transition's differ by 2 to 4 at most.
+- Scene changes on 14 lines of three scripts, 61 to 381 frames each: the scene above the text box is the same pixel
+  for pixel on every frame of 10 lines (cross fade, the numbered pattern transition, the horizontal blur with its
+  right edge, character moves, background moves). On the other 4 it differs by at most 2, and only while a
+  transition by a rule picture runs. The text and name boxes differ by 1 at letter edges.
+- The text window above a scene change: at four moments of one scene change the scene has no differing pixel, the name
+  box 4 and the text box 3 to 10, each by 1.
+- Timing: the text window reports the click to the script one frame after it in both (`N_300` = 3), and the
+  transition or layer effect of the next line is called in that frame in both. On a long line the count of letters
+  shown is the same in 200 of 200 frames. On five lines with two changes in a row the picture changes on the same
+  frames in both, for example on frames 2 to 33 and 35 to 92.
+- The original never starts a transition of mode 2 on the 169 lines logged; scene changes use mode 1, the menus
+  and the loading of a save mode 0.
+
+**What still differs:**
+
+- A transition by a rule picture (`SYS\RULE%03d.ELG`) rounds differently, by 2 at most in a scene change and by 4
+  at most while a save loads. Not traced.
+- The small button that waits for a click. In the original it is on screen in the frame the line is complete and
+  hidden only in the frame of the click, and its six pictures take exactly 38 frames, because the animation's start
+  is set anew at the end of each 600 ms. In the port it stays hidden for up to 4 frames after a line is complete and
+  its round takes 37 and 38 frames in turn.
+- Who takes a plain click. The script makes a click region as large as the screen with -1 as its fifth argument;
+  the original creates that region switched off, and the text window's own controller takes the click. The port
+  creates it switched on, so the script sees a hit (`N_2ba` = 1) and leaves out one routine that the original runs
+  in the frame of the click. The next line starts in the same frame either way.
+- The pointer. The original moves it onto the first save slot and onto a dialog's default button, which lights them
+  at once; the port leaves it where it is (see "Left as it is" above).
+
+**Read in the original's code for these, 2026-11-26:** the routines that draw a running transition, one per mode
+(`docs/re/30_effects.md` 2.2), what `N_1a3` hands out and what the menus do with it, and the order of a frame with
+every native call logged around a click (`docs/re/10_lifecycle_system.md` 3.2).
 
 ## Mining in the game, 2026-11-26
 
@@ -312,8 +353,9 @@ which no script has run yet are kept for the next logic frame.
   a start that goes back to that line and reads on as an unbroken run does.
 - `movie_flow`: both opening films of the game's MoviePlay script, with no input to skip them, end by themselves and
   return to the script.
-- `menu_fade`: the load screen is opened from the title and closed again, and every frame of the closing is looked
-  at: once the screen has faded away it does not show again.
+- `menu_fade`: the load screen is opened from the title and closed again, and every frame is looked at: the screen
+  fades in over the title's picture, it fades away with all its controls, and once it has faded away it does not
+  show again.
 - `fx_test` checks the arithmetic of the effects, and `elg_all` decodes every ELG picture.
 - `mining_test`: the mining settings file, the text of a record, which lines are sent, the request and the queue.
 - `dict_test`: undoing inflections against Yomitan's test corpus, reading a zip, importing a dictionary in Yomitan's

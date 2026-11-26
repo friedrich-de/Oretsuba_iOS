@@ -599,7 +599,7 @@ Return value "obj/0" = new object pointer or 0 on failure.
 | N_19f | 0x42fb00 | page, x, y | set bg source offset; invalidate → 0 if unchanged |
 | N_1a0 | 0x42fb80 | page, x, y, w, h, l,t,r,b | 0xffff | **zoomed background**: bg src rect (default full) stretched to w×h placed at (x,y) into the cache image (page size); area not covered pre-filled with the bg colour; `w,h ≤ 0` → bg size; identity → cache dropped |
 | N_1a2 | 0x42fce0 | page, x, y, angle, zoom(float bits) | **rotated/zoomed background** (0x43af80, 32bpp bg only): the bg quad (size·zoom) is rotated about centre·zoom (comp+0x90/94) using the cos table at `[DAT_0050387c+0xa04]` (`tbl[k]=cos(2πk/512)`): `x'=cos·dx+sin·dy, y'=−sin·dx+cos·dy` (angle units 1/512 turn; positive = counter-clockwise on screen, derived), the quad's bounding box is moved to (x,y), drawn into the cache with tvpgl+0x2c (uncovered = bg colour). angle 0 & zoom 1 & x=y=0 → cache dropped |
-| N_1a3 | 0x42fd60 | page, &bg,&x,&y,&c52,&c51,&color | read background state |
+| N_1a3 | 0x42fd60 | page, &bg,&x,&y,&c52,&c51,&color | read background state; `bg` is the page's background **object**, which a script may draw into (the menus copy the game's picture into it with N_148 before they fade away, 30_effects 2.2.1) |
 | N_1a4 | 0x42fde0 | page | full invalidate (0x43b390) |
 | N_1a6 | 0x42fef0 | page, bool | `isurface->vt+0x28(bool)`: enable/disable compositor rendering of the page (sub+0x8c), returns old. With 0 the page image is shown untouched |
 | N_1a8 | 0x42ffe0 | page, dstImage, mode, tag, withOverlay | snapshot: compose the page (bg + layers filtered by tag: mode 0 all / 1 `==tag` / 2 `!=tag`) into dstImage (same size) → 0 ok, 1 bad dst, 2 size mismatch |

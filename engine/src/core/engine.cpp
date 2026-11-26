@@ -176,12 +176,20 @@ int Engine::frame(int64_t t) {
 	now = t;
 	input.poll();
 	sound.update(now);
-	tasks.tick(now);
+	// The original's order in a frame: input, the script, the tasks, the
+	// picture. A task the script starts (a layer effect, the typewriter) so
+	// runs for the first time in the same frame, and what a task does with a
+	// click (the text window going on to the next line) reaches the script in
+	// the next frame's run.
+	tasks.set_now(now);
 	for (int i = 0; i < steps; ++i) {
 		if (!run_vm()) return -1;
 		autosave_after_step();
 		if (quit_requested) break;
-		if (i == 0) input.clear_edges();
+		if (i == 0) {
+			tasks.tick(now);
+			input.clear_edges();
+		}
 	}
 	render_frame();
 	if (mining) mining->frame_drawn();
