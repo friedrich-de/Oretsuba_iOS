@@ -23,8 +23,8 @@
 //                             faces at 8 to 48 px, to check the port's metrics
 //
 // The input file holds one command per line, keyed by frame number:
-//   <frame> click X Y        left click (press now, release 3 frames later)
-//   <frame> rclick X Y
+//   <frame> click X Y [N]    left click (press now, release N frames later; 3 if not given)
+//   <frame> rclick X Y [N]
 //   <frame> move X Y
 //   <frame> wheel D           +120 up / -120 down
 //   <frame> key VK [down|up]  (no state = press and release)
@@ -92,6 +92,7 @@ struct Cmd {
 	std::string op;
 	int a = 0, b = 0;
 	std::string s;
+	int hold = 3;  // frames a click keeps the button down
 };
 
 #if defined(_WIN32)
@@ -259,6 +260,8 @@ int main(int argc, char **argv) {
 				ss >> c.s;
 			} else {
 				ss >> c.a >> c.b;
+				int hold = 0;
+				if ((c.op == "click" || c.op == "rclick") && ss >> hold && hold > 0) c.hold = hold;
 			}
 			cmds.emplace(frame, c);
 		}
@@ -295,7 +298,7 @@ int main(int argc, char **argv) {
 			Cmd r;
 			r.op = "release";
 			r.a = b;
-			releases.emplace(f + 3, r);
+			releases.emplace(f + c.hold, r);
 		} else if (c.op == "release") {
 			engine.mouse_button(c.a, false);
 		} else if (c.op == "move") {
