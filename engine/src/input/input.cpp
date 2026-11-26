@@ -38,6 +38,7 @@ int Input::vk_to_dik(int vk) {
 }
 
 void Input::on_key(int vk, bool down) {
+	if (muted_) return;
 	int dik = vk_to_dik(vk);
 	if (dik < 0) return;
 	if (down) latched_keys_[dik] = true;
@@ -52,16 +53,19 @@ void Input::on_mouse_move(int x, int y) {
 }
 
 void Input::on_mouse_button(int button, bool down) {
+	if (muted_) return;
 	if (button < 0 || button > 2) return;
 	if (down) latched_buttons_[button] = true;
 	host_buttons_[button] = down;
 }
 
 void Input::on_wheel(int delta) {
+	if (muted_) return;
 	host_wheel_ += delta;
 }
 
 void Input::on_command(int command) {
+	if (muted_) return;
 	if (command >= 0 && command < 12) commands_pending_ |= uint16_t(1u << command);
 }
 
@@ -83,6 +87,16 @@ void Input::poll() {
 	host_wheel_ = 0;
 	moved_ = host_moved_;
 	host_moved_ = false;
+}
+
+void Input::set_muted(bool muted) {
+	muted_ = muted;
+	memset(host_keys_, 0, sizeof host_keys_);
+	memset(latched_keys_, 0, sizeof latched_keys_);
+	memset(host_buttons_, 0, sizeof host_buttons_);
+	memset(latched_buttons_, 0, sizeof latched_buttons_);
+	host_wheel_ = 0;
+	clear();
 }
 
 void Input::clear() {
