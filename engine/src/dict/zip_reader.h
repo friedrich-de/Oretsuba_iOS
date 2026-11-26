@@ -5,6 +5,7 @@
 #include "dict/kit_config.h"
 #if ORE_MINING_KIT
 
+#include <atomic>
 #include <cstdint>
 #include <cstdio>
 #include <memory>
@@ -16,7 +17,7 @@ namespace ore::dict {
 class ZipReader {
 public:
 	struct Entry {
-		std::string name;     // its path in the zip
+		std::string name;     // its path in the zip, in UTF-8 when the zip says it in UTF-8 anywhere
 		uint64_t size = 0;    // unpacked
 		uint64_t packed = 0;  // as stored
 		uint64_t offset = 0;  // of its local header
@@ -36,6 +37,9 @@ public:
 	// reason in `problem`: "large" when it is over the limit, else "damaged".
 	// Several threads may read at once.
 	bool read(const Entry &entry, uint64_t limit, std::string &out, std::string &problem) const;
+	// How many of the files read so far the zip states a checksum for that they do not have. They are read
+	// all the same when they unpack whole.
+	uint32_t wrong_checksums() const { return wrong_checksums_.load(std::memory_order_relaxed); }
 
 private:
 	ZipReader() = default;
@@ -43,6 +47,7 @@ private:
 	FILE *file_ = nullptr;
 	uint64_t file_size_ = 0;
 	std::vector<Entry> entries_;
+	mutable std::atomic<uint32_t> wrong_checksums_{0};
 };
 
 }  // namespace ore::dict

@@ -5,15 +5,16 @@
 //
 //   node tools/mining_page/neighbours.mjs [EXPRESSION:READING[:RULES] ...]
 //
-// The words named are added to the dictionary (RULES as Yomitan has them: v1, v5, adj-i, n).
+// The words named are added to the dictionary (RULES as Yomitan has them: v1, v5, adj-i, n),
+// each with a made-up meaning and two pictures.
 // Every card the AnkiConnect is given is printed with its fields and the sizes of its files.
 import { createServer } from 'node:http';
 
-import { fakeAnki, fakeAudioSource, smallDictionary } from './fakes.mjs';
+import { fakeAnki, fakeAudioSource, PICTURES, smallDictionary } from './fakes.mjs';
 
 const words = process.argv.slice(2).map((word) => {
   const [expression, reading = '', rules = 'n'] = word.split(':');
-  return { expression, reading, rules, meanings: [`a made-up meaning of ${expression}`] };
+  return { expression, reading, rules, meanings: [`a made-up meaning of ${expression}`, PICTURES] };
 });
 
 const anki = await fakeAnki(8765);

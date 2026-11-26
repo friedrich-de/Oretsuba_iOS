@@ -16,6 +16,7 @@
 
 #include "dict/zip_reader.h"
 #include "util/json.h"
+#include "util/log.h"
 #include "util/utf8.h"
 
 namespace ore::dict {
@@ -453,6 +454,10 @@ DictionaryInfo import_into(const std::string &zip_path, const std::string &datab
 		advance(*entry);
 	}
 	if (info.terms == 0 && info.frequencies == 0 && info.pitches == 0) throw DictError("No row of that dictionary could be read.");
+
+	if (uint32_t wrong = zip->wrong_checksums())
+		log_warn("mining: the dictionary %s states a wrong checksum for %u of its files; they unpacked whole and were read",
+		         info.title.c_str(), wrong);
 
 	info.imported = now_utc();
 	check();

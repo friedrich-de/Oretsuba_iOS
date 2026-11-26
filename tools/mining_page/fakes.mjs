@@ -178,14 +178,27 @@ export function zipOf(files) {
 }
 
 /**
+ * A meaning with pictures as dictionaries carry them: a small mark drawn in the text's colour,
+ * under a Japanese name, and a picture in its own colours. smallDictionary() has the two files.
+ */
+export const PICTURES = {
+  type: 'structured-content',
+  content: [
+    { tag: 'img', path: 'gaiji/外字.svg', width: 1, height: 1, sizeUnits: 'em', appearance: 'monochrome', alt: '外', collapsible: false, collapsed: false, background: false },
+    ' and ',
+    { tag: 'img', path: 'img/dot.png', width: 2, height: 2, sizeUnits: 'em', alt: 'dot', collapsible: false, collapsed: false },
+  ],
+};
+
+/**
  * A small dictionary in Yomitan's format: a few words with meanings, one with structured content
- * and a link to another entry, and a frequency and a pitch for 食べる.
+ * and a link to another entry, one with two pictures, and a frequency and a pitch for 食べる.
  */
 export function smallDictionary(extraWords = []) {
   const term = (expression, reading, rules, meanings, score = 0) => [expression, reading, '', rules, score, meanings, 0, ''];
   const terms = [
     term('食べる', 'たべる', 'v1', ['to eat', 'to live on'], 10),
-    term('友達', 'ともだち', 'n', ['friend', 'companion']),
+    term('友達', 'ともだち', 'n', ['friend', 'companion', PICTURES]),
     term('晩ご飯', 'ばんごはん', 'n', ['dinner', 'evening meal']),
     term('昨日', 'きのう', 'n', ['yesterday']),
     term('飲む', 'のむ', 'v5', ['to drink']),
@@ -209,5 +222,7 @@ export function smallDictionary(extraWords = []) {
     'term_bank_1.json': JSON.stringify(terms),
     'term_meta_bank_1.json': JSON.stringify(metas),
     'styles.css': 'div[data-sc-content="glossary"] { font-weight: bold; }',
+    'gaiji/外字.svg': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"/></svg>',
+    'img/dot.png': Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==', 'base64'),
   });
 }
