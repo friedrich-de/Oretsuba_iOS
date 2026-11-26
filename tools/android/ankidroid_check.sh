@@ -91,14 +91,38 @@ until [ "$(run shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ]
 done
 echo "Device: $serial, Android $(run shell getprop ro.build.version.release | tr -d '\r')"
 
+# Taps what carries this text on the screen; false when nothing does.
+tap_text() {
+	run shell uiautomator dump /sdcard/ore-screen.xml > /dev/null 2>&1 || return 1
+	point="$(run shell cat /sdcard/ore-screen.xml | python3 -c '
+import re, sys
+found = re.search(r"text=\"%s\"[^>]*bounds=\"\[(\d+),(\d+)\]\[(\d+),(\d+)\]\"" % re.escape(sys.argv[1]), sys.stdin.read())
+if found:
+    left, top, right, bottom = map(int, found.groups())
+    print((left + right) // 2, (top + bottom) // 2)' "$1")"
+	[ -n "$point" ] || return 1
+	# shellcheck disable=SC2086
+	run shell input tap $point
+}
+
+# A new AnkiDroid as a player sets it up: allowed to keep its collection where
+# it wants it, opened, and "Get started" pressed. Only in the script's own
+# emulator; a device given by ORE_ADB_SERIAL has its AnkiDroid as it is.
+open_ankidroid() {
+	[ -z "$started" ] || run shell appops set --uid com.ichi2.anki MANAGE_EXTERNAL_STORAGE allow
+	run shell monkey -p com.ichi2.anki -c android.intent.category.LAUNCHER 1 > /dev/null 2>&1 || true
+	sleep 10
+	if [ -n "$started" ]; then
+		tap_text "Get started" && sleep 10 || true
+	fi
+	run exec-out screencap -p > "$OUT/$1.png" 2>/dev/null || true
+}
+
 # AnkiDroid first: Android gives an app a permission of another app's only when that app is there.
 run install -r -g "$apk" > /dev/null
 run install -r "$APP" > /dev/null
 echo "AnkiDroid $(run shell dumpsys package com.ichi2.anki | grep -m1 versionName | tr -d ' \r')"
-# Opened once, so that its collection is there.
-run shell monkey -p com.ichi2.anki -c android.intent.category.LAUNCHER 1 > /dev/null 2>&1 || true
-sleep 15
-run exec-out screencap -p > "$OUT/ankidroid.png" 2>/dev/null || true
+open_ankidroid ankidroid
 
 status=0
 run shell am instrument -w ${ORE_CHECK_DECK:+-e deck "$ORE_CHECK_DECK"} "$PACKAGE/.AnkiDroidCheck" > "$OUT/check.txt" 2>&1 || status=$?
@@ -114,8 +138,7 @@ if [ "$status" = 0 ] && [ -n "$started" ]; then
 	run uninstall com.ichi2.anki > /dev/null
 	run install -r "$APP" > /dev/null
 	run install -r -g "$apk" > /dev/null
-	run shell monkey -p com.ichi2.anki -c android.intent.category.LAUNCHER 1 > /dev/null 2>&1 || true
-	sleep 15
+	open_ankidroid ankidroid-other-order
 	run shell dumpsys package "$PACKAGE" | grep "com.ichi2.anki.permission" | tr -d '\r' | sed 's/^ */  /' || echo "  (Android does not list the permission for this app)"
 	run shell am instrument -w "$PACKAGE/.AnkiDroidCheck" > "$OUT/check-other-order.txt" 2>&1 || status=$?
 	tail -n 3 "$OUT/check-other-order.txt"

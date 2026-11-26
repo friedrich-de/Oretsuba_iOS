@@ -46,6 +46,7 @@ object AnkiDroid {
     private const val NOT_THERE = "AnkiDroid is not on this device."
     private const val NOT_ALLOWED = "AnkiDroid has not allowed this app to add cards yet. Allow it in the launcher."
     private const val NO_ANSWER = "AnkiDroid did not answer. Open AnkiDroid once, then try again."
+    private const val NOT_SET_UP = "AnkiDroid has no decks yet. Open AnkiDroid and go through its first screens, then try again."
 
     /** The app that answers for AnkiDroid's cards, or null when there is none. */
     fun packageName(context: Context): String? =
@@ -140,6 +141,8 @@ object AnkiDroid {
     private fun info(resolver: ContentResolver): JSONObject {
         val deckRows = deckList(resolver) ?: return problem(NO_ANSWER, "failed")
         val typeRows = noteTypes(resolver) ?: return problem(NO_ANSWER, "failed")
+        // Anki always has a deck and a note type: an AnkiDroid with neither was never set up.
+        if (deckRows.isEmpty() && typeRows.isEmpty()) return problem(NOT_SET_UP, "failed")
         val deckNames = JSONArray()
         for (deck in deckRows) deckNames.put(deck.name)
         val types = JSONArray()
