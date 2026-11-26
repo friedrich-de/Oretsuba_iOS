@@ -152,13 +152,13 @@ commands one frame earlier.
 of the test host (without `VOICE.LPK`) and on a Mac with macOS 26.6 and Xcode 27.2. Every AnkiConnect, audio source
 and dictionary in these runs was made up for the test or a throwaway.
 
-- `dict_test` (1,652 checks) and `kit_test` (193), on both: Yomitan's own tests for Japanese inflections, the
+- `dict_test` (1,665 checks) and `kit_test` (195), on both: Yomitan's own tests for Japanese inflections, the
   import of a dictionary and what a lookup finds, and the kit against a made-up AnkiConnect and audio source. The
   page's arithmetic has 12 tests of its own (`node --test engine/tests/page/*.test.mjs`).
 - Importing Jitendex takes about 2 seconds on the four-core machine these checks ran on and leaves a file of 94 MB.
-- `tools/test_mining_page.mjs`, the popup's page in Chromium: 31 checks over a made-up line and 57 over the game.
-  The marks lie on the tapped word, the popup stands beside it and inside the picture, a card is made once, and the
-  game's line is the same when the popup closes.
+- `tools/test_mining_page.mjs`, the popup's page in Chromium: 32 checks over a made-up line and 58 over the game.
+  The marks lie on the tapped word, the popup stands beside it and inside the picture, a card is made once, the
+  game's line is the same when the popup closes, and a meaning's pictures (an SVG and a PNG) are drawn.
 - `tools/test_mining_kit.mjs`, the engine and the kit without a browser: 38 checks with the Linux host and 40 on the
   Mac, where the card carries the line's voice as an M4A file of 112,642 bytes. A tap on a character names that
   character and holds the game; clicks, keys, the wheel and commands during the hold do not reach it; a tap in the
@@ -192,8 +192,8 @@ and dictionary in these runs was made up for the test or a throwaway.
 - The Release packages for iOS, Mac and visionOS compile with the mining kit and carry the folder `mining`.
 
 **Not checked:** a real iPhone, iPad or Vision Pro; Anki on a computer with the AnkiConnect add-on itself; the Mac
-and visionOS apps beyond compiling; a keyboard's Escape and a controller's B in the app; and a dictionary's
-pictures inside the app (`dict_test` and `kit_test` cover reading them).
+and visionOS apps beyond compiling; a keyboard's Escape and a controller's B in the app; and the two real
+dictionaries above inside the app (the importer is the same code there, and the test dictionary's pictures show).
 
 ## The Android app, 2026-11-26
 
