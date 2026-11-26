@@ -13,8 +13,11 @@ settings:
   base:
     DEVELOPMENT_TEAM: ${ORE_TEAM}
     CODE_SIGN_STYLE: Automatic
-    MARKETING_VERSION: "0.1.1"
-    CURRENT_PROJECT_VERSION: "2"
+    # A build that was given no number (from Xcode, or tools/apple/package.sh on its own) is 0.1.0.
+    # The build on GitHub is 0.1.N, N being the number of its run: package.sh puts ORE_BUILD_NUMBER
+    # in the place of the last part, so every published build is newer than the one before.
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.0"
     CLANG_CXX_LANGUAGE_STANDARD: c++17
     CLANG_ENABLE_OBJC_ARC: YES

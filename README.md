@@ -5,7 +5,7 @@ A native port of 俺たちに翼はない (Navel, 2009) for iPhone, iPad, Apple 
 This is a fork of [galhack/Oretsuba_iOS](https://github.com/galhack/Oretsuba_iOS). It adds mining (see below) and an
 Android app, plays the Japanese original only, and has its apps and documents in English.
 
-> **Pre-release 0.1.1.** The opening and the first chapters run with text, voices, saving and loading, and both opening
+> **Pre-release 0.1.** The opening and the first chapters run with text, voices, saving and loading, and both opening
 > films play to their end. Not every route has been played through, and some visual effects still have open questions
 > from the reverse engineering. What was checked, on which devices and how, is in
 > [docs/VALIDATION.md](docs/VALIDATION.md).
@@ -47,10 +47,14 @@ on a Mac, see
 [Checks and packages](#checks-and-packages). The builds of the
 [original project](https://github.com/galhack/Oretsuba_iOS/releases) come without mining.
 
+Every published build has a version of its own, 0.1.N, where N is the number of the build on GitHub: the higher, the
+newer. The release's title names it, and both packages carry it, so the version your device shows for the app tells
+you which build is installed.
+
 ### iPhone / iPad (a source for Feather, AltStore or SideStore)
 
 Apps that install from sources can take the newest build straight from this address. Add it as a source (in Feather
-under Sources) and the app appears there with its build number and date:
+under Sources) and the app appears there with its version and date:
 
 ```text
 https://github.com/friedrich-de/Oretsuba_iOS/releases/latest/download/source.json
