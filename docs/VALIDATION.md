@@ -141,10 +141,13 @@ moves within one colour step); the pattern transition number 86 is the same pixe
 | The end of a transition | The port ended a transition one frame after its last step. A screen that fades away and leaves the change of pages to the script, as the save, load and history screens do, showed once more for one frame after its fade; two transitions in a row had one still frame more between them than in the original | A transition ends in the frame that shows its last step, as the original's loop does (render, then finish) |
 | Right edge of the horizontal blur | The last column was repeated beyond the edge; the last columns were off by up to 17 steps | The column before the last is repeated and the last one is not read, the rule that fits all 31 frames measured on the original. Not yet measured again with the changed code |
 
-**Still different, not changed yet:** the save, load and history screens fade in over 300 ms in the original and
-appear at once in the port; the text window and the name box stay above a transition in the original and fade with
-the picture in the port; a layer effect starts one frame later in the port, and a click reaches the next line's
-commands one frame earlier.
+| How the save, load and history screens fade | They appeared at once. When they closed, their controls vanished first and only the background faded | They fade in over the game's picture in 300 ms and fade away whole. The original's script copies the game's picture into the menu's page and starts a transition of a kind that composes nothing while it runs; the port composed the page anyway, so both ends of the fade were the menu. On the test host the strength of the fade is now 13, 27, … 244 on the frames 3 to 20 after the click and the screen is complete at frame 21; closing runs over the frames 1 to 18 and is complete at 19. Those are the frames measured on the original |
+| The text window during a scene change | Window and name box faded away with the old picture and came back when the change was over | They stay above the change, and the text goes on writing while the picture changes. The original draws the page's overlay list, which holds the window and the name box, over every frame of a transition |
+| When a click and an effect take hold | A click on the text started the next line one frame earlier than in the original, and a layer effect showed its first change one frame later. On screen the two cancelled each other for a plain line | The engine runs the script before the tasks, the order logged on the original. The next line's commands start in the frame after the click, and a layer effect takes the frame of its call as its start |
+
+**Read in the original's code for these, 2026-11-26:** the routines that draw a running transition, one per mode
+(`docs/re/30_effects.md` 2.2), what `N_1a3` hands out and what the menus do with it, and the order of a frame with
+every native call logged around a click (`docs/re/10_lifecycle_system.md` 3.2).
 
 ## Mining in the game, 2026-11-26
 
@@ -301,8 +304,9 @@ which no script has run yet are kept for the next logic frame.
   a start that goes back to that line and reads on as an unbroken run does.
 - `movie_flow`: both opening films of the game's MoviePlay script, with no input to skip them, end by themselves and
   return to the script.
-- `menu_fade`: the load screen is opened from the title and closed again, and every frame of the closing is looked
-  at: once the screen has faded away it does not show again.
+- `menu_fade`: the load screen is opened from the title and closed again, and every frame is looked at: the screen
+  fades in over the title's picture, it fades away with all its controls, and once it has faded away it does not
+  show again.
 - `fx_test` checks the arithmetic of the effects, and `elg_all` decodes every ELG picture.
 - `mining_test`: the mining settings file, the text of a record, which lines are sent, the request and the queue.
 - `dict_test`: undoing inflections against Yomitan's test corpus, reading a zip, importing a dictionary in Yomitan's

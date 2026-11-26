@@ -175,9 +175,32 @@ thread priority.
 ### 2.2 Run loop (0x4bd580, method of the stage object; S = this+0x30)
 Per frame:
 1. `if (tr->update(now) != 0) → finish` (no current transition returns nonzero).
-2. If the live flag `this+0xbc` is set, re-render the front and back layer trees
-   (`FUN_0043b800`) so animated layers keep moving during the transition.
-   Otherwise the page images are taken as they are.
+2. Which pictures are the old and the new one depends on the **mode** given to
+   `start`; the page has one drawing routine per mode (0x4cee60 / 0x4ce2b0 /
+   0x4ce860 for mode 0 / 1 / 2). The flag `this+0xbc` is the page's "use
+   compositor" byte (sub+0x8c: 1 for a page made with mode ≠ 0, changed by
+   N_1a6). **[read and measured on the original, 2026-11-26]**
+   * **Mode 0** composes nothing while the transition runs. Old = the page's
+     own image as it lies, new = the linked page's image as it lies. A picture
+     that the script copied into the page's image with N_148 so is the old
+     picture, even though the page's layers show something else. The menus
+     use this: see 2.2.1.
+   * **Mode 1**, with "use compositor" set: the front and the back compositor
+     are rendered anew for every frame (`FUN_0043b800`), with their overlay
+     lists unlinked for the render, so layers on both pages keep moving and
+     neither picture holds the overlay. Without the flag nothing is rendered
+     anew.
+   * **Mode 2** takes the two compositors' background images (+0x44) without
+     rendering the pages and draws the front compositor's layer lists over the
+     result. Read only in outline, not measured; no call with mode 2 was seen
+     in the scripts' fixed call sites.
+   * In every mode, when "use compositor" is set and the overlay is not
+     hidden (compositor+0x57), the **front page's overlay list is drawn over
+     the frame** after the transition has drawn it. The text window and the
+     name box live in that list: they stay above a scene change and go on
+     writing. **[measured: 0000 line 37, the scene equals old + ((new − old) ·
+     a >> 8) in every pixel while the letters in the text box grow from 98 to
+     332 white pixels during the fade]**
 3. Build the **render context** (13 ints):
    ```
    ctx[0..3]  = x, y, w, h        rectangle being produced
@@ -203,6 +226,35 @@ Per frame:
    page action itself (the menus' `L+2a150`) shows the old page for one frame
    more, and chained transitions get one still frame between their stages
    **[measured: 1109 line 45, last picture at k 20, next N_fb at k 21]**.
+
+The update of a cross (0x40af70) sets `start = now` at its first call and
+returns progress 0; after that `a = (now − start) · 255 / D`, capped at 255.
+With N_fb in the script run of frame k the first call falls into the drawing
+of the same frame, and the first picture with a > 0 is that of frame k + 1.
+
+In the EXE measured on 2026-11-26 the routines lie a little lower than the
+addresses above: start 0x4d1150, finish 0x4d1310, the drawing routines
+0x4ceb70 / 0x4cdfc0 / 0x4ce570, current image 0x4d10b0. They are found
+through the vtables that hold swapPages 0x472210 at +0x3c.
+
+#### 2.2.1 How the menus fade (SAVELOAD, HISTORY) **[measured]**
+Opening: the script hides the game's view, makes the menu's page P
+(`N_de(800,600,32,2)`) and a plain back page B (`N_eb(…,0)`, no compositor),
+builds the controls on P, then `N_148(P, stage)` copies the game's picture
+into P's image, `N_1a8(P, B)` renders P's layers into B, and
+`N_fb(P, "cross", 0, 1, 300)` starts a mode 0 cross. P is not composed while
+it runs, so the cross goes from the game's picture to the finished menu: a =
+13, 27, … 244 on the frames 3 to 20 after the click that opens it, complete
+at 21.
+
+Closing: `N_1a9(P, 1, 1)` hides P's lists (this only affects later
+compositions), `N_1a8(stage, B)` renders the game into B, `N_1a3(P, &bg, …)`
+fetches P's background object and `N_148(bg, B)` copies the game's picture
+into it, then the same mode 0 cross. Old = P's last composed image, the menu
+with all its controls; new = B. The whole screen crosses, a = 13 … 244 on the
+frames 1 to 18 after the right click, complete at 19. After the cross P
+composes as "background = the game's picture, lists hidden", so it already
+shows the game when the script hides its view.
 
 Progress convention: **progress 0 shows src1 (old), 100% shows src2 (new).**
 
