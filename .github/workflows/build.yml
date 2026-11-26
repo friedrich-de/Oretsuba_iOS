@@ -58,6 +58,7 @@ jobs:
           build/host/kit_test engine
           node --test engine/tests/page/*.test.mjs
           build/host/image_blend
+          build/host/wait_cursor
           xcrun swiftc -module-cache-path build/swift-module-cache \
             app/Sources/App/FolderImport.swift app/Tests/FolderImportTests.swift \
             -o build/folder-import-tests

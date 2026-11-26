@@ -401,6 +401,24 @@ void MessageWindow::set_cursor(uint32_t anim) {
 	if (Layer *l = layer_of(anim)) l->set_visible(false);
 }
 
+// The task that plays the cursor animation, made paused when it is missing.
+// The original makes it at the first N_2fa, so it stands behind the window's
+// controller in the task list: when the controller shows the cursor, the
+// cursor draws in the same frame.
+Task *MessageWindow::cursor_anim_task() {
+	FrameAnim *a = Object::as<FrameAnim>(cursor);
+	if (!a) return nullptr;
+	Task *t = Object::as<Task>(cursor_task);
+	if (!t || t->killed || !engine.tasks.contains(t)) {
+		auto nt = std::make_unique<FrameAnimTask>(a, 0);
+		t = nt.get();
+		cursor_task = t->handle();
+		engine.tasks.add(std::move(nt));
+		engine.tasks.pause(t);
+	}
+	return t;
+}
+
 // The cursor animation draws into this window's surface; it is shown by
 // resuming its task and hidden by restoring the background and pausing it
 // (FUN_00409b00, FUN_00409090, FUN_00409370).
@@ -411,14 +429,7 @@ void MessageWindow::set_cursor_visible(bool v) {
 		if (Layer *l = layer_of(cursor)) l->set_visible(v);
 		return;
 	}
-	Task *t = Object::as<Task>(cursor_task);
-	if (!t || t->killed || !engine.tasks.contains(t)) {
-		auto nt = std::make_unique<FrameAnimTask>(a, 0);
-		t = nt.get();
-		cursor_task = t->handle();
-		engine.tasks.add(std::move(nt));
-		engine.tasks.pause(t);
-	}
+	Task *t = cursor_anim_task();
 	if (v) {
 		if (t->paused) engine.tasks.resume(t);
 	} else {
@@ -470,6 +481,7 @@ int MessageWindow::start(bool instant, bool allow_skip) {
 	c->restore_size();
 	clear_page();
 	if (cursor_visible) set_cursor_visible(false);
+	cursor_anim_task();
 	if (!visible()) set_visible(true);
 	if (TextWindow *nb = Object::as<TextWindow>(name_box)) {
 		nb->clear_page();

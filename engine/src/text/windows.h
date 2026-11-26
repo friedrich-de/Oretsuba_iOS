@@ -123,6 +123,7 @@ public:
 	int state() const;          // N_300
 	int skip_flag() const;      // N_301
 	void set_cursor_visible(bool v);
+	Task *cursor_anim_task();
 	void set_cursor(uint32_t anim);  // N_2fd
 	bool advance_pressed();     // FUN_004093c0
 

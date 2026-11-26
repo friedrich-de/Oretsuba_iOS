@@ -224,6 +224,7 @@ build/host/quick_save /path/to/SET_UP
 build/host/command_input /path/to/SET_UP
 build/host/native_coverage /path/to/SET_UP
 build/host/image_blend
+build/host/wait_cursor
 build/host/mining_test
 build/host/dict_test engine
 build/host/kit_test engine
