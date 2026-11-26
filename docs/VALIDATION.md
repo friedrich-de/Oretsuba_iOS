@@ -140,10 +140,11 @@ moves within one colour step); the pattern transition number 86 is the same pixe
 |---|---|---|
 | The end of a transition | The port ended a transition one frame after its last step. A screen that fades away and leaves the change of pages to the script, as the save, load and history screens do, showed once more for one frame after its fade; two transitions in a row had one still frame more between them than in the original | A transition ends in the frame that shows its last step, as the original's loop does (render, then finish) |
 | Right edge of the horizontal blur | The last column was repeated beyond the edge; the last columns were off by up to 17 steps | The column before the last is repeated and the last one is not read, the rule that fits all 31 frames measured on the original. Measured again with the changed code: the same pixel for pixel |
-
 | How the save, load and history screens fade | They appeared at once. When they closed, their controls vanished first and only the background faded | They fade in over the game's picture in 300 ms and fade away whole. The original's script copies the game's picture into the menu's page and starts a transition of a kind that composes nothing while it runs; the port composed the page anyway, so both ends of the fade were the menu. On the test host the strength of the fade is now 13, 27, … 244 on the frames 3 to 20 after the click and the screen is complete at frame 21; closing runs over the frames 1 to 18 and is complete at 19. Those are the frames measured on the original |
 | The text window during a scene change | Window and name box faded away with the old picture and came back when the change was over | They stay above the change, and the text goes on writing while the picture changes. The original draws the page's overlay list, which holds the window and the name box, over every frame of a transition |
 | When a click and an effect take hold | A click on the text started the next line one frame earlier than in the original, and a layer effect showed its first change one frame later. On screen the two cancelled each other for a plain line | The engine runs the script before the tasks, the order logged on the original. The next line's commands start in the frame after the click, and a layer effect takes the frame of its call as its start |
+| The small button that waits for a click | It was drawn only when its picture changed, so after a click it came back up to 4 frames after the next line was complete; the first time it came one frame late; its round of six pictures took 37 and 38 frames in turn | It is on screen in the frame the line is complete, and its round takes 38 frames. The original draws it again when it is shown and sets the animation's start anew at the end of each 600 ms, which drops what was over. On the test host with eight clicks it came in the frame the text was complete every time, and with a line that is complete one frame after the click it was hidden for that one frame only, as measured on the original |
+| Who takes a plain click | The click region as large as the screen took it: the script saw a hit without a number (`N_2ba` = 1, `N_2bb` = -1) and left out its key routine in that frame | The script makes that region with -1 as its fifth argument, and the original makes such a region switched off: it never takes a click, and the text window's own controller advances the text. Now the script sees `N_2ba` = 0 in the frame of a click and runs its key routine, the calls logged on the original. The next line starts in the same frame as before |
 
 **Measured after the changes,** port against original on the same stepped clock, the click held for two frames on
 both sides, every frame compared. Frames are counted from the click.
@@ -168,18 +169,13 @@ both sides, every frame compared. Frames are counted from the click.
 - The original never starts a transition of mode 2 on the 169 lines logged; scene changes use mode 1, the menus
   and the loading of a save mode 0.
 
+The last two rows were changed after that comparison, from what it found in the original. They were measured on the
+test host with the same clock and the same clicks, not again next to the original.
+
 **What still differs:**
 
 - A transition by a rule picture (`SYS\RULE%03d.ELG`) rounds differently, by 2 at most in a scene change and by 4
   at most while a save loads. Not traced.
-- The small button that waits for a click. In the original it is on screen in the frame the line is complete and
-  hidden only in the frame of the click, and its six pictures take exactly 38 frames, because the animation's start
-  is set anew at the end of each 600 ms. In the port it stays hidden for up to 4 frames after a line is complete and
-  its round takes 37 and 38 frames in turn.
-- Who takes a plain click. The script makes a click region as large as the screen with -1 as its fifth argument;
-  the original creates that region switched off, and the text window's own controller takes the click. The port
-  creates it switched on, so the script sees a hit (`N_2ba` = 1) and leaves out one routine that the original runs
-  in the frame of the click. The next line starts in the same frame either way.
 - The pointer. The original moves it onto the first save slot and onto a dialog's default button, which lights them
   at once; the port leaves it where it is (see "Left as it is" above).
 
