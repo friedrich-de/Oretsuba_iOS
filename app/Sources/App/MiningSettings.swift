@@ -47,6 +47,15 @@ final class MiningSettingsModel: ObservableObject {
         }
     }
 
+    /// A dictionary the kit offers to download with one tap.
+    struct Suggested: Identifiable {
+        let name: String
+        let text: String
+        let url: String
+        let installed: Bool
+        var id: String { url }
+    }
+
     /// How asking a server went.
     enum Check: Equatable {
         case idle
@@ -80,10 +89,17 @@ final class MiningSettingsModel: ObservableObject {
     @Published var audioSet = false
     @Published var audio = Check.idle
     @Published var dictionaries: [Installed] = []
+    @Published var suggested: [Suggested] = []
     @Published var importState = "idle"
     @Published var importProgress = 0.0
     @Published var importTitle = ""
     @Published var importError = ""
+    /// What is downloaded, by a name the player knows, when it is a suggested dictionary.
+    @Published var importName = ""
+    /// The name of a file picked in Files while it is taken over, before the import itself begins.
+    @Published var reading: String?
+    /// Why the last thing asked of the dictionaries did not happen; shown with them.
+    @Published var dictionaryProblem = ""
     @Published var textSize = 100
     @Published var hideTags = false
     @Published var compact = false
@@ -182,6 +198,11 @@ final class MiningSettingsModel: ObservableObject {
         importProgress = state["progress"] as? Double ?? 0
         importTitle = state["title"] as? String ?? ""
         importError = state["error"] as? String ?? ""
+        importName = state["name"] as? String ?? ""
+        suggested = (answer["suggested"] as? [[String: Any]] ?? []).map {
+            Suggested(name: $0["name"] as? String ?? "", text: $0["text"] as? String ?? "", url: $0["url"] as? String ?? "",
+                      installed: $0["installed"] as? Bool ?? false)
+        }
     }
 
     /// Whether a card could be made as things are.
@@ -402,33 +423,67 @@ final class MiningSettingsModel: ObservableObject {
     // MARK: - dictionaries
 
     private func dictionaryCall(_ method: String, _ params: [String: Any] = [:]) async -> Bool {
-        guard let kit else { return false }
+        guard let kit else {
+            dictionaryProblem = MiningKit.problem
+            return false
+        }
         do {
             applyDictionaries(try await kit.call(method, params))
-            problem = nil
+            dictionaryProblem = ""
             if importRunning { watchImport() }
             return true
         } catch {
-            problem = error.localizedDescription
+            dictionaryProblem = error.localizedDescription
             return false
         }
     }
 
-    /// Imports a dictionary picked in the Files app. The kit reads a copy of it: the picked file is only lent.
-    func importFile(_ url: URL) async {
+    /// Imports a dictionary picked in the Files app. The kit reads a copy of it: the picked file is only lent,
+    /// and may lie with a file provider that has to fetch it first, so it is read the way such files want to be.
+    /// `lent` says that the file was opened for this app (`startAccessingSecurityScopedResource`) by the caller.
+    func importFile(_ url: URL, lent: Bool = false) async {
         let name = url.lastPathComponent
+        dictionaryProblem = ""
+        reading = name
         let copy = FileManager.default.temporaryDirectory.appendingPathComponent("ore-dictionary-\(UUID().uuidString).zip")
-        let copied = await Task.detached { () -> Bool in
+        let unreadable = await Task.detached { () -> String? in
             let scoped = url.startAccessingSecurityScopedResource()
-            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-            return (try? FileManager.default.copyItem(at: url, to: copy)) != nil
+            defer {
+                if scoped { url.stopAccessingSecurityScopedResource() }
+                if lent { url.stopAccessingSecurityScopedResource() }
+            }
+            var coordination: NSError?
+            var copying: String?
+            NSFileCoordinator().coordinate(readingItemAt: url, options: .withoutChanges, error: &coordination) { readable in
+                do {
+                    try FileManager.default.copyItem(at: readable, to: copy)
+                } catch {
+                    copying = error.localizedDescription
+                }
+            }
+            // A copy the picker made for this app in its own temporary folder has served its purpose.
+            let own = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().path
+            if url.resolvingSymlinksInPath().path.hasPrefix(own) { try? FileManager.default.removeItem(at: url) }
+            return coordination?.localizedDescription ?? copying
         }.value
-        guard copied else {
-            problem = "\(name) could not be read."
+        reading = nil
+        if let unreadable {
+            dictionaryProblem = "\(name) could not be read: \(unreadable)"
             return
         }
         let taken = await dictionaryCall("dict.import", ["path": copy.path, "name": name, "remove": true])
         if !taken { try? FileManager.default.removeItem(at: copy) }
+    }
+
+    /// The file picker gave nothing: says why, unless the player only closed it.
+    func importFailed(_ error: Error) {
+        if (error as? CocoaError)?.code == .userCancelled { return }
+        dictionaryProblem = "The file could not be taken: \(error.localizedDescription)"
+    }
+
+    /// Downloads a dictionary the kit suggests.
+    func add(_ dictionary: Suggested) async {
+        _ = await dictionaryCall("dict.download", ["url": dictionary.url])
     }
 
     func download(_ address: String) async {

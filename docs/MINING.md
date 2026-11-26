@@ -31,11 +31,14 @@ In the launcher, under "Mining in the game", press **Set up…**.
    * An address in the internet has to begin with `https://`. Plain `http://` is for a server in your own
      network, given by its IP address, a name without dots or one ending in `.local`; iOS then asks once for
      access to the local network.
-2. **Dictionaries.** Import dictionaries in [Yomitan](https://yomitan.wiki/dictionaries/)'s format, as the zip
-   files they come in: from the Files app, or by their address (`https://`). Dictionaries of words, of
+2. **Dictionaries.** "Add Jitendex" downloads the newest release of [Jitendex](https://jitendex.org)
+   (Japanese to English) from its makers and imports it; "Add JMnedict" does the same for the names of people
+   and places. Any other dictionary in [Yomitan](https://yomitan.wiki/dictionaries/)'s format you import as the
+   zip file it comes in: from the Files app, or by its address (`https://`). Dictionaries of words, of
    frequencies and of pitch accents all count. A word's meanings are shown in the order of the list, and a card
    gets the meaning of the first; Edit changes the order, and a swipe removes a dictionary. Importing a large
-   dictionary takes a few seconds and can be stopped.
+   dictionary takes a few seconds and can be stopped. If a file or an address cannot be taken, the reason
+   stands under the buttons.
 3. **Word audio** (optional). The address of an audio source as Yomitan takes a custom one, with `{term}` and
    `{reading}` where the word and its reading go. It may answer with a sound or with Yomitan's list of sounds.
    Check asks it for 食べる and keeps an address that answers.
@@ -213,6 +216,10 @@ for the popup in `engine/resources/mining/page`, and a thin layer of each system
 between them. The Swift side (`app/Sources/App/Mining*.swift`) holds no dictionary and no Anki logic, so another
 system needs only that layer.
 
+The folder `engine/resources/mining` (the page and the inflection rules) is under the GNU General Public License,
+version 3 or later, as the works it is built on are; its `SOURCES.md` and `LICENSE` say more. An app packs the folder
+whole, so that the licence's text goes with the page.
+
 * `dict/`: dictionaries. `yomitan_import` reads a Yomitan zip into an SQLite file, `dictionary_db` reads it,
   `deinflector` undoes inflections with Yomitan's rules (`engine/resources/mining/transforms.json`), `lookup`
   finds the words that start a text, and `library` keeps the installed dictionaries, their order and one
@@ -247,7 +254,7 @@ player","kind":"…"}` with a kind of `address`, `settings`, `anki`, `unreachabl
 | `anki.targets`, `ankimobile.fetch`, `ankidroid.status` | The places for cards this device has, `[{name, label, detail}]`; the request to AnkiMobile for its decks and note types, which come later with the event `anki.lists {ok, message}`; and whether AnkiDroid is there and lets the app in, `{installed, allowed}`. |
 | `anki.fields {noteType?}`, `anki.choose {deck?, noteType?}`, `anki.setRole {field, role}`, `anki.roleChoices` | The fields of a note type and what goes into them. |
 | `audio.check {address?}`, `audio.sources {term, reading}` | The audio source: whether it answers, and the names of the sounds it has for a word. |
-| `dict.list`, `dict.import {path, name?, remove?}`, `dict.download {url}`, `dict.cancel`, `dict.arrange {order, disabled}`, `dict.enable {id, enabled}`, `dict.remove {id}` | The dictionaries. An import runs beside the call; `dict.list` says how far it is. |
+| `dict.list`, `dict.import {path, name?, remove?}`, `dict.download {url}`, `dict.cancel`, `dict.arrange {order, disabled}`, `dict.enable {id, enabled}`, `dict.remove {id}` | The dictionaries. An import runs beside the call; `dict.list` says how far it is (`import {state, source, name, progress, title, error}`). It also names the dictionaries a settings page can offer with one tap, `suggested [{name, text, url, installed}]`: the `url` goes to `dict.download`, and `installed` says the dictionary is already there. |
 | `page.init` | What the popup needs to draw itself: its look, the dictionaries and their styles, whether a card can be made and why not. |
 | `lookup {text}` | The words that start `text`, longest first, each with its entries in every dictionary. |
 | `card.known {words}`, `card.add {word, audioChoice?}` | Whether Anki has the words, and a card of one. `word` is `{expression, reading, furigana, meaning, frequency, pitch, pitchCategories, selection, at:{start, length}}`, with `at` in UTF-16 units of the sentence. |

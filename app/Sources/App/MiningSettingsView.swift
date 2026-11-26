@@ -12,7 +12,7 @@ struct MiningSettingsView: View {
     @State private var downloadAddress = ""
 
     var body: some View {
-        NavigationStack {
+        filePicker(NavigationStack {
             Form {
                 gameSection
                 ankiSection
@@ -30,7 +30,7 @@ struct MiningSettingsView: View {
                     Button("Done") { dismiss() }
                 }
             }
-        }
+        })
         .task {
             await model.load()
             // The decks and note types to choose from, when an AnkiConnect is set already or the Anki app has them.
@@ -38,10 +38,6 @@ struct MiningSettingsView: View {
         }
         .onDisappear {
             Task { await model.setTags() }
-        }
-        .fileImporter(isPresented: $pickingFile, allowedContentTypes: [.zip]) { result in
-            guard case .success(let url) = result else { return }
-            Task { await model.importFile(url) }
         }
         .alert("Download a dictionary", isPresented: $askingAddress) {
             TextField("https://…", text: $downloadAddress)
@@ -56,6 +52,33 @@ struct MiningSettingsView: View {
         } message: {
             Text("The address of a dictionary in Yomitan's format (a zip file).")
         }
+    }
+
+    /// The Files picker for a dictionary. On iPhone, iPad and Vision Pro it hands over a copy of the chosen
+    /// file inside the app's own folder, so the import does not depend on what the place the file lies in
+    /// (iCloud Drive, another app) lets this app do. On the Mac the file is read where it is.
+    @ViewBuilder
+    private func filePicker<Content: View>(_ content: Content) -> some View {
+        #if targetEnvironment(macCatalyst)
+        content.fileImporter(isPresented: $pickingFile, allowedContentTypes: DictionaryPicker.types) { result in
+            switch result {
+            case .success(let url):
+                // Opened here, while the picker's answer stands; the model closes it after reading.
+                let lent = url.startAccessingSecurityScopedResource()
+                Task { await model.importFile(url, lent: lent) }
+            case .failure(let error):
+                model.importFailed(error)
+            }
+        }
+        #else
+        content.sheet(isPresented: $pickingFile) {
+            DictionaryPicker { url in
+                pickingFile = false
+                if let url { Task { await model.importFile(url) } }
+            }
+            .ignoresSafeArea()
+        }
+        #endif
     }
 
     // MARK: - the game
@@ -193,12 +216,30 @@ struct MiningSettingsView: View {
             .onMove { from, to in model.move(from: from, to: to) }
             if model.importRunning {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(model.importState == "downloading" ? "Downloading…"
+                    Text(model.importState == "downloading"
+                        ? (model.importName.isEmpty ? "Downloading…" : "Downloading \(model.importName)…")
                         : model.importTitle.isEmpty ? "Importing…" : "Importing \(model.importTitle)…")
                     ProgressView(value: min(max(model.importProgress, 0), 1))
                 }
                 Button("Stop", role: .destructive) { Task { await model.cancelImport() } }
+            } else if let reading = model.reading {
+                HStack {
+                    Text("Reading \(reading)…")
+                    Spacer()
+                    ProgressView()
+                }
             } else {
+                // The dictionaries most people use, each one tap away.
+                ForEach(model.suggested.filter { !$0.installed }) { dictionary in
+                    Button {
+                        Task { await model.add(dictionary) }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Add \(dictionary.name)")
+                            Text("\(dictionary.text), its newest release").font(.footnote).foregroundStyle(Color.secondary)
+                        }
+                    }
+                }
                 Button("Import from Files…") { pickingFile = true }
                 Button("Download from an address…") {
                     downloadAddress = ""
@@ -207,6 +248,11 @@ struct MiningSettingsView: View {
             }
             if model.importState == "failed", !model.importError.isEmpty {
                 Label(model.importError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
+            if !model.dictionaryProblem.isEmpty {
+                Label(model.dictionaryProblem, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote)
                     .foregroundStyle(.orange)
             }
@@ -274,6 +320,41 @@ struct MiningSettingsView: View {
             Label(text, systemImage: "checkmark.circle.fill").font(.footnote).foregroundStyle(.green)
         case .bad(let text):
             Label(text, systemImage: "exclamationmark.triangle.fill").font(.footnote).foregroundStyle(.orange)
+        }
+    }
+}
+
+/// The system's file picker, asked for a copy of one file.
+private struct DictionaryPicker: UIViewControllerRepresentable {
+    /// Any file can be chosen, not only what the system knows as a zip: some places name a dictionary's
+    /// file by another type, and such a file could not be tapped. What is no dictionary, the import says.
+    static let types: [UTType] = [.zip, .data]
+
+    /// The copy of the chosen file, or nothing when the picker was closed.
+    let picked: (URL?) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(picked: picked) }
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: DictionaryPicker.types, asCopy: true)
+        picker.allowsMultipleSelection = false
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ picker: UIDocumentPickerViewController, context: Context) {}
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        private let picked: (URL?) -> Void
+
+        init(picked: @escaping (URL?) -> Void) { self.picked = picked }
+
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            picked(urls.first)
+        }
+
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            picked(nil)
         }
     }
 }
