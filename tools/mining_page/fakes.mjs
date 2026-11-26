@@ -92,8 +92,8 @@ export async function fakeAnki(port = 0, key = '') {
   return Object.assign(anki, server);
 }
 
-/** A tenth of a second of silence as a WAV file. */
-export function silence() {
+/** A tenth of a second of a quiet tone (440 Hz) as a WAV file. */
+export function shortTone() {
   const samples = 4410;
   const wav = Buffer.alloc(44 + samples * 2);
   wav.write('RIFF', 0);
@@ -108,6 +108,7 @@ export function silence() {
   wav.writeUInt16LE(16, 34);
   wav.write('data', 36);
   wav.writeUInt32LE(samples * 2, 40);
+  for (let i = 0; i < samples; i += 1) wav.writeInt16LE(Math.round(Math.sin((2 * Math.PI * 440 * i) / 44100) * 8000), 44 + i * 2);
   return wav;
 }
 
@@ -131,7 +132,7 @@ export async function fakeAudioSource(port = 0) {
     } else if (url.pathname.startsWith('/sound/')) {
       source.fetched.push(url.pathname.slice('/sound/'.length));
       answer.writeHead(200, { 'Content-Type': 'audio/wav' });
-      answer.end(silence());
+      answer.end(shortTone());
     } else {
       answer.writeHead(404);
       answer.end();

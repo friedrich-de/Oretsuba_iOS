@@ -4,9 +4,12 @@ import Foundation
 /// Owns the engine instance and its audio output.
 final class EngineBridge {
     let engine: OpaquePointer
-    private let audio = AVAudioEngine()
+    private var audio = AVAudioEngine()
     private var source: AVAudioSourceNode?
     private var diagnosticSaves: URL?
+    /// The app is in the background: the sound stays off until it is back.
+    private var paused = false
+    private var observers: [NSObjectProtocol] = []
 
     init(gameFolder: URL) throws {
         var saves = GamePaths.saves
@@ -43,6 +46,7 @@ final class EngineBridge {
     }
 
     deinit {
+        observers.forEach(NotificationCenter.default.removeObserver)
         audio.stop()
         ore_destroy(engine)
         if let diagnosticSaves {
@@ -52,10 +56,13 @@ final class EngineBridge {
     }
 
     private func startAudio() {
-        let session = AVAudioSession.sharedInstance()
-        // Playback: the game is heard even with the silent switch on.
-        try? session.setCategory(.playback, mode: .default)
-        try? session.setActive(true)
+        connectAudio()
+        observeAudio()
+        resumeAudio()
+    }
+
+    /// The game's sound: a node that asks the engine for its samples, on the output's mixer.
+    private func connectAudio() {
         let rate = Double(ore_audio_rate())
         guard let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 2) else { return }
         let engine = self.engine
@@ -81,15 +88,77 @@ final class EngineBridge {
         audio.attach(node)
         audio.connect(node, to: audio.mainMixerNode, format: format)
         source = node
+    }
+
+    /// Takes the device's sound for the game and starts the output again if it stopped, unless the
+    /// app is in the background. Cheap when all is well, so it is also called to make sure.
+    func resumeAudio() {
+        guard !paused else { return }
+        let session = AVAudioSession.sharedInstance()
+        // Playback: the game is heard even with the silent switch on.
+        if session.category != .playback || session.mode != .default {
+            try? session.setCategory(.playback, mode: .default)
+        }
+        try? session.setActive(true)
+        guard !audio.isRunning else { return }
         do {
             try audio.start()
+            fputs("audio: the output runs\n", stderr)
         } catch {
             fputs("audio: \(error)\n", stderr)
         }
     }
 
+    /// The game's sound comes back after whatever took it: a call, Siri, an alarm, another app's
+    /// player, headphones put in or taken out, the system's sound starting anew. The output stops
+    /// at each of them, and before this it stayed off until the game was started again.
+    private func observeAudio() {
+        let center = NotificationCenter.default
+        observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil,
+                                            queue: .main) { [weak self] note in
+            guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  AVAudioSession.InterruptionType(rawValue: raw) == .ended else { return }
+            self?.resumeAudio()
+        })
+        observers.append(center.addObserver(forName: .AVAudioEngineConfigurationChange, object: nil,
+                                            queue: .main) { [weak self] note in
+            guard let self, (note.object as AnyObject?) === self.audio else { return }
+            self.resumeAudio()
+        })
+        observers.append(center.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil,
+                                            queue: .main) { [weak self] _ in self?.rebuildAudio() })
+    }
+
+    /// After the system's sound started anew, nothing of the old output works: a new one.
+    private func rebuildAudio() {
+        audio.stop()
+        source = nil
+        audio = AVAudioEngine()
+        connectAudio()
+        resumeAudio()
+    }
+
     func setPaused(_ paused: Bool) {
+        self.paused = paused
         ore_set_paused(engine, paused ? 1 : 0)
-        if paused { audio.pause() } else { try? audio.start() }
+        if paused { audio.pause() } else { resumeAudio() }
+    }
+
+    /// A sound of the app's own over the game's, through the same output: the word the dictionary
+    /// popup plays (docs/MINING.md). 16-bit samples, `channels` (1 or 2) a frame, interleaved, at
+    /// `rate`; nil stops it. False when it does not play.
+    @discardableResult
+    func playAppSound(_ samples: Data?, channels: Int, rate: Int) -> Bool {
+        guard let samples, channels > 0, !samples.isEmpty else {
+            ore_play_app_sound(engine, nil, 0, 0, 0)
+            return samples == nil
+        }
+        // A word is only heard when the output runs.
+        resumeAudio()
+        let frames = samples.count / 2 / channels
+        return samples.withUnsafeBytes { raw in
+            ore_play_app_sound(engine, raw.baseAddress?.assumingMemoryBound(to: Int16.self), Int32(frames),
+                               Int32(channels), Int32(rate)) == 1
+        }
     }
 }

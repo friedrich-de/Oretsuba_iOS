@@ -15,6 +15,10 @@
 //                            Methods that start with "popup." are for the host itself: popup.ready
 //                            (the page can show words), popup.close (hide the page and let the game
 //                            go on) and popup.found {length} (how many characters the word takes).
+//                            A host whose answer to popup.ready is {"sound":true} plays the word's
+//                            sound itself: the page then calls popup.sound {rate, channels, frames,
+//                            pcm} (16-bit samples, interleaved, in base64) and popup.sound {} to stop.
+//                            A file the page cannot read that way it still plays itself.
 //   kit/data/<method>?p=…    a file of the kit's, fetched like any file beside the page; p is the
 //                            method's parameters as JSON.
 //

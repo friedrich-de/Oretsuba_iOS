@@ -33,8 +33,23 @@ function check(condition, what) {
   assert.ok(condition, what);
 }
 
-async function openStage(browser, harness, viewport) {
+async function openStage(browser, harness, viewport, { unreadableSounds = false } = {}) {
   const context = await browser.newContext({ viewport, hasTouch: false });
+  // A web view that cannot read sound files.
+  if (unreadableSounds) {
+    await context.addInitScript(() => {
+      BaseAudioContext.prototype.decodeAudioData = () => Promise.reject(new DOMException('no', 'EncodingError'));
+    });
+  }
+  // Counts the sounds the page plays itself, in every frame.
+  await context.addInitScript(() => {
+    window.mediaPlays = 0;
+    const play = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function (...args) {
+      window.mediaPlays += 1;
+      return play.apply(this, args);
+    };
+  });
   const page = await context.newPage();
   const problems = [];
   page.on('pageerror', (error) => problems.push(String(error)));
@@ -92,11 +107,13 @@ async function madeUpLine(browser, harness, anki, audio) {
   check(note.tags.includes('vn-miner'), 'and the tag');
   check(/Made a card of 食べる/.test(await popup.locator('#status').textContent()), 'the popup says so');
 
-  // The audio button plays the word.
+  // The audio button plays the word, in the page: the host did not say it plays sounds.
   const fetchedBefore = audio.fetched.length;
   await popup.locator('.gsm-hoshidicts-audio-button').first().click();
   await until('the sound to be fetched', () => audio.fetched.length > fetchedBefore);
   check(true, 'the audio button fetches the word\'s sound');
+  await until('the page to play it', () => page.frame({ name: 'popup' })?.evaluate(() => window.mediaPlays > 0));
+  check(!harness.events.some((event) => event.name === 'popup.sound'), 'and plays it itself');
 
   // A tap on another character of the line looks that word up, without closing.
   await tapGame(page, ...cell(3));
@@ -229,6 +246,45 @@ async function realLine(browser, harness, anki, scratch) {
   await context.close();
 }
 
+/** The iPhone app plays a word's sound with the game's: the page only reads the file and hands it the samples. */
+async function hostSound(browser, harness, audio) {
+  const { page, popup, problems, context } = await openStage(browser, harness, { width: 844, height: 390 });
+  const cell = (index) => [60 + index * 28 + 14, 455];
+  await tapGame(page, ...cell(10));
+  await popup.locator('.dictionary-popup').getByText('食べる').first().waitFor();
+
+  const fetchedBefore = audio.fetched.length;
+  await popup.locator('.gsm-hoshidicts-audio-button').first().click();
+  const sound = await until('the sound to reach the host', () =>
+    harness.events.find((event) => event.name === 'popup.sound' && event.payload.bytes > 0)?.payload);
+  check(audio.fetched.length > fetchedBefore, 'the audio button fetches the word\'s sound');
+  // The source's file: a tenth of a second at 44,100 Hz, one channel, a tone of 8,000 at its loudest.
+  check(sound.rate === 44100 && sound.channels === 1, `the host gets its samples at the game's rate (${sound.rate} Hz, ${sound.channels} channel)`);
+  check(sound.frames === 4410 && sound.bytes === 4410 * 2, `all of them (${sound.frames} frames, ${sound.bytes} bytes)`);
+  check(Math.abs(sound.peak - 8000) <= 2, `as loud as in the file (${sound.peak})`);
+  check(await page.frame({ name: 'popup' }).evaluate(() => window.mediaPlays === 0), 'and the page plays nothing itself');
+
+  // Closing the popup stops it.
+  const before = harness.events.length;
+  await tapGame(page, 780, 590);
+  await until('the popup to close', () => harness.events.slice(before).some((event) => event.name === 'popup.close'));
+  check(harness.events.slice(before).some((event) => event.name === 'popup.sound' && event.payload.bytes === undefined), 'closing the popup tells the host to stop the sound');
+
+  check(problems.length === 0, `the page reports no errors (${problems.join(' | ')})`);
+  await context.close();
+
+  // A sound file the web view cannot read is played by the page after all.
+  const unreadable = await openStage(browser, harness, { width: 844, height: 390 }, { unreadableSounds: true });
+  await tapGame(unreadable.page, ...cell(10));
+  await unreadable.popup.locator('.dictionary-popup').getByText('食べる').first().waitFor();
+  const handedBefore = harness.events.filter((event) => event.name === 'popup.sound' && event.payload.bytes > 0).length;
+  await unreadable.popup.locator('.gsm-hoshidicts-audio-button').first().click();
+  await until('the page to play it', () => unreadable.page.frame({ name: 'popup' })?.evaluate(() => window.mediaPlays > 0));
+  check(harness.events.filter((event) => event.name === 'popup.sound' && event.payload.bytes > 0).length === handedBefore,
+    'a sound the web view cannot read is played by the page itself');
+  await unreadable.context.close();
+}
+
 const scratch = mkdtempSync(join(tmpdir(), 'ore-mining-page-'));
 const anki = await fakeAnki();
 const audio = await fakeAudioSource();
@@ -239,6 +295,13 @@ try {
   harness = await startHarness({ kit: join(scratch, 'kit'), debug });
   await setUpKit(harness, scratch, anki, audio, check);
   await madeUpLine(browser, harness, anki, audio);
+  await harness.stop();
+  harness = null;
+
+  console.log('A host that plays the word\'s sound itself');
+  harness = await startHarness({ kit: join(scratch, 'kit-sound'), hostSound: true, debug });
+  await setUpKit(harness, scratch, anki, audio, check);
+  await hostSound(browser, harness, audio);
   await harness.stop();
   harness = null;
 

@@ -2,15 +2,17 @@
 // looking at the popup in a browser. It runs the test host with its mining kit (orehost --kit
 // --control), serves the page as the app does, and carries the page's calls to the kit.
 //
-//   node tools/mining_page/harness.mjs --kit FOLDER [--data SET_UP] [--save DIR] [--port 8750]
+//   node tools/mining_page/harness.mjs --kit FOLDER [--data SET_UP] [--save DIR] [--port 8750] [--host-sound 1]
 //
 // Then http://127.0.0.1:8750/ shows the game's picture with the popup's page over it: a click on
 // the picture is a finger's tap. Without --data there is no game, only the kit and a line made up
-// for the popup to stand on (the kit's line.set changes it).
+// for the popup to stand on (the kit's line.set changes it). With hostSound (--host-sound 1) it
+// answers popup.ready as the iPhone app does, so the page hands it a word's sound to play
+// (popup.sound); the events keep what came of it, {rate, channels, frames, bytes, peak}, not the samples.
 //
 //   /                     the stage: the picture and the page over it
 //   /page/…               the page's files (engine/resources/mining/page)
-//   /page/kit/call/NAME   POST: a method of the kit, or popup.ready, popup.found, popup.close
+//   /page/kit/call/NAME   POST: a method of the kit, or popup.ready, popup.found, popup.close, popup.sound
 //   /page/kit/data/NAME   a file of the kit's
 //   /test/command?line=   one command for the test host, answered with its JSON
 //   /test/frame.png       the game's picture as it stands
@@ -39,6 +41,15 @@ const TYPES = {
 
 /** The line the popup stands on when there is no game. */
 const MADE_UP_LINE = '昨日は友達と晩ご飯を食べました。';
+
+/** What the page handed over to be played: its form, and the loudest of its samples. */
+function soundOf(params) {
+  if (typeof params.pcm !== 'string') return {};
+  const pcm = Buffer.from(params.pcm, 'base64');
+  let peak = 0;
+  for (let at = 0; at + 1 < pcm.length; at += 2) peak = Math.max(peak, Math.abs(pcm.readInt16LE(at)));
+  return { rate: params.rate, channels: params.channels, frames: params.frames, bytes: pcm.length, peak };
+}
 
 export async function startHarness(options = {}) {
   const hostPath = options.host ?? HOSTS.map((host) => join(ROOT, host)).find((host) => existsSync(host));
@@ -86,9 +97,9 @@ export async function startHarness(options = {}) {
       return { ok: false, error: 'The call is not JSON.', kind: 'internal' };
     }
     if (method.startsWith('popup.')) {
-      events.push({ from: 'page', name: method, payload: params });
+      events.push({ from: 'page', name: method, payload: method === 'popup.sound' ? soundOf(params) : params });
       if (method === 'popup.close' && options.data) await command('hold 0');
-      return { ok: true, result: null };
+      return { ok: true, result: method === 'popup.ready' && options.hostSound ? { sound: true } : null };
     }
     if (method === 'line.set' && !options.data) madeUp = { sentence: params.sentence ?? '', speaker: params.speaker ?? '' };
     return command(`call ${method} ${JSON.stringify(params)}`);
@@ -164,6 +175,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.exit(2);
   }
   options.port = Number(options.port);
+  options.hostSound = options['host-sound'] === '1';
   const harness = await startHarness(options);
   console.log(`The stage is at ${harness.url}`);
 }

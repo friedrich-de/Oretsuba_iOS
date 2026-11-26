@@ -16,6 +16,11 @@ final class MiningPopup: NSObject, WKScriptMessageHandlerWithReply, WKURLSchemeH
     let webView: WKWebView
     /// The popup was closed, by the page or because the page broke: let the game go on.
     var onClose: (() -> Void)?
+    /// Plays a word's sound with the game's (16-bit samples, so many channels a frame, at a rate);
+    /// nil stops it. False when it does not play. The page reads the sound file and hands over its
+    /// samples: a sound the web view played itself took the device's sound from the game, which
+    /// stayed silent after it.
+    var onSound: ((_ samples: Data?, _ channels: Int, _ rate: Int) -> Bool)?
 
     private let kit: MiningKit
     private let files: URL?
@@ -80,6 +85,7 @@ final class MiningPopup: NSObject, WKScriptMessageHandlerWithReply, WKURLSchemeH
         waiting = nil
         webView.isHidden = true
         run("window.oreMining && window.oreMining.hide()")
+        _ = onSound?(nil, 0, 0)
         onClose?()
     }
 
@@ -105,23 +111,52 @@ final class MiningPopup: NSObject, WKScriptMessageHandlerWithReply, WKURLSchemeH
         let params = body["params"] as? String ?? "{}"
         // What starts with "popup." is for the app itself.
         if method.hasPrefix("popup.") {
-            if method == "popup.ready" {
+            var result = "null"
+            switch method {
+            case "popup.ready":
                 ready = true
                 if let script = waiting {
                     waiting = nil
                     run(script)
                 }
-            } else if method == "popup.close", isOpen {
+                // A word's sound is the app's to play.
+                result = #"{"sound":true}"#
+            case "popup.close" where isOpen:
                 waiting = nil
                 webView.isHidden = true
+                _ = onSound?(nil, 0, 0)
                 onClose?()
+            case "popup.sound":
+                if let problem = playSound(params) {
+                    replyHandler(#"{"ok":false,"error":\#(MiningPopup.quoted(problem)),"kind":"internal"}"#, nil)
+                    return
+                }
+            default:
+                break
             }
-            replyHandler(#"{"ok":true,"result":null}"#, nil)
+            replyHandler(#"{"ok":true,"result":\#(result)}"#, nil)
             return
         }
         kit.callRaw(method, json: params) { answer in
             DispatchQueue.main.async { replyHandler(answer, nil) }
         }
+    }
+
+    /// popup.sound: {rate, channels, frames, pcm} plays the samples (pcm, in base64), {} stops what
+    /// plays. Nil when that went well, else a sentence for the player.
+    private func playSound(_ params: String) -> String? {
+        guard let object = (try? JSONSerialization.jsonObject(with: Data(params.utf8))) as? [String: Any] else {
+            return "The sound is not one."
+        }
+        guard let pcm = object["pcm"] as? String else {
+            _ = onSound?(nil, 0, 0)
+            return nil
+        }
+        guard let channels = object["channels"] as? Int, let rate = object["rate"] as? Int, (1...2).contains(channels),
+              let samples = Data(base64Encoded: pcm), !samples.isEmpty, samples.count % (2 * channels) == 0 else {
+            return "The sound is not one."
+        }
+        return onSound?(samples, channels, rate) == true ? nil : "The game could not play the sound."
     }
 
     // MARK: - a page that broke
