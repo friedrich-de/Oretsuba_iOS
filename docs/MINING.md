@@ -18,8 +18,9 @@ on.
 
 In the launcher, under "Mining in the game", press **Set up…**.
 
-1. **Anki.** On an iPhone or iPad, **Send cards to** chooses where cards go: to an AnkiConnect, or straight
-   into the AnkiMobile app on the same device, which [ANKI_APPS.md](ANKI_APPS.md) describes. For an AnkiConnect,
+1. **Anki.** On an iPhone, an iPad or an Android device, **Send cards to** chooses where cards go: to an
+   AnkiConnect, or straight into the Anki app on the same device (AnkiMobile, AnkiDroid), which
+   [ANKI_APPS.md](ANKI_APPS.md) describes. For an AnkiConnect,
    enter its address and, if it asks for one, its key, then press Connect. That is the
    AnkiConnect add-on of Anki on your computer (`http://192.168.1.20:8765`; the add-on listens to its own
    computer only until its setting `webBindAddress` is `0.0.0.0`), or a server of your own that speaks

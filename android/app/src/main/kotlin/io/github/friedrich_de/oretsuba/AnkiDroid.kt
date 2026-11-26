@@ -162,18 +162,20 @@ object AnkiDroid {
         return out.toString()
     }
 
-    /** Whether a note of this type has exactly `value` in `field`: Anki's own search does the comparing. */
-    private fun isKnown(resolver: ContentResolver, noteType: String, field: String, value: String): Boolean? {
+    /**
+     * Whether a note of this type has exactly `value` in `field`: Anki's own
+     * search does the comparing. AnkiDroid answers a search that finds nothing
+     * with no rows at all (null), not with an empty list. An AnkiDroid that
+     * cannot be reached gives the same; adding the card then says so.
+     */
+    private fun isKnown(resolver: ContentResolver, noteType: String, field: String, value: String): Boolean {
         if (value.isBlank()) return false
         val search = "\"note:${searchText(noteType)}\" \"${searchText(field)}:${searchText(value)}\""
-        return resolver.query(notes, arrayOf("_id"), search, null, null)?.use { it.count > 0 }
+        return resolver.query(notes, arrayOf("_id"), search, null, null)?.use { it.count > 0 } ?: false
     }
 
-    private fun known(resolver: ContentResolver, ask: JSONObject): JSONObject {
-        val found = isKnown(resolver, ask.getString("noteType"), ask.getString("field"), ask.getString("value"))
-            ?: return problem(NO_ANSWER, "failed")
-        return JSONObject().put("known", found)
-    }
+    private fun known(resolver: ContentResolver, ask: JSONObject): JSONObject =
+        JSONObject().put("known", isKnown(resolver, ask.getString("noteType"), ask.getString("field"), ask.getString("value")))
 
     // ------------------------------------------------------------ a new card
 
@@ -193,7 +195,7 @@ object AnkiDroid {
         if (values[0].isBlank()) {
             return problem("The card's first field, \"${type.fields[0]}\", is empty.", "empty")
         }
-        if (!card.optBoolean("allowDuplicate", false) && isKnown(resolver, type.name, type.fields[0], values[0]) == true) {
+        if (!card.optBoolean("allowDuplicate", false) && isKnown(resolver, type.name, type.fields[0], values[0])) {
             return problem("This word is in AnkiDroid already.", "duplicate")
         }
 

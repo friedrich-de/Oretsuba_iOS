@@ -62,9 +62,12 @@ class AnkiDroidCheck : Instrumentation() {
             .put("fields", JSONObject().put("Front", front).put("Back", back))
             .put("tags", JSONArray().put("oretsuba-check").put("two words"))
 
-    private fun known(context: Context, value: String): Boolean =
-        ask(context, "known", JSONObject().put("noteType", "Basic").put("field", "Front").put("value", value))
-            .optBoolean("known", false)
+    private fun known(context: Context, value: String): Boolean {
+        val answer = ask(context, "known", JSONObject().put("noteType", "Basic").put("field", "Front").put("value", value))
+        // No answer must not pass for "not known": the mining kit takes it for a failure and makes no card.
+        if (!answer.has("known")) check(false, "whether \"$value\" is known is answered ($answer)")
+        return answer.optBoolean("known", false)
+    }
 
     private fun media(name: String, sound: Boolean, field: String): JSONObject =
         JSONObject().put("name", name).put("sound", sound).put("fields", JSONArray().put(field))
