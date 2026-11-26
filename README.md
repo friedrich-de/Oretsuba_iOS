@@ -211,7 +211,8 @@ cd android && ./gradlew :app:assembleRelease   # app/build/outputs/apk/release/a
   licence and sources) and [Yomitan](https://github.com/yomidevs/yomitan)'s rules for Japanese inflections as the
   Hoshidicts language pack writes them (`transforms.json`). [SOURCES.md](engine/resources/mining/SOURCES.md) there
   has the details, also for the tests that belong to the folder (`engine/tests/page`, `engine/tests/japanese`).
-  Dictionaries are not part of the app; you import your own.
+  Dictionaries are not part of the app: you import your own, or have the app fetch Jitendex and JMnedict from
+  their makers.
 
 ## Checks and packages
 

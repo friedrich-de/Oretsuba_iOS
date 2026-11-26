@@ -182,6 +182,13 @@ and dictionary in these runs was made up for the test or a throwaway.
   in an unsigned one, where the Keychain refuses.
 - **The app in the iPhone Simulator** (iPhone 17 Pro, iOS 27.2, landscape): the popup stands above the line and
   inside the screen, and a word Anki has already shows as known.
+- **Dictionaries in the iPad Simulator**, after "Import from Files…" did nothing on a real iPhone (the picked file
+  was only lent to the app, and the reason for a failure stood out of sight at the top of the page): the picker
+  now hands the app a copy of its own. A zip picked in "On My iPad" is imported and no copy is left behind;
+  closing the picker and opening it again works; a file that is no zip is refused with the reason under the
+  buttons; "Add Jitendex" downloads the newest release from its makers and imports it (437,367 words), and the
+  button is gone once the dictionary is there. The Simulator lets an app read any file, so the failure itself
+  does not show there: on a real iPhone this is still to be tried.
 - The Release packages for iOS, Mac and visionOS compile with the mining kit and carry the folder `mining`.
 
 **Not checked:** a real iPhone, iPad or Vision Pro; Anki on a computer with the AnkiConnect add-on itself; the Mac
@@ -301,7 +308,8 @@ which no script has run yet are kept for the next logic frame.
 - `dict_test`: undoing inflections against Yomitan's test corpus, reading a zip, importing a dictionary in Yomitan's
   format, lookups, frequencies and pitch, pictures, and the library of installed dictionaries.
 - `kit_test`: the mining kit's methods against a made-up AnkiConnect and audio source: settings, the Lapis defaults,
-  what a card's note holds, duplicates, wrong keys and addresses, imports and downloads.
+  what a card's note holds, duplicates, wrong keys and addresses, imports and downloads, and the dictionaries
+  suggested for one tap.
 - `engine/tests/page/*.test.mjs` (Node): where a word stands in its sentence, furigana, and a meaning as a card's HTML.
 - `tools/test_mining_page.mjs` (Node and Playwright's Chromium): the popup's page over a made-up line, and over the
   game when given `SET_UP`.

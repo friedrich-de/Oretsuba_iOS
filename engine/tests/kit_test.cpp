@@ -691,6 +691,10 @@ void test_kit(const std::string &root) {
 	// ---- dictionaries
 	call = ask(*kit, "dict.list");
 	check(call.ok && call.result["dictionaries"].size() == 0 && call.result["import"].str("state") == "idle", "no dictionary yet");
+	check(call.result["suggested"].size() == 2 && call.result["suggested"][0].str("name") == "Jitendex" &&
+	          call.result["suggested"][0].str("url").rfind("https://", 0) == 0 && !call.result["suggested"][0].boolean("installed", true) &&
+	          call.result["suggested"][1].str("name") == "JMnedict" && !call.result["suggested"][1].boolean("installed", true),
+	      "two dictionaries are suggested, neither is there");
 	call = ask(*kit, "lookup", R"({"text":"食べた"})");
 	check(call.ok && call.result["results"].size() == 0, "so nothing is found");
 	std::string zip = dictionary_zip();
@@ -942,6 +946,18 @@ void test_kit(const std::string &root) {
 	      "and so are the dictionaries");
 	call = ask(*kit, "dict.remove", "{\"id\":" + json::quote(ask(*kit, "dict.list").result["dictionaries"][0].str("id")) + "}");
 	check(call.ok && call.result["dictionaries"].size() == 0 && !ask(*kit, "dict.remove", R"({"id":"gone"})").ok, "a dictionary is removed");
+
+	// A suggested dictionary is known by its title, whatever its revision.
+	std::string suggested_zip = scratch + "/suggested.zip";
+	testing_zip::write_zip(suggested_zip, {{"index.json", R"({"title":"Jitendex.org [2026-11-23]","revision":"2026.11.23.0","format":3})"},
+	                                       {"term_bank_1.json", R"([["話","はなし","","n",5,["talk"],1,""]])"}});
+	call = ask(*kit, "dict.import", "{\"path\":" + json::quote(suggested_zip) + ",\"name\":\"suggested.zip\"}");
+	kit->library().wait_import();
+	call = ask(*kit, "dict.list");
+	check(call.ok && call.result["dictionaries"].size() == 1 && call.result["suggested"][0].boolean("installed") &&
+	          !call.result["suggested"][1].boolean("installed", true) && call.result["import"].str("name").empty(),
+	      "a suggested dictionary that is there is marked so");
+	ask(*kit, "dict.remove", "{\"id\":" + json::quote(call.result["dictionaries"][0].str("id")) + "}");
 }
 
 }  // namespace
