@@ -70,8 +70,8 @@ android {
 }
 
 // The mining kit's files (docs/MINING.md) go into the package as they are, from the
-// folder the Apple app takes them from: the rules for undoing inflections and the
-// page of the dictionary popup. The notes on where they come from stay out.
+// folder the Apple app takes them from, whole: the rules for undoing inflections,
+// the page of the dictionary popup, and the licences and notes that belong to them.
 abstract class CopyMiningFiles : DefaultTask() {
     @get:InputDirectory
     @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -86,7 +86,7 @@ abstract class CopyMiningFiles : DefaultTask() {
     @TaskAction
     fun copy() {
         fs.sync {
-            from(files) { exclude("**/*.md") }
+            from(files)
             into(assets.dir("mining"))
         }
     }
