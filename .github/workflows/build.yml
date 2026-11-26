@@ -5,6 +5,10 @@
 # also carries source.json, the source file that sideloading apps on iOS read
 # to offer the iPhone package.
 #
+# Every run has a version of its own, 0.1.N with N the run's number, in both
+# packages, in source.json and in the release's title, so a newer build always
+# shows a higher version than the one installed.
+#
 # The jobs run on GitHub's standard macOS and Linux runners, which cost
 # nothing for a public repository.
 name: Build
@@ -175,9 +179,11 @@ jobs:
         run: |
           cd packages
           short="${GITHUB_SHA:0:7}"
+          # The version the iPhone package carries; the Android package of the same run carries the same.
+          version="$(python3 -c 'import json; print(json.load(open("source.json"))["apps"][0]["version"])')"
           files="Oretsuba-iOS-unsigned.ipa Oretsuba-iOS-unsigned.ipa.sha256 source.json"
           {
-            echo "Built by GitHub Actions from commit [$short]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA). The packages contain nothing of the game."
+            echo "**Version $version**, built by GitHub Actions from commit [$short]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA). The packages contain nothing of the game."
             echo
             echo "**iPhone and iPad:** \`Oretsuba-iOS-unsigned.ipa\`, built with $(cat built-with.txt). The package is unsigned. Sign it with your own Apple account, for example with a sideloading tool: see the README."
             echo
@@ -202,6 +208,6 @@ jobs:
           # shellcheck disable=SC2086
           gh release create latest-build $files \
             --target "$GITHUB_SHA" \
-            --title "Latest build ($short)" \
+            --title "Latest build $version ($short)" \
             --notes-file release-notes.md \
             --latest
