@@ -47,7 +47,7 @@ $(BUILD)/obj/host/stb_write.o: tests/stb_write_impl.cpp
 $(BUILD)/orehost: host/main.mm $(BUILD)/libore.a $(BUILD)/obj/host/stb_write.o
 	$(CXX) $(CXXFLAGS) -fobjc-arc host/main.mm $(BUILD)/obj/host/stb_write.o $(BUILD)/libore.a $(FRAMEWORKS) -o $@
 
-tests: $(BUILD)/elg_all $(BUILD)/vm_smoke $(BUILD)/movie_test $(BUILD)/movie_flow $(BUILD)/save_roundtrip $(BUILD)/quick_save $(BUILD)/command_input $(BUILD)/image_blend $(BUILD)/native_coverage $(BUILD)/mining_test $(BUILD)/menu_fade $(BUILD)/dict_test $(BUILD)/kit_test $(BUILD)/anki_app_test $(BUILD)/anki_target_test
+tests: $(BUILD)/elg_all $(BUILD)/vm_smoke $(BUILD)/movie_test $(BUILD)/movie_flow $(BUILD)/save_roundtrip $(BUILD)/quick_save $(BUILD)/command_input $(BUILD)/image_blend $(BUILD)/native_coverage $(BUILD)/mining_test $(BUILD)/menu_fade $(BUILD)/dict_test $(BUILD)/kit_test $(BUILD)/anki_app_test $(BUILD)/anki_target_test $(BUILD)/dict_probe
 
 $(BUILD)/elg_all: tests/elg_all.cpp $(BUILD)/libore.a $(BUILD)/obj/host/stb_write.o
 	$(CXX) $(CXXFLAGS) $^ $(FRAMEWORKS) -o $@
@@ -88,6 +88,10 @@ $(BUILD)/dict_test: tests/dict_test.cpp $(BUILD)/libore.a
 
 $(BUILD)/kit_test: tests/kit_test.cpp $(BUILD)/libore.a
 	$(CXX) $(CXXFLAGS) -Itests $^ $(FRAMEWORKS) -o $@
+
+# Tries a dictionary of one's own against the importer: build/host/dict_probe (its file says how it is used)
+$(BUILD)/dict_probe: tests/dict_probe.cpp $(BUILD)/libore.a
+	$(CXX) $(CXXFLAGS) $^ $(FRAMEWORKS) -o $@
 
 # The Anki app on the same device (docs/MINING.md); the second takes the engine folder too.
 $(BUILD)/anki_app_test: tests/anki_app_test.cpp $(BUILD)/libore.a

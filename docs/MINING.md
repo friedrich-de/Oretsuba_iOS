@@ -38,7 +38,9 @@ In the launcher, under "Mining in the game", press **Set up…**.
    frequencies and of pitch accents all count. A word's meanings are shown in the order of the list, and a card
    gets the meaning of the first; Edit changes the order, and a swipe removes a dictionary. Importing a large
    dictionary takes a few seconds and can be stopped. If a file or an address cannot be taken, the reason
-   stands under the buttons.
+   stands under the buttons. Importing a dictionary that is already there puts the new import in its place.
+   If a dictionary's label pictures (漢, 文 and the like) fail to show, it was imported by a build that kept
+   them under the wrong names (see `zip_reader` below): import it once more.
 3. **Word audio** (optional). The address of an audio source as Yomitan takes a custom one, with `{term}` and
    `{reading}` where the word and its reading go. It may answer with a sound or with Yomitan's list of sounds.
    Check asks it for 食べる and keeps an address that answers.
@@ -223,7 +225,11 @@ whole, so that the licence's text goes with the page.
 * `dict/`: dictionaries. `yomitan_import` reads a Yomitan zip into an SQLite file, `dictionary_db` reads it,
   `deinflector` undoes inflections with Yomitan's rules (`engine/resources/mining/transforms.json`), `lookup`
   finds the words that start a text, and `library` keeps the installed dictionaries, their order and one
-  import at a time.
+  import at a time. `zip_reader` takes a zip as Yomitan's reader does, because real dictionaries count on it.
+  A file's name that the packer wrote in its own encoding (Shift-JIS on a Japanese Windows) is read from the
+  "Unicode Path" field beside it, or a picture named 漢-default.svg would be kept under bytes no meaning asks
+  for. And a checksum that does not fit refuses nothing as long as the file unpacks to its end and to the size
+  stated: some dictionaries are packed with wrong ones.
 * `mining/anki_connect`, `anki_fields`, `card_note`, `word_audio`: the AnkiConnect client behind the `CardTarget`
   seam, the Lapis defaults and the guesses for other note types, the note of a card, and the audio source.
 * `mining/anki_app`, `anki_app_target`: the Anki apps on the device as two more `CardTarget`s, AnkiMobile and
@@ -296,7 +302,14 @@ node --test engine/tests/page/*.test.mjs   # the page's own arithmetic
 node tools/test_mining_page.mjs [SET_UP]
 # the engine and the kit with the game: a tap, the line's picture and voice, the card, the hold
 node tools/test_mining_kit.mjs SET_UP
+
+# a dictionary of your own against the importer, outside the app: what the import says, what it counted,
+# and for the words after "--" their pitch accents and whether every picture of their meanings is there
+build/host/dict_probe FOLDER engine/resources/mining/transforms.json DICTIONARY.zip -- 昨日 丈夫
 ```
+
+`dict_probe` is the tool for a dictionary that does not import or shows no pictures; `engine/tests/dict_probe.cpp`
+has the one line that builds it without the engine, from the dictionary sources, SQLite and zlib.
 
 The last two drive the test host, which opens the kit with `--kit FOLDER` and with `--control` takes commands
 on its standard input (`run N`, `tap X Y`, `call METHOD JSON`, `data METHOD JSON`, `hold 0|1`, `state` ...; the

@@ -38,6 +38,14 @@ bool read_at(FILE *f, uint64_t offset, void *out, size_t size) {
 // A zip's directory is never larger than this here: a dictionary has some thousand files.
 const uint64_t kMaxDirectory = 64u * 1024 * 1024;
 
+// The flag of a file whose name is written in UTF-8. Without it the name is in the packer's own encoding: a
+// Japanese Windows writes Shift-JIS, in which a dictionary's 漢-default.svg is another run of bytes than the
+// name its meanings ask for.
+const uint16_t kNamesInUtf8 = 0x800;
+// Info-ZIP's "Unicode Path" field, which such a packer adds: a version (1), the checksum of the name in the
+// record, and the name in UTF-8. Yomitan takes the name from it, so dictionaries are made counting on it.
+const uint16_t kUnicodePath = 0x7075;
+
 }  // namespace
 
 std::unique_ptr<ZipReader> ZipReader::open(const std::string &path) {
@@ -101,7 +109,9 @@ bool ZipReader::read_directory() {
 		entry.offset = u32(p + 42);
 		if (size_t(stop - p) < 46 + name + extra + comment) return false;
 		entry.name.assign(reinterpret_cast<const char *>(p + 46), name);
-		// The sizes too large for the record are in an extra field.
+		// The sizes too large for the record are in an extra field, and so is the name in UTF-8 when the packer
+		// wrote the name itself in its own encoding.
+		std::string unicode_name;
 		const uint8_t *x = p + 46 + name, *xend = x + extra;
 		while (xend - x >= 4) {
 			uint16_t id = u16(x), length = u16(x + 2);
@@ -112,9 +122,15 @@ bool ZipReader::read_directory() {
 				if (entry.size == 0xffffffff && vend - v >= 8) entry.size = u64(v), v += 8;
 				if (entry.packed == 0xffffffff && vend - v >= 8) entry.packed = u64(v), v += 8;
 				if (entry.offset == 0xffffffff && vend - v >= 8) entry.offset = u64(v), v += 8;
+			} else if (id == kUnicodePath && length > 5 && x[0] == 1) {
+				// It holds for the name it was written beside, which its checksum tells: a tool that renamed the
+				// file and kept the field leaves one that no longer fits.
+				if (u32(x + 1) == uint32_t(crc32(0, p + 46, uInt(name))))
+					unicode_name.assign(reinterpret_cast<const char *>(x + 5), size_t(length) - 5);
 			}
 			x += length;
 		}
+		if (!(entry.flags & kNamesInUtf8) && !unicode_name.empty()) entry.name = std::move(unicode_name);
 		p += 46 + name + extra + comment;
 		entries_.push_back(std::move(entry));
 	}
@@ -175,10 +191,16 @@ bool ZipReader::read(const Entry &entry, uint64_t limit, std::string &out, std::
 			return false;
 		}
 	}
-	if (uint32_t(crc32(0, reinterpret_cast<const Bytef *>(out.data()), uInt(out.size()))) != entry.crc) {
-		out.clear();
-		return false;
+	// A checksum that does not fit refuses nothing. Some dictionaries are packed with a wrong one beside files
+	// that are whole: they unpack to their end and to the size stated, which is what was asked of them above.
+	// Yomitan, which the dictionaries are made for, does not look at the checksum either.
+	uint32_t crc = 0;
+	for (size_t at = 0; at < out.size();) {
+		size_t part = std::min<size_t>(out.size() - at, 1u << 30);
+		crc = uint32_t(crc32(crc, reinterpret_cast<const Bytef *>(out.data() + at), uInt(part)));
+		at += part;
 	}
+	if (crc != entry.crc) wrong_checksums_.fetch_add(1, std::memory_order_relaxed);
 	problem.clear();
 	return true;
 }
