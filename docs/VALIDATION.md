@@ -139,11 +139,12 @@ moves within one colour step); the pattern transition number 86 is the same pixe
 | What | Before | Now |
 |---|---|---|
 | The end of a transition | The port ended a transition one frame after its last step. A screen that fades away and leaves the change of pages to the script, as the save, load and history screens do, showed once more for one frame after its fade; two transitions in a row had one still frame more between them than in the original | A transition ends in the frame that shows its last step, as the original's loop does (render, then finish) |
+| Right edge of the horizontal blur | The last column was repeated beyond the edge; the last columns were off by up to 17 steps | The column before the last is repeated and the last one is not read, the rule that fits all 31 frames measured on the original. Not yet measured again with the changed code |
 
 **Still different, not changed yet:** the save, load and history screens fade in over 300 ms in the original and
 appear at once in the port; the text window and the name box stay above a transition in the original and fade with
-the picture in the port; the horizontal blur takes its right edge from the column before the last; a layer effect
-starts one frame later in the port, and a click reaches the next line's commands one frame earlier.
+the picture in the port; a layer effect starts one frame later in the port, and a click reaches the next line's
+commands one frame earlier.
 
 ## Mining in the game, 2026-11-26
 
