@@ -228,6 +228,17 @@ bool AnkiMobileTarget::known(const std::vector<CardNote> &notes, std::vector<Kno
 
 bool AnkiMobileTarget::add(const CardNote &note, AddOutcome &outcome, AnkiProblem &problem) {
 	problem = AnkiProblem();
+	// AnkiMobile says nothing when it refuses a note, so what can be known before is said here:
+	// the note type may be one that was chosen for another Anki.
+	AnkiAppInfo info;
+	if (possible() && !state_->lists(info)) {
+		problem.message = "Fetch the decks and note types from AnkiMobile in the settings first.";
+		return false;
+	}
+	if (possible() && !info.note_type(note.note_type)) {
+		problem.message = "AnkiMobile had no note type \"" + note.note_type + "\" when it was last asked. Choose one of its note types in the settings.";
+		return false;
+	}
 	std::vector<AnkiMobileHandover::File> files;
 	std::map<std::string, std::string> role_of;
 	for (const CardMedia &media : note.media) {

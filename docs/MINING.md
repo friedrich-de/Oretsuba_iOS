@@ -5,7 +5,7 @@ on.
 
 * **In the game.** A tap on a word of the text shows a dictionary over the game, and a button in it makes the
   card, with the sentence, its voice, a picture of the scene and the word's sound. You set it up in the launcher:
-  the AnkiConnect your cards go to, the dictionaries, and where the sound of a word comes from.
+  where your cards go, the dictionaries, and where the sound of a word comes from.
 * **Through a mining server.** The game sends every line you read to a
   [VN Mining Server](https://github.com/friedrich-de/VN-Mining-Server), whose page shows the lines as they come,
   looks words up and makes the cards, on the same phone or on any other device. It is on once a file named
@@ -17,7 +17,9 @@ on.
 
 In the launcher, under "Mining in the game", press **Set up…**.
 
-1. **Anki.** Enter the address of your AnkiConnect and, if it asks for one, its key, then press Connect. That is the
+1. **Anki.** On an iPhone or iPad, **Send cards to** chooses where cards go: to an AnkiConnect, or straight
+   into the AnkiMobile app on the same device, which [ANKI_APPS.md](ANKI_APPS.md) describes. For an AnkiConnect,
+   enter its address and, if it asks for one, its key, then press Connect. That is the
    AnkiConnect add-on of Anki on your computer (`http://192.168.1.20:8765`; the add-on listens to its own
    computer only until its setting `webBindAddress` is `0.0.0.0`), or a server of your own that speaks
    AnkiConnect. The game is a client of it and nothing of Anki is in the app.
@@ -216,6 +218,8 @@ system needs only that layer.
   import at a time.
 * `mining/anki_connect`, `anki_fields`, `card_note`, `word_audio`: the AnkiConnect client behind the `CardTarget`
   seam, the Lapis defaults and the guesses for other note types, the note of a card, and the audio source.
+* `mining/anki_app`, `anki_app_target`: the Anki apps on the device as two more `CardTarget`s, AnkiMobile and
+  AnkiDroid ([ANKI_APPS.md](ANKI_APPS.md)).
 * `mining/mining_kit`: `MiningKit`, one per app. It keeps the settings (`settings.json`) and answers calls by
   the name of a method with JSON in and out. `mining/kit_tap`: `KitTap` ties it to the engine: which character a
   tap hits, the line's voice and picture, and the reading hold.
@@ -238,7 +242,8 @@ player","kind":"…"}` with a kind of `address`, `settings`, `anki`, `unreachabl
 | --- | --- |
 | `settings.get`, `settings.set {direct?, anki?, popup?}` | The settings: `direct` (the text takes taps), `anki {target, address, deck, noteType, fields:[{field, role}], tags}`, `popup {textSize, hideTags, compact}`, and whether the two secrets are set. |
 | `secrets.set {ankiKey?, audioAddress?}` | The two secrets, which the kit does not write down: the host keeps them and tells them at each start. |
-| `anki.check {address?, key?, adopt?}` | Asks the AnkiConnect for its decks and note types and whether Lapis is there. With `adopt` the address and key become the kit's, and Lapis is chosen where nothing was. |
+| `anki.check {address?, key?, adopt?}` | Asks the AnkiConnect, or the Anki app when `anki.target` names one, for its decks and note types and whether Lapis is there. With `adopt` the address and key become the kit's, and Lapis is chosen where nothing was. |
+| `anki.targets`, `ankimobile.fetch`, `ankidroid.status` | The places for cards this device has, `[{name, label, detail}]`; the request to AnkiMobile for its decks and note types, which come later with the event `anki.lists {ok, message}`; and whether AnkiDroid is there and lets the app in, `{installed, allowed}`. |
 | `anki.fields {noteType?}`, `anki.choose {deck?, noteType?}`, `anki.setRole {field, role}`, `anki.roleChoices` | The fields of a note type and what goes into them. |
 | `audio.check {address?}`, `audio.sources {term, reading}` | The audio source: whether it answers, and the names of the sounds it has for a word. |
 | `dict.list`, `dict.import {path, name?, remove?}`, `dict.download {url}`, `dict.cancel`, `dict.arrange {order, disabled}`, `dict.enable {id, enabled}`, `dict.remove {id}` | The dictionaries. An import runs beside the call; `dict.list` says how far it is. |

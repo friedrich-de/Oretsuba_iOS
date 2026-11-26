@@ -1,19 +1,23 @@
 // The Anki app beside this one on an iPhone or iPad, for the mining kit
 // (mining/kit_host.h): AnkiMobile, which is reached by links and answers on
-// the clipboard (mining/anki_app.h). A Mac's test host has none.
+// the clipboard (mining/anki_app.h). A Mac has none: neither its test host
+// nor the app as Mac Catalyst builds it.
 #include "mining/kit_host.h"
 #if ORE_MINING_KIT
 
 #include <TargetConditionals.h>
 
 #import <Foundation/Foundation.h>
-#if TARGET_OS_IPHONE
+#if TARGET_OS_IPHONE && !TARGET_OS_MACCATALYST
+#define ORE_ANKIMOBILE 1
 #import <UIKit/UIKit.h>
+#else
+#define ORE_ANKIMOBILE 0
 #endif
 
 namespace ore {
 
-#if TARGET_OS_IPHONE
+#if ORE_ANKIMOBILE
 namespace {
 
 // Both belong to the main thread.
@@ -107,7 +111,7 @@ std::string take_answer() {
 // told when this app is in front again after it was away.
 AnkiAppHost host_anki_app() {
 	AnkiAppHost host;
-#if TARGET_OS_IPHONE
+#if ORE_ANKIMOBILE
 	host.open_link = open_link;
 	host.take_answer = take_answer;
 	dispatch_async(dispatch_get_main_queue(), ^{

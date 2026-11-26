@@ -33,8 +33,8 @@ struct MiningSettingsView: View {
         }
         .task {
             await model.load()
-            // The decks and note types to choose from, when an AnkiConnect is set already.
-            if !model.address.isEmpty { await model.connect(adopt: false) }
+            // The decks and note types to choose from, when an AnkiConnect is set already or the Anki app has them.
+            await model.refreshPlaces()
         }
         .onDisappear {
             Task { await model.setTags() }
@@ -77,22 +77,44 @@ struct MiningSettingsView: View {
 
     private var ankiSection: some View {
         Section {
-            TextField("Address of your AnkiConnect", text: $model.address)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .keyboardType(.URL)
-                .onSubmit { Task { await model.connect(adopt: true) } }
-            SecureField(model.keySet ? "Key (one is kept; type to replace it)" : "Key, if it asks for one", text: $model.key)
-            HStack {
-                Button("Connect") { Task { await model.connect(adopt: true) } }
-                    .disabled(model.anki == .working)
-                if model.anki == .working {
-                    Spacer()
-                    ProgressView()
+            // Only where this device has an Anki app to send them to (docs/ANKI_APPS.md).
+            if model.targets.count > 1 || !model.toConnect {
+                Picker("Send cards to", selection: Binding(get: { model.target }, set: { target in
+                    Task { await model.choose(target: target) }
+                })) {
+                    if !model.targets.contains(where: { $0.name == model.target }) {
+                        Text(model.target).tag(model.target)
+                    }
+                    ForEach(model.targets) { Text($0.label).tag($0.name) }
+                }
+            }
+            if model.toConnect {
+                TextField("Address of your AnkiConnect", text: $model.address)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+                    .onSubmit { Task { await model.connect(adopt: true) } }
+                SecureField(model.keySet ? "Key (one is kept; type to replace it)" : "Key, if it asks for one", text: $model.key)
+                HStack {
+                    Button("Connect") { Task { await model.connect(adopt: true) } }
+                        .disabled(model.anki == .working)
+                    if model.anki == .working {
+                        Spacer()
+                        ProgressView()
+                    }
+                }
+            } else if model.target == "ankimobile" {
+                HStack {
+                    Button("Fetch decks and note types from AnkiMobile") { Task { await model.fetchFromAnkiMobile() } }
+                        .disabled(model.anki == .working)
+                    if model.anki == .working {
+                        Spacer()
+                        ProgressView()
+                    }
                 }
             }
             checkLine(model.anki)
-            if model.keySet {
+            if model.toConnect, model.keySet {
                 Button("Forget the key", role: .destructive) { Task { await model.removeKey() } }
             }
             if !model.decks.isEmpty {
@@ -126,7 +148,7 @@ struct MiningSettingsView: View {
                     .autocorrectionDisabled()
                     .onSubmit { Task { await model.setTags() } }
             }
-            if !model.cardProblem.isEmpty, !model.address.isEmpty {
+            if !model.cardProblem.isEmpty, (model.toConnect ? !model.address.isEmpty : !model.decks.isEmpty) {
                 Label(model.cardProblem, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote)
                     .foregroundStyle(.orange)
@@ -134,8 +156,18 @@ struct MiningSettingsView: View {
         } header: {
             Text("Anki")
         } footer: {
-            Text("Cards go to the AnkiConnect you name here: the one of Anki on your computer, or a server of your own. With the Lapis note type there is nothing more to choose. An address in your own network may start with http; any other has to start with https. The key is kept in this device's Keychain.")
+            Text(ankiFooter)
         }
+    }
+
+    private var ankiFooter: String {
+        if model.toConnect {
+            return "Cards go to the AnkiConnect you name here: the one of Anki on your computer, or a server of your own. With the Lapis note type there is nothing more to choose. An address in your own network may start with http; any other has to start with https. The key is kept in this device's Keychain."
+        }
+        if model.target == "ankimobile" {
+            return "Cards go to AnkiMobile on this device, which comes to the front for a moment with every card. Fetch its decks and note types once, and again after adding one there: AnkiMobile hands them over on the clipboard, so allow Oretsuba to paste from it when iOS asks. With the Lapis note type there is nothing more to choose. In any other, the picture and each sound need a field of their own."
+        }
+        return model.targets.first { $0.name == model.target }?.detail ?? ""
     }
 
     // MARK: - dictionaries

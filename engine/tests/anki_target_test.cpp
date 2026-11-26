@@ -374,6 +374,8 @@ void test_ankimobile() {
 		check(!target.places(places, problem) && !problem.unreachable && problem.message == "Fetch the decks and note types from AnkiMobile first.",
 		      "before AnkiMobile was asked, its lists are asked for");
 		check(!target.field_names("Lapis", names, problem) && !problem.message.empty(), "and so are a note type's fields");
+		check(!target.add(taberu_note(), outcome, problem) && !problem.unreachable && has(problem.message, "Fetch") && anki.links.empty(),
+		      "and no card is handed over, which AnkiMobile would refuse without a word");
 
 		check(target.fetch(problem) && told.wait(1), "fetching opens AnkiMobile, and an answer comes");
 		json::Value event = parsed(told.at(0).second);
@@ -394,6 +396,10 @@ void test_ankimobile() {
 	AnkiMobileTarget target(anki.host(), "oretsuba", lists_file, told.tell(), quick());
 	check(target.places(places, problem) && places.decks.size() == 2 && anki.links.size() == 1,
 	      "the next time the app runs the lists are there without asking AnkiMobile again");
+	CardNote other = taberu_note();
+	other.note_type = "Chosen for another Anki";
+	check(!target.add(other, outcome, problem) && !problem.unreachable && has(problem.message, "Chosen for another Anki") && anki.links.size() == 1,
+	      "nor is a card of a note type AnkiMobile did not name");
 
 	// ---- a card that arrives whole
 	size_t before = told.count();

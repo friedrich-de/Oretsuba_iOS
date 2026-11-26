@@ -9,16 +9,24 @@ The game's dictionary popup makes Anki cards. Where they go is a choice in the m
 | AnkiDroid | The Anki app on the same Android device. |
 
 The choice offers only what the device has: AnkiMobile on iPhone and iPad, AnkiDroid on Android, AnkiConnect
-everywhere. The deck, the note type and the fields are chosen in the same settings, whichever it is.
+everywhere (a Mac has AnkiConnect alone, and the choice is not shown there). The deck, the note type and the
+fields are chosen in the same settings, whichever it is. They are kept once, not for each place: after changing
+where cards go, look at the deck and the note type again.
+
+> **Android.** The Android app does not look words up in the game yet ([ANDROID.md](ANDROID.md)), so it has no
+> mining settings and this choice does not show there. The part that speaks to AnkiDroid is in the app and checked
+> against the real AnkiDroid; it is what the choice will use once the dictionary popup is on Android.
 
 ## AnkiMobile (iPhone, iPad)
 
 1. Install [AnkiMobile](https://apps.apple.com/app/ankimobile-flashcards/id373493387) and open it once.
-2. In the mining settings, set **Send cards to** to AnkiMobile.
+2. In the launcher, under "Mining in the game", press **Set up…** and set **Send cards to** to AnkiMobile.
 3. Press **Fetch decks and note types from AnkiMobile**. AnkiMobile comes to the front for a moment and the game
    comes back. iOS then asks whether Oretsuba may paste from AnkiMobile: allow it. That is how AnkiMobile hands
    its lists over. (Settings › Oretsuba › Paste from Other Apps › Allow stops the question for good.)
-4. Choose the deck, the note type and what goes into which field.
+4. Choose the deck, the note type and what goes into which field. With the
+   [Lapis](https://github.com/donkuri/lapis) note type there is nothing to choose: it is taken together with its
+   deck, and its picture and sounds have fields of their own.
 
 From then on the + in the popup hands the card to AnkiMobile: AnkiMobile comes to the front, adds the note, and
 the game comes back and says "AnkiMobile added the card."
@@ -33,9 +41,12 @@ AnkiMobile can be reached only by links, which is why it works differently from 
   it stays in front with its own message. Go back to the game; the popup then says that AnkiMobile did not
   confirm the card.
 * **Cards go to the profile that is open in AnkiMobile.**
-* **After adding a deck or a note type in AnkiMobile, fetch the lists again.**
+* **After adding a deck or a note type in AnkiMobile, fetch the lists again.** A card of a note type AnkiMobile
+  did not name is not sent; the popup says so.
 
 ## AnkiDroid (Android)
+
+How it will go once the Android app has the dictionary popup and its settings (see the note above):
 
 1. Install [AnkiDroid](https://play.google.com/store/apps/details?id=com.ichi2.anki) and open it once.
 2. In the mining settings, set **Send cards to** to AnkiDroid. Android asks once whether Oretsuba may read and
@@ -46,8 +57,8 @@ AnkiDroid is asked directly, so the game stays in front: the + adds the card at 
 are marked, and a second card of the same word is refused unless duplicates are allowed. Pictures and sounds go
 into AnkiDroid's media folder and may share a field with text.
 
-If AnkiDroid was installed after Oretsuba, Android does not offer the permission: install Oretsuba again over
-itself (the game files and saves stay), or allow it under Settings › Apps › Oretsuba › Permissions.
+It does not matter which of the two apps was installed first (checked on Android 14). An AnkiDroid that was never
+opened has no decks yet: open it and go through its first screens.
 
 ## For developers
 
@@ -69,6 +80,11 @@ The code is in `engine/src/mining/`:
   `android/app/src/main/cpp/android_platform.cpp` and goes through `Native.ankiDroid` to `AnkiDroid.kt`, which
   speaks to AnkiDroid's content provider; `AnkiMediaProvider.kt` hands a card's files over. AnkiDroid names each
   file it stores after its type, so a voice in Ogg arrives as `.oga`.
+
+* The settings sheet of the Apple app (`app/Sources/App/MiningSettings.swift`, `MiningSettingsView.swift`) asks
+  `anki.targets` for the choice, sets `anki.target`, and for AnkiMobile calls `ankimobile.fetch` and waits for
+  the event `anki.lists`. An Android settings screen has the same to do, with `ankidroid.status` and
+  `AnkiDroid.ask(activity, code)` for the permission.
 
 The setting is `anki.target`: `connect`, `ankimobile` or `ankidroid`.
 
@@ -92,4 +108,9 @@ tools/apple/ankimobile-standin/run.sh
 ```
 
 The second one takes a device instead of an emulator with `ORE_ADB_SERIAL`. It adds notes to that device's
-AnkiDroid, so use only one whose collection does not matter.
+AnkiDroid, so use only one whose collection does not matter. In its own emulator it sets a new AnkiDroid up as a
+player does and runs a second time with the apps installed in the other order, Oretsuba first.
+
+What these checks do not reach is the real AnkiMobile, which costs money and which no Simulator takes: that iOS
+asks before the paste and the lists then arrive, that AnkiMobile fetches the picture and the sounds while Oretsuba
+is in the back, and that it plays the `.m4a` voice. The first card on a real iPhone shows all three.
