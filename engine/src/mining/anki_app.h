@@ -261,6 +261,7 @@ struct AnkiDroidFile {
 };
 std::string ankidroid_add_request(const AnkiLinkNote &note, const std::vector<AnkiDroidFile> &files);
 std::string ankidroid_known_request(std::string_view note_type, std::string_view field, std::string_view value);
+std::string ankidroid_newest_request(std::string_view note_type);
 
 // What AnkiDroid.kt answers. `problem` and `code` are set when it answered with an error or with no JSON.
 struct AnkiDroidAnswer {
@@ -273,6 +274,8 @@ struct AnkiDroidAnswer {
 	AnkiAppInfo info;
 	// known
 	bool known = false;
+	// deckOfNewest
+	std::string deck;
 	// add
 	std::string id;
 	std::vector<std::string> missing;

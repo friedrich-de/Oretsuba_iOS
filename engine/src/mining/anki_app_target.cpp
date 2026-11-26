@@ -320,6 +320,20 @@ bool AnkiDroidTarget::field_names(const std::string &note_type, std::vector<std:
 	return true;
 }
 
+bool AnkiDroidTarget::deck_of_newest(const std::string &note_type, const std::vector<std::string> &decks, std::string &deck,
+                                     AnkiProblem &problem) {
+	deck.clear();
+	AnkiDroidAnswer answer;
+	if (!ask("deckOfNewest", ankidroid_newest_request(note_type), answer, problem)) {
+		// An AnkiDroid that is there and lets the app in, but stumbles over this one question, leaves the deck to be chosen.
+		bool closed = answer.code == "missing" || answer.code == "permission" || !host_.ankidroid;
+		if (!closed) problem = AnkiProblem();
+		return !closed;
+	}
+	if (std::find(decks.begin(), decks.end(), answer.deck) != decks.end()) deck = answer.deck;
+	return true;
+}
+
 bool AnkiDroidTarget::known(const std::vector<CardNote> &notes, std::vector<Known> &answers, AnkiProblem &problem) {
 	problem = AnkiProblem();
 	answers.assign(notes.size(), Known::CannotSay);

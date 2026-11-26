@@ -7,6 +7,7 @@
 //   status  {}                                   -> {installed, allowed, mediaFolder}
 //   info    {}                                   -> {decks: [name], noteTypes: [{name, fields: [name]}]}
 //   known   {noteType, field, value}             -> {known}
+//   deckOfNewest {noteType}                      -> {deck}, "" when the note type has no note yet
 //   add     {deck, noteType, fields: {name: html}, tags: [tag], allowDuplicate,
 //            media: [{name, sound, fields: [name]}]}
 //                                                -> {id, missing: [name]}
@@ -82,6 +83,7 @@ object AnkiDroid {
                 "status" -> status(app)
                 "info" -> guarded(app) { info(app.contentResolver) }
                 "known" -> guarded(app) { known(app.contentResolver, JSONObject(json)) }
+                "deckOfNewest" -> guarded(app) { deckOfNewest(app.contentResolver, JSONObject(json)) }
                 "add" -> guarded(app) { add(app, JSONObject(json)) }
                 else -> problem("AnkiDroid cannot do \"$method\".", "failed")
             }
@@ -148,6 +150,28 @@ object AnkiDroid {
         val types = JSONArray()
         for (type in typeRows) types.put(JSONObject().put("name", type.name).put("fields", JSONArray(type.fields)))
         return JSONObject().put("decks", deckNames).put("noteTypes", types)
+    }
+
+    /**
+     * The deck the newest note of a note type has its first card in, for a
+     * first choice of deck: where the player's cards of that type go already.
+     * Empty when there is no such note, or when the card is in a filtered deck.
+     */
+    private fun deckOfNewest(resolver: ContentResolver, ask: JSONObject): JSONObject {
+        val answer = JSONObject().put("deck", "")
+        // A note's number is the time it was made, so the largest is the newest.
+        var newest = 0L
+        resolver.query(notes, arrayOf("_id"), "\"note:${searchText(ask.getString("noteType"))}\"", null, null)?.use { rows ->
+            val id = rows.getColumnIndexOrThrow("_id")
+            while (rows.moveToNext()) newest = maxOf(newest, rows.getLong(id))
+        }
+        if (newest == 0L) return answer
+        var deckId = -1L
+        resolver.query(Uri.withAppendedPath(Uri.withAppendedPath(notes, newest.toString()), "cards"), null, null, null, null)?.use { rows ->
+            if (rows.moveToFirst()) deckId = rows.getLong(rows.getColumnIndexOrThrow("deck_id"))
+        }
+        val deck = deckList(resolver)?.firstOrNull { it.id == deckId } ?: return answer
+        return answer.put("deck", deck.name)
     }
 
     // ------------------------------------------------------------ is the word there already

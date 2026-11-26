@@ -20,9 +20,10 @@ where cards go, look at the deck and the note type again.
 3. Press **Fetch decks and note types from AnkiMobile**. AnkiMobile comes to the front for a moment and the game
    comes back. iOS then asks whether Oretsuba may paste from AnkiMobile: allow it. That is how AnkiMobile hands
    its lists over. (Settings › Oretsuba › Paste from Other Apps › Allow stops the question for good.)
-4. Choose the deck, the note type and what goes into which field. With the
-   [Lapis](https://github.com/donkuri/lapis) note type there is nothing to choose: it is taken together with its
-   deck, and its picture and sounds have fields of their own.
+4. Choose the deck, the note type and what goes into which field. The
+   [Lapis](https://github.com/donkuri/lapis) note type is taken by itself, with its fields filled, and its
+   picture and sounds have fields of their own. The deck is left to you unless there is only one besides Default:
+   AnkiMobile cannot be asked where its cards are.
 
 From then on the + in the popup hands the card to AnkiMobile: AnkiMobile comes to the front, adds the note, and
 the game comes back and says "AnkiMobile added the card."
@@ -47,8 +48,8 @@ AnkiMobile can be reached only by links, which is why it works differently from 
 2. In the launcher, under "Mining in the game", press **Set up…** and set **Send cards to** to AnkiDroid. Android
    asks whether Oretsuba may read and write AnkiDroid's cards: allow it.
 3. Choose the deck, the note type and what goes into which field. With the
-   [Lapis](https://github.com/donkuri/lapis) note type there is nothing to choose: it is taken together with its
-   deck.
+   [Lapis](https://github.com/donkuri/lapis) note type there is nothing to choose: it is taken together with the
+   deck its newest card is in.
 
 AnkiDroid is asked directly, so the game stays in front: the + adds the card at once, words AnkiDroid has already
 are marked, and a second card of the same word is refused. Pictures and sounds go into AnkiDroid's media folder
@@ -82,7 +83,9 @@ The code is in `engine/src/mining/`:
   (`app/Resources/Info.plist`); the links it is opened with go to `ore_app_opened_with`. The Android app's is in
   `android/app/src/main/cpp/android_platform.cpp` and goes through `Native.ankiDroid` to `AnkiDroid.kt`, which
   speaks to AnkiDroid's content provider; `AnkiMediaProvider.kt` hands a card's files over. AnkiDroid names each
-  file it stores after its type, so a voice in Ogg arrives as `.oga`.
+  file it stores after its type, so a voice in Ogg arrives as `.oga`. A search that finds no note is answered
+  with no rows at all, not with an empty list. Asked for the deck a note type's newest card is in, AnkiDroid
+  can say (`deckOfNewest`), so Lapis gets its deck as with an AnkiConnect; AnkiMobile cannot be asked.
 
 * The settings sheet of the Apple app (`app/Sources/App/MiningSettings.swift`, `MiningSettingsView.swift`) asks
   `anki.targets` for the choice, sets `anki.target`, and for AnkiMobile calls `ankimobile.fetch` and waits for
@@ -110,12 +113,13 @@ tools/apple/ankimobile-standin/run.sh
 
 # Android emulator: the real AnkiDroid from its release page. The debug build carries two checks: one plays the
 # player on the mining settings screen (Send cards to AnkiDroid, Android's question, deck, note type, fields, a
-# card through the mining kit), the other adds cards of every kind and reads them back
+# card through the mining kit, a note type with the fields of Lapis), the other adds cards of every kind and
+# reads them back
 (cd android && ./gradlew :app:assembleDebug) && tools/android/ankidroid_check.sh
 ```
 
-The second one takes a device instead of an emulator with `ORE_ADB_SERIAL`. It adds notes and a deck to that
-device's AnkiDroid and changes the app's mining settings, so use only one where neither matters; with
+The second one takes a device instead of an emulator with `ORE_ADB_SERIAL`. It adds notes, two decks and a note
+type to that device's AnkiDroid and changes the app's mining settings, so use only one where neither matters; with
 `ORE_ANKIDROID_NEW=yes` it also sets up an AnkiDroid that was never opened there. In its own
 emulator it sets a new AnkiDroid up as a player does and runs a second time with the apps installed in the other
 order, Oretsuba first; that time Android's question is refused twice, and the way through the system's settings

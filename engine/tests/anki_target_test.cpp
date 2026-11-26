@@ -109,6 +109,7 @@ struct PretendAnkiDroid {
 	std::mutex mutex;
 	bool installed = true, allowed = true;
 	bool takes_files = true;
+	bool stumbles_over_newest = false;
 	std::string media_folder;
 	std::vector<std::string> decks{"Default", "Mining"};
 	std::vector<std::pair<std::string, std::vector<std::string>>> types{{"Basic", {"Front", "Back"}}, {"Lapis", kLapisFields}};
@@ -168,6 +169,16 @@ struct PretendAnkiDroid {
 		if (method == "known") {
 			json::Value answer = json::Value::object();
 			answer.set("known", is_known(ask.str("noteType"), ask.str("field"), ask.str("value")));
+			return json::write(answer);
+		}
+		if (method == "deckOfNewest") {
+			if (stumbles_over_newest) return problem("AnkiDroid did not answer. Open AnkiDroid once, then try again.", "failed");
+			// The newest note of the type; a deck that is not in the list is a filtered one.
+			std::string deck;
+			for (const Note &note : notes)
+				if (note.note_type == ask.str("noteType")) deck = note.deck;
+			json::Value answer = json::Value::object();
+			answer.set("deck", std::find(decks.begin(), decks.end(), deck) != decks.end() ? deck : std::string());
 			return json::write(answer);
 		}
 		if (method == "add") {
@@ -280,7 +291,7 @@ void test_ankidroid() {
 	check(target.field_names("Lapis", names, problem) && names == kLapisFields, "and so are a note type's fields, in their order");
 	check(!target.field_names("Gone", names, problem) && !problem.unreachable && has(problem.message, "Gone"), "a note type it does not have is said so");
 	std::string deck = "x";
-	check(target.deck_of_newest("Lapis", places.decks, deck, problem) && deck.empty(), "which deck the newest card is in is not asked");
+	check(target.deck_of_newest("Lapis", places.decks, deck, problem) && deck.empty(), "a note type without a note names no deck");
 
 	check(target.known({taberu_note()}, answers, problem) && answers == std::vector<Known>({Known::No}), "a new word is not known");
 	droid.asked.clear();
@@ -301,6 +312,18 @@ void test_ankidroid() {
 	CardNote again = taberu_note();
 	again.allow_duplicate = true;
 	check(target.add(again, outcome, problem) && droid.notes.size() == 2, "unless duplicates are asked for");
+
+	deck = "x";
+	check(target.deck_of_newest("Lapis", places.decks, deck, problem) && deck == "Mining", "a note type with cards names the deck its newest is in");
+	check(target.deck_of_newest("Lapis", {"Default"}, deck, problem) && deck.empty(), "unless that deck is not among the decks to choose from");
+	droid.stumbles_over_newest = true;
+	deck = "x";
+	check(target.deck_of_newest("Lapis", places.decks, deck, problem) && deck.empty() && problem.message.empty(),
+	      "an AnkiDroid that stumbles over this question leaves the deck to be chosen");
+	droid.stumbles_over_newest = false;
+	droid.allowed = false;
+	check(!target.deck_of_newest("Lapis", places.decks, deck, problem) && problem.unreachable, "one that does not let the app in fails here too");
+	droid.allowed = true;
 
 	CardNote empty = taberu_note();
 	empty.fields[0].second.clear();
@@ -602,6 +625,20 @@ void test_kit(const std::string &root) {
 	check(call.ok && call.result["known"][0].as_bool(), "the word is known from then on");
 	call = ask(*kit, "card.add", kTaberu);
 	check(!call.ok && call.kind == "duplicate" && droid.notes.size() == 1, "and a second card of it is refused as a duplicate");
+	// A player's AnkiDroid has more decks than one: Lapis then comes with the deck its newest card is in.
+	droid.decks = {"Default", "Kaishi 1.5k", "Mining"};
+	check(ask(*kit, "anki.choose", R"({"deck":"","noteType":""})").ok, "with neither deck nor note type chosen");
+	call = ask(*kit, "anki.check", R"({"adopt":true})");
+	check(call.ok && call.result["settings"]["anki"].str("noteType") == "Lapis" && call.result["settings"]["anki"].str("deck") == "Mining" &&
+	          ask(*kit, "page.init").result["cards"].boolean("possible"),
+	      "Lapis is taken together with the deck its newest card is in, and cards can be made");
+	droid.notes[0].deck = "A filtered deck";
+	ask(*kit, "anki.choose", R"({"deck":"","noteType":""})");
+	call = ask(*kit, "anki.check", R"({"adopt":true})");
+	check(call.ok && call.result["settings"]["anki"].str("noteType") == "Lapis" && call.result["settings"]["anki"].str("deck").empty(),
+	      "with that card in no deck of the list, the deck is left to the player");
+	droid.notes[0].deck = "Mining";
+	ask(*kit, "anki.choose", R"({"deck":"Mining","noteType":"Lapis"})");
 
 	// ---- the kit goes while a card is on its way
 	ask(*kit, "settings.set", R"({"anki":{"target":"ankimobile"}})");

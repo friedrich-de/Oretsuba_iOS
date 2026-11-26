@@ -2,8 +2,10 @@
 // the real AnkiDroid on a device or an emulator: sets "Send cards to" to
 // AnkiDroid, answers Android's question, chooses a deck, a note type and its
 // fields, and makes a card the way the dictionary's + does, through the mining
-// kit. Only debug builds hold it. With AnkiDroid installed and opened once,
-// and this app not yet let at its cards:
+// kit; at the end it gives AnkiDroid a note type with the fields of Lapis and
+// looks whether the screen takes it together with its deck. Only debug builds
+// hold it. With AnkiDroid installed and opened once, and this app not yet let
+// at its cards:
 //
 //   adb shell am instrument -w io.github.friedrich_de.oretsuba/.MiningSettingsCheck
 //
@@ -19,12 +21,14 @@
 //   -e roles A,B,C      what the note type's first fields get, by the kit's names
 //                       (word,meaning,wordAudio without it; word,picture,sound
 //                       leaves settings with which a card made in the game
-//                       carries the picture and the line's voice)
+//                       carries the picture and the line's voice; the part
+//                       with Lapis is left out then, so that they stay)
 //   -e only notes       checks nothing: prints the notes AnkiDroid got in the
 //                       last day, newest first, as this app is let see them
 //
-// It adds a note and the deck "Oretsuba check" to AnkiDroid and changes this
-// app's mining settings, so run it where neither matters.
+// It adds notes, the decks "Oretsuba check" and "Oretsuba Lapis" and a note
+// type "Lapis" to AnkiDroid and changes this app's mining settings, so run it
+// where neither matters.
 package io.github.friedrich_de.oretsuba
 
 import android.accessibilityservice.AccessibilityService
@@ -55,6 +59,7 @@ class MiningSettingsCheck : Instrumentation() {
     private var refuseTwice = false
     private var audioPort = ""
     private var roleNames = listOf("word", "meaning", "wordAudio")
+    private var rolesGiven = false
     private var onlyNotes = false
     private var shots: File? = null
     private var shot = 0
@@ -64,7 +69,10 @@ class MiningSettingsCheck : Instrumentation() {
         refuseTwice = arguments?.getString("refuse") == "twice"
         audioPort = arguments?.getString("audioPort").orEmpty()
         arguments?.getString("roles")?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.takeIf { it.isNotEmpty() }
-            ?.let { roleNames = it }
+            ?.let {
+                roleNames = it
+                rolesGiven = true
+            }
         onlyNotes = arguments?.getString("only") == "notes"
         start()
     }
@@ -471,7 +479,116 @@ class MiningSettingsCheck : Instrumentation() {
         check(choose(activity, R.id.anki_target_choice, "AnkiDroid") && waitFor(30) { entries(activity, R.id.deck).contains(deck) },
               "AnkiDroid again: its lists are there at once, and Android does not ask a second time")
         picture("ankidroid-again")
+
+        if (!rolesGiven) lapis(context, activity)
         onMain { activity.finish() }
+    }
+
+    private fun deckId(context: Context, name: String): Long {
+        var id = -1L
+        context.contentResolver.query(Uri.parse("content://com.ichi2.anki.flashcards/decks"), null, null, null, null)?.use { rows ->
+            while (rows.moveToNext()) {
+                if (rows.getString(rows.getColumnIndexOrThrow("deck_name")) == name) id = rows.getLong(rows.getColumnIndexOrThrow("deck_id"))
+            }
+        }
+        return id
+    }
+
+    /**
+     * The Lapis note type comes with its deck. A note type with Lapis's fields
+     * and a card of it in a deck of its own are made in AnkiDroid behind the
+     * screen's back; with neither deck nor note type chosen, the screen then
+     * fetches the lists again. AnkiDroid has three decks by now, so the deck
+     * can only be the one that card is in.
+     */
+    private fun lapis(context: Context, activity: Activity) {
+        val resolver = context.contentResolver
+        val type = "Lapis"
+        val deck = "Oretsuba Lapis"
+        val info = JSONObject(AnkiDroid.call(context, "info", "{}"))
+        val types = info.optJSONArray("noteTypes") ?: JSONArray()
+        if ((0 until types.length()).any { types.getJSONObject(it).getString("name") == type }) {
+            note("the note type \"$type\" is there from an earlier run")
+        } else {
+            val row = ContentValues()
+            row.put("name", type)
+            row.put("field_names", LAPIS_FIELDS.joinToString("\u001f"))
+            row.put("num_cards", 1)
+            val made = try {
+                resolver.insert(Uri.parse("content://com.ichi2.anki.flashcards/models"), row)
+            } catch (e: Throwable) {
+                note("making the note type: $e")
+                null
+            }
+            check(made != null, "a note type with the fields of Lapis is made in AnkiDroid")
+            if (made == null) return
+        }
+        val decks = info.optJSONArray("decks") ?: JSONArray()
+        if ((0 until decks.length()).none { decks.getString(it) == deck }) {
+            val row = ContentValues()
+            row.put("deck_name", deck)
+            check(resolver.insert(Uri.parse("content://com.ichi2.anki.flashcards/decks"), row) != null, "and a deck \"$deck\"")
+        }
+        val stamp = System.currentTimeMillis().toString(36)
+        val first = JSONObject(AnkiDroid.call(context, "add", JSONObject().put("deck", deck).put("noteType", type)
+            .put("fields", JSONObject().put("Expression", "読む$stamp")).toString()))
+        check(first.optString("id").isNotEmpty(), "with a card of that note type in it (${first.optString("error")})")
+        val newest = JSONObject(AnkiDroid.call(context, "deckOfNewest", JSONObject().put("noteType", type).toString()))
+        check(newest.optString("deck") == deck, "AnkiDroid names the deck the note type's newest card is in: $newest")
+        val none = JSONObject(AnkiDroid.call(context, "deckOfNewest", JSONObject().put("noteType", "Cloze").toString()))
+        check(none.has("deck") && none.optString("deck").isEmpty(), "and none for a note type without a card: $none")
+
+        MiningKit.call("anki.choose", JSONObject().put("deck", "").put("noteType", ""))
+        pressButton(activity, R.id.anki_droid_button)
+        check(waitFor(30) { chosen(activity, R.id.note_type) == type && chosen(activity, R.id.deck) == deck },
+              "with nothing chosen, fetching the lists again takes Lapis and its deck: " +
+                  "\"${chosen(activity, R.id.note_type)}\" in \"${chosen(activity, R.id.deck)}\" of ${entries(activity, R.id.deck)}")
+        check(text(activity, R.id.anki_check) == context.getString(R.string.kit_droid_lapis),
+              "the screen says that the Lapis note type is there: \"${text(activity, R.id.anki_check)}\"")
+        val roles = fieldRoles()
+        check(roles["Expression"] == "word" && roles["ExpressionReading"] == "reading" && roles["MainDefinition"] == "meaning" &&
+                  roles["Sentence"] == "sentence" && roles["Picture"] == "picture" && roles["SentenceAudio"] == "sound" &&
+                  roles["ExpressionAudio"] == "wordAudio",
+              "its fields are filled the way Lapis means them")
+        check(waitFor { !shown(activity, R.id.card_problem) } &&
+                  (MiningKit.call("page.init") as? JSONObject)?.optJSONObject("cards")?.optBoolean("possible") == true,
+              "and nothing is left to choose for a card")
+        picture("lapis")
+
+        val word = JSONObject().put("expression", "書く$stamp").put("reading", "かく").put("meaning", "to write ($stamp)")
+        val made = try {
+            MiningKit.call("card.add", JSONObject().put("word", word)) as? JSONObject
+        } catch (e: KitError) {
+            note("card.add: ${e.message} (${e.kind})")
+            null
+        }
+        val id = made?.optLong("noteId") ?: 0L
+        check(id > 0, "the kit makes a card of the Lapis note type: $made")
+        if (id <= 0) return
+        val notes = Uri.parse("content://com.ichi2.anki.flashcards/notes")
+        var kept = ""
+        resolver.query(Uri.withAppendedPath(notes, id.toString()), null, null, null, null)?.use { row ->
+            if (row.moveToFirst()) kept = row.getString(row.getColumnIndexOrThrow("flds")) ?: ""
+        }
+        val values = kept.split('\u001f')
+        fun value(field: String): String = values.getOrNull(LAPIS_FIELDS.indexOf(field)).orEmpty()
+        note("the note: Expression \"${value("Expression")}\", ExpressionReading \"${value("ExpressionReading")}\", " +
+                 "MainDefinition \"${value("MainDefinition")}\", ExpressionAudio \"${value("ExpressionAudio")}\"")
+        check(value("Expression") == "書く$stamp" && value("ExpressionReading") == "かく" && value("MainDefinition").contains("to write ($stamp)"),
+              "the word, its reading and its meaning are in the fields Lapis has for them")
+        if (audioPort.isNotEmpty()) {
+            check(Regex("^\\[sound:[^\\]]+\\]$").matches(value("ExpressionAudio")), "and the word's sound in ExpressionAudio")
+        }
+        val wanted = deckId(context, deck)
+        var cards = 0
+        var inDeck = 0
+        resolver.query(Uri.withAppendedPath(Uri.withAppendedPath(notes, id.toString()), "cards"), null, null, null, null)?.use { rows ->
+            while (rows.moveToNext()) {
+                cards++
+                if (rows.getLong(rows.getColumnIndexOrThrow("deck_id")) == wanted) inDeck++
+            }
+        }
+        check(cards > 0 && cards == inDeck, "its cards ($cards) are in the deck \"$deck\"")
     }
 
     /** No to Android's question, then yes when the screen's button asks again. */
@@ -503,18 +620,39 @@ class MiningSettingsCheck : Instrumentation() {
         check(waitFor { find { it.packageName?.toString()?.contains("settings") == true } != null },
               "the system's settings for this app come to the front")
         picture("system-settings")
-        // How the system lists the permission there, for the record; nothing depends on it.
+        // The player's way from there: Permissions, Additional permissions, the permission by the name AnkiDroid gave it, Allow.
+        var tapped = false
         if (pressWhenThere(5, withText("Permissions"))) {
             SystemClock.sleep(1500)
             picture("system-permissions")
             note("the system's permissions screen: " + texts().joinToString(" | "))
-            uiAutomation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
-            SystemClock.sleep(800)
+            val label = try {
+                context.packageManager.getPermissionInfo(AnkiDroid.PERMISSION, 0).loadLabel(context.packageManager).toString()
+            } catch (e: Throwable) {
+                ""
+            }
+            note("AnkiDroid calls the permission \"$label\"")
+            if (pressWhenThere(5, withText("Additional permissions"))) {
+                SystemClock.sleep(1500)
+                picture("system-additional-permissions")
+                note("under Additional permissions: " + texts().joinToString(" | "))
+                if (label.isNotEmpty() && pressWhenThere(5) { it.text?.toString().equals(label, ignoreCase = true) }) {
+                    SystemClock.sleep(1500)
+                    note("the permission's own screen: " + texts().joinToString(" | "))
+                    tapped = pressWhenThere(5, withId("allow_radio_button")) && waitFor(5) { AnkiDroid.allowed(context) }
+                    picture("system-permission-allowed")
+                }
+            }
         }
-        // What the player does there with a tap, done here by the system's own means.
-        if (Build.VERSION.SDK_INT >= 28) uiAutomation.grantRuntimePermission(context.packageName, AnkiDroid.PERMISSION)
-        check(AnkiDroid.allowed(context), "the permission is given in the system's settings")
-        for (i in 0 until 4) {
+        if (tapped) {
+            check(true, "the permission is given in the system's settings, under Permissions, Additional permissions")
+        } else {
+            // Where the taps do not find their way (another Android lays these screens out differently), the system's own means give it.
+            note("the taps did not find the permission in the system's settings; it is given by the system's own means")
+            if (Build.VERSION.SDK_INT >= 28) uiAutomation.grantRuntimePermission(context.packageName, AnkiDroid.PERMISSION)
+            check(AnkiDroid.allowed(context), "the permission is given in the system's settings")
+        }
+        for (i in 0 until 6) {
             if (onMain { activity.hasWindowFocus() }) break
             uiAutomation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
             SystemClock.sleep(1200)
@@ -524,5 +662,12 @@ class MiningSettingsCheck : Instrumentation() {
 
     private companion object {
         const val TAG = "OretsubaCheck"
+
+        /** The fields of the Lapis note type (github.com/donkuri/lapis), in its order. */
+        val LAPIS_FIELDS = listOf(
+            "Expression", "ExpressionFurigana", "ExpressionReading", "ExpressionAudio", "SelectionText", "MainDefinition",
+            "DefinitionPicture", "Sentence", "SentenceFurigana", "SentenceAudio", "Picture", "Glossary", "Hint",
+            "IsWordAndSentenceCard", "IsClickCard", "IsSentenceCard", "IsAudioCard", "PitchPosition", "PitchCategories",
+            "Frequency", "FreqSort", "MiscInfo")
     }
 }

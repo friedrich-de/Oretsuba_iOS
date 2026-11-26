@@ -18,9 +18,9 @@
 # (tools/mining_page/neighbours.mjs, ports 18765 to 18767) gives the card a
 # word's sound. With ORE_ADB_SERIAL it uses that device instead: use only one
 # whose AnkiDroid collection and mining settings do not matter, the checks add
-# notes and a deck and change the settings. Its AnkiDroid is taken as it is;
-# ORE_ANKIDROID_NEW=yes says that it is new there, and has it set up as in the
-# script's own emulator.
+# notes, two decks and a note type and change the settings. Its AnkiDroid is
+# taken as it is; ORE_ANKIDROID_NEW=yes says that it is new there, and has it
+# set up as in the script's own emulator.
 # ORE_ANKIDROID_APK names an AnkiDroid package to install; without it the
 # newest release is downloaded from AnkiDroid's page on GitHub. What it found
 # is in build/ankidroid-check; the emulator and the downloaded package are
