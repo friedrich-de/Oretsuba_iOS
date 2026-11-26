@@ -44,7 +44,7 @@ object AnkiDroid {
     private const val FIELD_SEPARATOR = "\u001f"
 
     private const val NOT_THERE = "AnkiDroid is not on this device."
-    private const val NOT_ALLOWED = "AnkiDroid has not allowed this app to add cards yet. Allow it in the launcher."
+    private const val NOT_ALLOWED = "AnkiDroid has not allowed this app to add cards yet. Allow it in the mining settings."
     private const val NO_ANSWER = "AnkiDroid did not answer. Open AnkiDroid once, then try again."
     private const val NOT_SET_UP = "AnkiDroid has no decks yet. Open AnkiDroid and go through its first screens, then try again."
 
@@ -182,9 +182,9 @@ object AnkiDroid {
         val typeName = card.getString("noteType")
         val deckName = card.getString("deck")
         val type = (noteTypes(resolver) ?: return problem(NO_ANSWER, "failed")).firstOrNull { it.name == typeName }
-            ?: return problem("AnkiDroid has no note type \"$typeName\" any more. Fetch the lists again in the launcher.", "noteType")
+            ?: return problem("AnkiDroid has no note type \"$typeName\". Choose one of its note types in the mining settings.", "noteType")
         val deck = (deckList(resolver) ?: return problem(NO_ANSWER, "failed")).firstOrNull { it.name == deckName }
-            ?: return problem("AnkiDroid has no deck \"$deckName\" any more. Fetch the lists again in the launcher.", "deck")
+            ?: return problem("AnkiDroid has no deck \"$deckName\". Choose one of its decks in the mining settings.", "deck")
 
         val given = card.optJSONObject("fields") ?: JSONObject()
         val values = type.fields.map { given.optString(it, "").replace(FIELD_SEPARATOR, "") }.toMutableList()
