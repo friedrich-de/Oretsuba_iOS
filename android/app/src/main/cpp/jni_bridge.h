@@ -6,6 +6,7 @@
 
 #include <string>
 
+#include "mining/http_fetch.h"
 #include "mining/mining.h"
 #include "platform/platform.h"
 
@@ -35,5 +36,15 @@ int jni_http_send(const HttpRequest &request, std::string &answer);
 // Native.ankiDroid: one request to AnkiDroid on this device, answered in JSON
 // (AnkiDroid.kt, the AnkiAppHost::ankidroid of mining/anki_app.h).
 std::string jni_ankidroid(const std::string &method, const std::string &json);
+// Native.kitFetch: one request of the mining kit (the HttpFetch of mining/http_fetch.h), with the
+// whole answer, its type and where it came from, into a file when the request names one.
+void jni_kit_fetch(const FetchRequest &request, FetchAnswer &answer);
+// What Native.fetchStep is given while such a request runs: tells the request's progress on, and
+// answers whether the request is to go on.
+bool jni_fetch_step(jlong handle, jlong taken, jlong expected);
+// Native.encodeVoice: 16-bit stereo samples as AAC in an MPEG-4 file. Empty when the device cannot.
+std::string jni_encode_voice(const std::string &samples, int rate);
+// Native.kitEvent: what the mining kit tells without having been asked, from whatever thread it is on.
+void jni_kit_event(const char *name, const char *payload_json);
 
 }  // namespace ore
