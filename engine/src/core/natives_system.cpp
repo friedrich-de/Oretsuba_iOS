@@ -262,7 +262,7 @@ void register_system_natives(Engine &e) {
 	def(0x19, "open_dialog", [](Args &) { return 0; });
 
 	// ---- strings and helpers
-	def(0x39, "strcpy", [&e](Args &a) -> int32_t {
+	def(0x39, "strcpy", [](Args &a) -> int32_t {
 		std::string s = a.s(1);
 		a.out_str(0, s);
 		return int32_t(a.u(0));
