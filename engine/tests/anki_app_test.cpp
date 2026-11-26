@@ -600,6 +600,32 @@ void test_ankimobile() {
 		check(told.count() == 1, "and the first, given up for it, says nothing more");
 	}
 	{
+		// word of being in front again that comes late: after the next link was
+		// asked for and before it is opened, it is the end of the trip before
+		std::function<void(bool)> held;
+		AnkiAppHost slow;
+		slow.open_link = [&](const std::string &, std::function<void(bool)> done) { held = std::move(done); };
+		slow.take_answer = [] { return std::string(); };
+		Told told;
+		AnkiMobile mobile(slow, "oretsuba", told.tell(), quick);
+		check(mobile.add(lapis_note(), two_files(), card, left_out, problem), "a card is asked for, its link not opened yet");
+		AppReturns::shared().in_front();
+		std::this_thread::sleep_for(std::chrono::milliseconds(350));
+		check(told.count() == 0, "being in front before the link is opened settles nothing");
+		held(true);
+		AppReturns::shared().in_front();
+		check(told.wait(1) && told.at(0).first == "card.unconfirmed" && has(told.at(0).second, card.c_str()),
+		      "being in front after it was opened does");
+		check(mobile.ask_lists(problem), "the lists are asked for, their link not opened yet");
+		AppReturns::shared().in_front();
+		std::this_thread::sleep_for(std::chrono::milliseconds(350));
+		check(told.count() == 1, "the same holds for the lists");
+		held(true);
+		AppReturns::shared().in_front();
+		check(told.wait(2) && told.at(1).first == "anki.lists" && has(told.at(1).second, "\"ok\":false"),
+		      "and once their link was opened, coming back without an answer says so");
+	}
+	{
 		// the owner lets go while a card is on its way and timers run
 		PretendAnkiMobile anki;
 		anki.comes_back = false;

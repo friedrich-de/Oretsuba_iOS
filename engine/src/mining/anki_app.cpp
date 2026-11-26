@@ -750,8 +750,10 @@ struct AnkiMobile::State {
 	AnkiMobileHandover handover;
 
 	std::mutex mutex;
-	bool lists_asked = false;  // the question for the lists is out
-	uint64_t lists_round = 0;  // which question: an older one's timers find a newer number and stop
+	bool lists_asked = false;   // the question for the lists is out
+	bool lists_opened = false;  // and its link was opened: AnkiMobile has it
+	uint64_t lists_round = 0;   // which question: an older one's timers find a newer number and stop
+	std::string opened_card;    // the card whose link was opened last
 
 	// `tell` reaches into whoever owns this object, so nothing is told once the owner lets go.
 	std::recursive_mutex telling;
@@ -782,13 +784,17 @@ struct AnkiMobile::State {
 		if (link.empty()) {
 			// In front again. AnkiMobile's way back, when there is one, arrives
 			// about now; only when none has come after a while is the card given up.
+			// That counts only for what AnkiMobile was already handed: word of
+			// being in front can come late, after the next link was asked for and
+			// before it is opened, and then it is the end of the trip before.
 			std::string card = state->handover.card();
 			uint64_t round;
 			bool asked;
 			{
 				std::lock_guard<std::mutex> lock(state->mutex);
-				asked = state->lists_asked;
+				asked = state->lists_asked && state->lists_opened;
 				round = state->lists_round;
+				if (card != state->opened_card) card.clear();
 			}
 			if (card.empty() && !asked) return;
 			std::thread([state, card, asked, round] {
@@ -878,10 +884,15 @@ bool AnkiMobile::ask_lists(std::string &problem) {
 	{
 		std::lock_guard<std::mutex> lock(state->mutex);
 		state->lists_asked = true;
+		state->lists_opened = false;
 		round = ++state->lists_round;
 	}
 	state->host.open_link(ankimobile_info_link(state->scheme + "://anki/lists"), [state, round](bool opened) {
-		if (opened) return;
+		if (opened) {
+			std::lock_guard<std::mutex> lock(state->mutex);
+			if (state->lists_round == round) state->lists_opened = true;
+			return;
+		}
 		{
 			std::lock_guard<std::mutex> lock(state->mutex);
 			if (!state->lists_asked || state->lists_round != round) return;
@@ -906,7 +917,12 @@ bool AnkiMobile::add(AnkiLinkNote note, std::vector<AnkiMobileHandover::File> fi
 	std::shared_ptr<State> state = state_;
 	std::string name = card;
 	state->host.open_link(prepared.link, [state, name](bool opened) {
-		if (opened || state->handover.card() != name) return;
+		if (opened) {
+			std::lock_guard<std::mutex> lock(state->mutex);
+			state->opened_card = name;
+			return;
+		}
+		if (state->handover.card() != name) return;
 		AnkiMobileHandover::Result result = state->handover.gave_up();
 		if (result.kind == AnkiMobileHandover::Result::Unconfirmed && result.card == name) state->say_unconfirmed(name, kNotThere);
 	});

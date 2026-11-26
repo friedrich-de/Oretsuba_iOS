@@ -63,6 +63,9 @@ void open_link(const std::string &link, std::function<void(bool opened)> done) {
 		watch_app();
 		UIApplication *app = [UIApplication sharedApplication];
 		end_task();
+		// A new trip begins here. Word of the last one's end may still be on its
+		// way (a card handed over the moment the app is back): it is not this trip's.
+		g_away = false;
 		g_task = [app beginBackgroundTaskWithName:@"A card for AnkiMobile"
 		                        expirationHandler:^{
 			                        end_task();
